@@ -1,3 +1,4 @@
+from app.utils.stock import SUCURSALES, stock_en, minimo_en
 from fastapi import APIRouter, Depends
 from app.database import get_db
 from app.utils.auth import get_current_user
@@ -20,10 +21,8 @@ async def get_dashboard(current_user: dict = Depends(get_current_user)):
     reparaciones_activas = await db.reparaciones.count_documents({
         "estado": {"$in": ["en_diagnostico", "ingresada", "en_reparacion", "lista"]}
     })
-    stock_bajo = await db.productos.count_documents({
-        "$expr": {"$lt": ["$stock_actual", "$stock_minimo"]},
-        "activo": True
-    })
+    productos_activos = await db.productos.find({"activo": True}).to_list(2000)
+    stock_bajo = len(_faltantes(productos_activos))
     total_clientes = await db.clientes.count_documents({"activo": True})
     return {
         "ventas_hoy": len(ventas_hoy),
@@ -296,28 +295,28 @@ async def get_reparaciones_report(current_user: dict = Depends(get_current_user)
         "total_canceladas": total_canceladas,
     }
 
+def _faltantes(productos):
+    """Filas (producto, variante, sucursal) que están por debajo del mínimo de esa sucursal."""
+    filas = []
+    for p in productos:
+        unidades = p.get("variantes", []) if p.get("tiene_variantes") else [p]
+        for u in unidades:
+            for suc in SUCURSALES:
+                actual, minimo = stock_en(u, suc), minimo_en(u, suc)
+                if actual < minimo:
+                    filas.append({
+                        "nombre": p["nombre"],
+                        "variante": u["nombre"] if p.get("tiene_variantes") else None,
+                        "sucursal": suc,
+                        "stock_actual": actual,
+                        "stock_minimo": minimo,
+                    })
+    return filas
+
+
 @router.get("/stock-bajo")
 async def get_stock_bajo(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
     productos = await db.productos.find({"activo": True}).to_list(1000)
-    resultado = []
-    for p in productos:
-        if p.get("tiene_variantes"):
-            for v in p.get("variantes", []):
-                if v.get("stock_actual", 0) < v.get("stock_minimo", 0):
-                    resultado.append({
-                        "nombre": p["nombre"],
-                        "variante": v["nombre"],
-                        "stock_actual": v.get("stock_actual", 0),
-                        "stock_minimo": v.get("stock_minimo", 0),
-                    })
-        else:
-            if p.get("stock_actual", 0) < p.get("stock_minimo", 0):
-                resultado.append({
-                    "nombre": p["nombre"],
-                    "variante": None,
-                    "stock_actual": p.get("stock_actual", 0),
-                    "stock_minimo": p.get("stock_minimo", 0),
-                })
-    return resultado
+    return _faltantes(productos)

@@ -6,6 +6,8 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
 from app.utils.logger import registrar_auditoria
+from app.utils.stock import stock_en, aplicar_delta
+from app.utils.cajas import exigir_caja_propia, exigir_dueno_o_admin
 from app.utils.idempotencia import resultado_previo, reclamar_clave, guardar_resultado, liberar_clave
 from app.utils.pagos import (
     METODOS_VALIDOS,
@@ -77,16 +79,10 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
     if porcentaje < 0 or porcentaje > 100:
         raise HTTPException(status_code=400, detail="El porcentaje debe estar entre 0 y 100")
 
-    # Toda venta se registra dentro de una caja abierta de la sucursal
-    sucursales_usuario = current_user.get("sucursales") or []
-    if sucursales_usuario and sale.sucursal not in sucursales_usuario:
-        raise HTTPException(status_code=403, detail="No tenés acceso a esa sucursal")
-    caja_cobro = await db.cajas.find_one({"estado": "abierta", "sucursal": sale.sucursal})
-    if not caja_cobro:
-        raise HTTPException(
-            status_code=400,
-            detail="Para registrar ventas hace falta una caja abierta en la sucursal. Abrí la caja y volvé a intentar.",
-        )
+    # Toda venta se registra en la caja del usuario que vende, y esa caja
+    # define la sucursal: de ahí sale el stock y ahí entra el dinero.
+    caja_cobro = await exigir_caja_propia(db, current_user, "registrar ventas")
+    sucursal = caja_cobro["sucursal"]
 
     # 2. Tomar precios y nombres de la base de datos (nunca del frontend)
     #    y validar el stock ANTES de escribir nada
@@ -118,11 +114,11 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
             if not variante:
                 raise HTTPException(status_code=404, detail=f"Variante '{item.variante_nombre}' no encontrada")
             precio = variante.get("precio_venta", 0)
-            stock = variante.get("stock_actual", 0)
+            stock = stock_en(variante, sucursal)
             nombre = f"{producto['nombre']} — {item.variante_nombre}"
         else:
             precio = producto.get("precio_venta", 0) or 0
-            stock = producto.get("stock_actual", 0)
+            stock = stock_en(producto, sucursal)
             nombre = producto["nombre"]
 
         clave = (item.producto_id, item.variante_nombre)
@@ -239,7 +235,7 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
     try:
         return await _registrar_venta(
             db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
-            interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro,
+            interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal,
         )
     except Exception:
         await liberar_clave(db, sale.clave_idempotencia, "venta")
@@ -247,7 +243,7 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
 
 
 async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
-                           interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro):
+                           interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal):
     numero = await get_next_number(db, "ventas", "V-")
     new_sale = {
         "cliente_id": sale.cliente_id,
@@ -262,7 +258,8 @@ async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porc
         "pagos": pagos_venta,
         "vuelto": vuelto,
         "cotizacion_usd": cotizacion,
-        "sucursal": sale.sucursal,
+        "sucursal": sucursal,
+        "caja_id": str(caja_cobro["_id"]),
         "notas": sale.notas,
         "numero_venta": numero,
         "estado": "completada",
@@ -287,21 +284,13 @@ async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porc
             "variante_nombre": item["variante_nombre"],
             "tipo": "salida",
             "cantidad": item["cantidad"],
+            "sucursal": sucursal,
             "motivo": "venta",
             "referencia_id": str(result.inserted_id),
             "usuario_id": current_user["user_id"],
             "fecha": datetime.utcnow(),
         })
-        if item["variante_nombre"]:
-            await db.productos.update_one(
-                {"_id": ObjectId(item["producto_id"]), "variantes.nombre": item["variante_nombre"]},
-                {"$inc": {"variantes.$.stock_actual": -item["cantidad"]}},
-            )
-        else:
-            await db.productos.update_one(
-                {"_id": ObjectId(item["producto_id"])},
-                {"$inc": {"stock_actual": -item["cantidad"]}},
-            )
+        await aplicar_delta(db, item["producto_id"], item["variante_nombre"], sucursal, -item["cantidad"])
 
     await registrar_auditoria(
         db=db,
@@ -332,18 +321,19 @@ async def cancel_sale(sale_id: str, current_user: dict = Depends(get_current_use
     if sale["estado"] == "cancelada":
         raise HTTPException(status_code=400, detail="La venta ya está cancelada")
 
-    # La devolución del dinero se registra en la caja abierta de hoy
-    sucursal = current_user["sucursales"][0]
-    caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
+    # La devolución del dinero se registra en la caja abierta de la sucursal
+    # de la venta. La cancela quien abrió esa caja o un administrador.
+    caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sale.get("sucursal")})
     if not caja:
         raise HTTPException(
             status_code=400,
-            detail="Para cancelar una venta hace falta una caja abierta, donde se registra la devolución del dinero.",
+            detail="Para cancelar una venta hace falta que la caja de su sucursal esté abierta, donde se registra la devolución del dinero.",
         )
+    exigir_dueno_o_admin(caja, current_user, "cancelar ventas de")
 
     # Solo se pueden cancelar ventas de la caja abierta: las de cajas ya
     # cerradas quedaron incluidas en un cierre y no se pueden modificar.
-    if sale.get("sucursal") != caja.get("sucursal") or sale["fecha"] < caja["fecha_apertura"]:
+    if sale["fecha"] < caja["fecha_apertura"]:
         raise HTTPException(
             status_code=400,
             detail="Esta venta corresponde a una caja anterior (ya cerrada), por eso no se puede cancelar.",
@@ -371,21 +361,13 @@ async def cancel_sale(sale_id: str, current_user: dict = Depends(get_current_use
             "variante_nombre": variante,
             "tipo": "entrada",
             "cantidad": item["cantidad"],
+            "sucursal": sale.get("sucursal", "sucursal_1"),
             "motivo": "cancelacion_venta",
             "referencia_id": sale_id,
             "usuario_id": current_user["user_id"],
             "fecha": datetime.utcnow(),
         })
-        if variante:
-            await db.productos.update_one(
-                {"_id": ObjectId(item["producto_id"]), "variantes.nombre": variante},
-                {"$inc": {"variantes.$.stock_actual": item["cantidad"]}},
-            )
-        else:
-            await db.productos.update_one(
-                {"_id": ObjectId(item["producto_id"])},
-                {"$inc": {"stock_actual": item["cantidad"]}},
-            )
+        await aplicar_delta(db, item["producto_id"], variante, sale.get("sucursal", "sucursal_1"), item["cantidad"])
 
     # Devolver el dinero por el mismo medio con el que se cobró: lo cobrado
     # en dólares se descuenta del esperado en dólares. Si hubo vuelto en

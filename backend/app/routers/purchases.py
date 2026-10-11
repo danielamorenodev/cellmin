@@ -6,6 +6,7 @@ from app.utils.logger import registrar_auditoria
 from bson import ObjectId
 from datetime import datetime
 from app.models.purchase import PurchaseCreate
+from app.utils.stock import validar_sucursal, stock_en, aplicar_delta
 
 
 router = APIRouter()
@@ -41,6 +42,7 @@ async def get_purchase(purchase_id: str, current_user: dict = Depends(get_curren
 async def create_purchase(purchase: PurchaseCreate, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
+    validar_sucursal(purchase.sucursal)
     numero = await get_next_number(db, "compras", "C-")
     new_purchase = {
         **purchase.dict(),
@@ -56,26 +58,13 @@ async def create_purchase(purchase: PurchaseCreate, current_user: dict = Depends
             "variante_nombre": item.variante_nombre,
             "tipo": "entrada",
             "cantidad": item.cantidad,
+            "sucursal": purchase.sucursal,
             "motivo": "compra",
             "referencia_id": str(result.inserted_id),
             "usuario_id": current_user["user_id"],
             "fecha": datetime.utcnow()
         })
-        if item.variante_nombre:
-            producto = await db.productos.find_one({"_id": ObjectId(item.producto_id)})
-            variantes = producto.get("variantes", [])
-            for v in variantes:
-                if v["nombre"] == item.variante_nombre:
-                    v["stock_actual"] = v.get("stock_actual", 0) + item.cantidad
-            await db.productos.update_one(
-                {"_id": ObjectId(item.producto_id)},
-                {"$set": {"variantes": variantes}}
-            )
-        else:
-            await db.productos.update_one(
-                {"_id": ObjectId(item.producto_id)},
-                {"$inc": {"stock_actual": item.cantidad}}
-            )
+        await aplicar_delta(db, item.producto_id, item.variante_nombre, purchase.sucursal, item.cantidad)
     return {"message": "Compra registrada", "numero_compra": numero, "id": str(result.inserted_id)}
 
 @router.put("/{purchase_id}/cancelar")
@@ -89,6 +78,8 @@ async def cancel_purchase(purchase_id: str, current_user: dict = Depends(get_cur
     if compra.get("estado", "completada") == "cancelada":
         raise HTTPException(status_code=400, detail="La compra ya está cancelada")
 
+    sucursal = compra.get("sucursal", "sucursal_1")
+
     # Primero verificamos que haya stock suficiente para revertir todos los ítems
     for item in compra.get("items", []):
         producto = await db.productos.find_one({"_id": ObjectId(item["producto_id"])})
@@ -99,32 +90,24 @@ async def cancel_purchase(purchase_id: str, current_user: dict = Depends(get_cur
                 (v for v in producto.get("variantes", []) if v["nombre"] == item["variante_nombre"]),
                 None,
             )
-            stock_actual = variante.get("stock_actual", 0) if variante else 0
+            stock_actual = stock_en(variante, sucursal) if variante else 0
         else:
-            stock_actual = producto.get("stock_actual", 0)
+            stock_actual = stock_en(producto, sucursal)
         if stock_actual < item["cantidad"]:
             raise HTTPException(
                 status_code=400,
-                detail=f"No hay stock suficiente para revertir '{item['nombre_producto']}'. Stock actual: {stock_actual}, a restar: {item['cantidad']}",
+                detail=f"No hay stock suficiente en la sucursal para revertir '{item['nombre_producto']}'. Stock actual: {stock_actual}, a restar: {item['cantidad']}",
             )
 
     # Si todo está bien, restamos el stock y registramos los movimientos
     for item in compra.get("items", []):
-        if item.get("variante_nombre"):
-            await db.productos.update_one(
-                {"_id": ObjectId(item["producto_id"]), "variantes.nombre": item["variante_nombre"]},
-                {"$inc": {"variantes.$.stock_actual": -item["cantidad"]}},
-            )
-        else:
-            await db.productos.update_one(
-                {"_id": ObjectId(item["producto_id"])},
-                {"$inc": {"stock_actual": -item["cantidad"]}},
-            )
+        await aplicar_delta(db, item["producto_id"], item.get("variante_nombre"), sucursal, -item["cantidad"])
         await db.stock_movimientos.insert_one({
             "producto_id": item["producto_id"],
             "variante_nombre": item.get("variante_nombre"),
             "tipo": "salida",
             "cantidad": item["cantidad"],
+            "sucursal": sucursal,
             "motivo": "cancelacion_compra",
             "referencia_id": purchase_id,
             "notas": f"Cancelación de compra {compra.get('numero_compra', '')}",

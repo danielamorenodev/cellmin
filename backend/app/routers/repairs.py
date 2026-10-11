@@ -6,6 +6,8 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime, timedelta
 from app.utils.logger import registrar_auditoria
+from app.utils.cajas import caja_propia, puede_sucursal
+from app.utils.stock import validar_sucursal
 from app.utils.pagos import (
     METODOS_VALIDOS,
     USD,
@@ -112,8 +114,8 @@ def validar_bloqueo(equipo: dict) -> dict:
 
 
 async def caja_abierta_del_usuario(db, current_user):
-    sucursal = current_user["sucursales"][0]
-    return await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
+    """La caja que abrió el usuario: solo en ella puede registrar cobros."""
+    return await caja_propia(db, current_user)
 
 
 @router.get("/")
@@ -151,6 +153,14 @@ async def create_repair(repair: RepairCreate, current_user: dict = Depends(get_c
     data = repair.dict()
     sena = data.pop("sena", None)
     data["equipo"] = validar_bloqueo(data["equipo"])
+    # La orden queda en la sucursal de la caja del usuario (si tiene una abierta)
+    mi_caja = await caja_propia(db, current_user)
+    if mi_caja:
+        data["sucursal"] = mi_caja["sucursal"]
+    else:
+        validar_sucursal(data["sucursal"])
+        if not puede_sucursal(current_user, data["sucursal"]):
+            raise HTTPException(status_code=403, detail="No tenés acceso a esa sucursal")
     precio_total = sum(t["precio"] for t in data["tipos_reparacion"])
 
     # Validar la seña ANTES de crear nada
@@ -273,10 +283,9 @@ async def add_payment(repair_id: str, pago: Pago, current_user: dict = Depends(g
     db = get_db()
 
     # Verificar caja abierta
-    sucursal = current_user["sucursales"][0]
-    caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
+    caja = await caja_propia(db, current_user)
     if not caja:
-        raise HTTPException(status_code=400, detail="Debe haber una caja abierta para registrar el cobro")
+        raise HTTPException(status_code=400, detail="Para registrar el cobro necesitás tener tu caja abierta")
 
     if not ObjectId.is_valid(repair_id):
         raise HTTPException(status_code=404, detail="Reparación no encontrada")

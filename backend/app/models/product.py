@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 
 class Variante(BaseModel):
@@ -10,6 +10,9 @@ class Variante(BaseModel):
     precio_venta: float
     stock_actual: int = 0
     stock_minimo: int = 0
+    # Stock y mínimo de cada sucursal: {"sucursal_1": 5, "sucursal_2": 0}
+    stock_sucursal: Optional[Dict[str, int]] = None
+    stock_minimo_sucursal: Optional[Dict[str, int]] = None
 
 class ProductCreate(BaseModel):
     nombre: str
@@ -23,6 +26,8 @@ class ProductCreate(BaseModel):
     precio_venta: Optional[float] = None
     stock_actual: Optional[int] = 0
     stock_minimo: Optional[int] = 0
+    stock_sucursal: Optional[Dict[str, int]] = None
+    stock_minimo_sucursal: Optional[Dict[str, int]] = None
     activo: bool = True
 
 class ProductUpdate(BaseModel):
@@ -36,6 +41,7 @@ class ProductUpdate(BaseModel):
     precio_costo: Optional[float] = None
     precio_venta: Optional[float] = None
     stock_minimo: Optional[int] = None
+    stock_minimo_sucursal: Optional[Dict[str, int]] = None
     activo: Optional[bool] = None
 
 class ProductResponse(BaseModel):

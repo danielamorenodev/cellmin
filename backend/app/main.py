@@ -18,6 +18,9 @@ from app.utils.logger import log_accesos, log_errores
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
+    from app.database import get_db
+    from app.utils.stock import migrar_stock_por_sucursal
+    await migrar_stock_por_sucursal(get_db())
     yield
     await close_db()
 

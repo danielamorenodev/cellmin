@@ -6,6 +6,8 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
 from app.utils.logger import registrar_auditoria
+from app.utils.cajas import caja_propia, exigir_caja_propia, exigir_dueno_o_admin, es_admin, puede_sucursal, dia_local, nombre_sucursal
+from app.utils.stock import validar_sucursal
 from app.utils.pagos import USD, cotizacion_para_cobro, pagos_de_venta, redondear
 
 router = APIRouter()
@@ -51,14 +53,9 @@ def calcular_esperado(caja: dict, ventas: list) -> dict:
     }
 
 
-@router.get("/actual")
-async def get_current_cash(current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "caja:read")
-    db = get_db()
-    sucursal = current_user["sucursales"][0]
-    caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
-    if not caja:
-        return {"estado": "cerrada"}
+async def detalle_caja(db, caja, usuario=None):
+    """Detalle completo de una caja (movimientos, esperados por medio de pago)."""
+    sucursal = caja["sucursal"]
 
     # Ventas del día
     ventas = await db.ventas.find({
@@ -106,6 +103,9 @@ async def get_current_cash(current_user: dict = Depends(get_current_user)):
     movimientos_completos.sort(key=lambda x: x["fecha"])
 
     esperado = calcular_esperado(caja, ventas)
+    duenio = await db.usuarios.find_one({"_id": ObjectId(caja["usuario_apertura_id"])}) if ObjectId.is_valid(caja.get("usuario_apertura_id", "")) else None
+    caja["usuario_apertura_nombre"] = duenio.get("nombre") if duenio else None
+    caja["es_mia"] = bool(usuario) and caja.get("usuario_apertura_id") == usuario["user_id"]
     caja["id"] = str(caja["_id"])
     caja["total_ventas_hoy"] = total_ventas_hoy
     caja["esperado_por_metodo"] = esperado["esperado_por_metodo"]
@@ -115,6 +115,50 @@ async def get_current_cash(current_user: dict = Depends(get_current_user)):
     caja["movimientos_completos"] = movimientos_completos
     del caja["_id"]
     return caja
+
+
+
+@router.get("/actual")
+async def get_current_cash(current_user: dict = Depends(get_current_user)):
+    """Mi caja: la que abrí yo (cada usuario puede tener una sola abierta)."""
+    check_permission(current_user["role"], "caja:read")
+    db = get_db()
+    caja = await caja_propia(db, current_user)
+    if not caja:
+        return {"estado": "cerrada"}
+    return await detalle_caja(db, caja, current_user)
+
+
+@router.get("/abiertas")
+async def get_open_cashes(current_user: dict = Depends(get_current_user)):
+    """Cajas abiertas ahora. El administrador ve todas; el resto, las de sus sucursales."""
+    check_permission(current_user["role"], "caja:read")
+    db = get_db()
+    cajas = await db.cajas.find({"estado": "abierta"}).sort("fecha_apertura", 1).to_list(50)
+    resultado = []
+    for caja in cajas:
+        if not puede_sucursal(current_user, caja["sucursal"]):
+            continue
+        d = await detalle_caja(db, caja, current_user)
+        d.pop("movimientos_completos", None)
+        d.pop("movimientos", None)
+        resultado.append(d)
+    return resultado
+
+
+@router.get("/detalle/{caja_id}")
+async def get_cash_detail(caja_id: str, current_user: dict = Depends(get_current_user)):
+    check_permission(current_user["role"], "caja:read")
+    db = get_db()
+    if not ObjectId.is_valid(caja_id):
+        raise HTTPException(status_code=404, detail="Caja no encontrada")
+    caja = await db.cajas.find_one({"_id": ObjectId(caja_id), "estado": "abierta"})
+    if not caja:
+        raise HTTPException(status_code=404, detail="La caja no existe o ya fue cerrada")
+    if not puede_sucursal(current_user, caja["sucursal"]):
+        raise HTTPException(status_code=403, detail="No tenés acceso a esa sucursal")
+    return await detalle_caja(db, caja, current_user)
+
 
 async def esperado_de_apertura(db, sucursal: str):
     """Efectivo que la última caja cerrada de la sucursal dejó para hoy (o None)."""
@@ -135,7 +179,7 @@ async def esperado_de_apertura(db, sucursal: str):
 async def get_expected_opening(sucursal: str = None, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "caja:read")
     db = get_db()
-    sucursal = sucursal or current_user["sucursales"][0]
+    sucursal = sucursal or (current_user.get("sucursales") or ["sucursal_1"])[0]
     dato = await esperado_de_apertura(db, sucursal)
     return dato or {"esperado": None, "caja_id": None, "fecha_cierre": None}
 
@@ -144,12 +188,34 @@ async def get_expected_opening(sucursal: str = None, current_user: dict = Depend
 async def open_cash(data: CashOpen, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "caja:open")
     db = get_db()
-    sucursal = data.sucursal
+    sucursal = validar_sucursal(data.sucursal)
+    if not puede_sucursal(current_user, sucursal):
+        raise HTTPException(status_code=403, detail="No tenés acceso a esa sucursal")
     if data.monto_inicial < 0:
         raise HTTPException(status_code=400, detail="El monto inicial no puede ser negativo")
+
+    # Un usuario no puede tener dos cajas abiertas al mismo tiempo
+    propia = await caja_propia(db, current_user)
+    if propia:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Ya tenés una caja abierta en {nombre_sucursal(propia['sucursal'])}. Cerrala antes de abrir otra.",
+        )
+    # Cada sucursal tiene su caja: una sola abierta a la vez...
     caja_abierta = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
     if caja_abierta:
-        raise HTTPException(status_code=400, detail="Ya hay una caja abierta en esta sucursal")
+        raise HTTPException(
+            status_code=400,
+            detail=f"{nombre_sucursal(sucursal)} ya tiene una caja abierta. Hay que cerrarla antes de abrir otra.",
+        )
+    # ...y se abre una caja por día
+    hoy = dia_local()
+    del_dia = await db.cajas.find_one({"sucursal": sucursal, "dia": hoy})
+    if del_dia:
+        raise HTTPException(
+            status_code=400,
+            detail=f"La caja de hoy de {nombre_sucursal(sucursal)} ya se abrió y se cerró. Se abre una caja por día.",
+        )
 
     # Comparar con lo que quedó en la caja anterior
     previo = await esperado_de_apertura(db, sucursal)
@@ -159,6 +225,7 @@ async def open_cash(data: CashOpen, current_user: dict = Depends(get_current_use
     new_caja = {
         "estado": "abierta",
         "sucursal": sucursal,
+        "dia": hoy,
         "monto_inicial": data.monto_inicial,
         "monto_esperado_apertura": esperado,
         "diferencia_apertura": diferencia_apertura,
@@ -187,10 +254,7 @@ async def open_cash(data: CashOpen, current_user: dict = Depends(get_current_use
 async def add_movement(data: CashMovement, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "caja:open")
     db = get_db()
-    sucursal = current_user["sucursales"][0]
-    caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
-    if not caja:
-        raise HTTPException(status_code=400, detail="No hay caja abierta en tu sucursal")
+    caja = await exigir_caja_propia(db, current_user, "registrar movimientos")
     movimiento = {
         "tipo": data.tipo,
         "monto": data.monto,
@@ -210,10 +274,17 @@ async def add_movement(data: CashMovement, current_user: dict = Depends(get_curr
 async def close_cash(data: CashClose, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "caja:close")
     db = get_db()
-    sucursal = current_user["sucursales"][0]
-    caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
+    if data.caja_id:
+        # El administrador puede cerrar cualquier caja abierta (p. ej. una olvidada)
+        if not ObjectId.is_valid(data.caja_id):
+            raise HTTPException(status_code=404, detail="Caja no encontrada")
+        caja = await db.cajas.find_one({"_id": ObjectId(data.caja_id), "estado": "abierta"})
+    else:
+        caja = await caja_propia(db, current_user)
     if not caja:
-        raise HTTPException(status_code=400, detail="No hay caja abierta en tu sucursal")
+        raise HTTPException(status_code=400, detail="No tenés una caja abierta para cerrar")
+    exigir_dueno_o_admin(caja, current_user, "cerrar")
+    sucursal = caja["sucursal"]
 
     ventas = await db.ventas.find({
         "estado": {"$in": ["completada", "cancelada"]},

@@ -5,6 +5,7 @@ from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
+from app.utils.stock import completar, stock_en, minimo_en, validar_sucursal, aplicar_delta, SUCURSALES
 
 router = APIRouter()
 
@@ -22,18 +23,29 @@ async def get_stock_productos(current_user: dict = Depends(get_current_user)):
     products = await db.productos.find({"activo": True}).to_list(1000)
     result = []
     for p in products:
+        p = completar(dict(p))
+        variantes = [completar(dict(v)) for v in p.get("variantes", [])]
+        tiene = p.get("tiene_variantes", False)
+        alerta_por = {
+            s: (
+                any(v["stock_sucursal"][s] < v["stock_minimo_sucursal"][s] for v in variantes)
+                if tiene
+                else p["stock_sucursal"][s] < p["stock_minimo_sucursal"][s]
+            )
+            for s in SUCURSALES
+        }
         result.append({
             "id": str(p["_id"]),
             "nombre": p["nombre"],
-            "tiene_variantes": p.get("tiene_variantes", False),
-            "variantes": p.get("variantes", []),
-            "stock_actual": p.get("stock_actual", 0),
-            "stock_minimo": p.get("stock_minimo", 0),
-            "alerta": (
-                any(v.get("stock_actual", 0) < v.get("stock_minimo", 0) for v in p.get("variantes", []))
-                if p.get("tiene_variantes", False)
-                else p.get("stock_actual", 0) < p.get("stock_minimo", 0)
-            )
+            "categoria_id": p.get("categoria_id"),
+            "tiene_variantes": tiene,
+            "variantes": variantes,
+            "stock_actual": p["stock_actual"],
+            "stock_minimo": p["stock_minimo"],
+            "stock_sucursal": p["stock_sucursal"],
+            "stock_minimo_sucursal": p["stock_minimo_sucursal"],
+            "alerta_sucursal": alerta_por,
+            "alerta": any(alerta_por.values()),
         })
     return result
 
@@ -41,6 +53,11 @@ async def get_stock_productos(current_user: dict = Depends(get_current_user)):
 async def create_movement(movement: StockMovement, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "stock:create")
     db = get_db()
+
+    # 0. La sucursal es obligatoria y el usuario tiene que tener acceso a ella
+    validar_sucursal(movement.sucursal)
+    if current_user["role"] != "administrador" and movement.sucursal not in current_user.get("sucursales", []):
+        raise HTTPException(status_code=403, detail="No tenés acceso a esa sucursal")
 
     # 1. Validar el tipo y la cantidad (el ajuste sí puede ser 0)
     if movement.tipo not in ("entrada", "salida", "ajuste"):
@@ -63,9 +80,9 @@ async def create_movement(movement: StockMovement, current_user: dict = Depends(
         )
         if not variante:
             raise HTTPException(status_code=404, detail="Variante no encontrada")
-        stock_actual = variante.get("stock_actual", 0)
+        stock_actual = stock_en(variante, movement.sucursal)
     else:
-        stock_actual = producto.get("stock_actual", 0)
+        stock_actual = stock_en(producto, movement.sucursal)
 
     # 3. Calcular el stock nuevo (una salida no puede dejarlo negativo)
     if movement.tipo == "entrada":
@@ -80,17 +97,8 @@ async def create_movement(movement: StockMovement, current_user: dict = Depends(
     else:  # ajuste: la cantidad es el stock final
         nuevo_stock = movement.cantidad
 
-    # 4. Actualizar el stock
-    if movement.variante_nombre:
-        await db.productos.update_one(
-            {"_id": ObjectId(movement.producto_id), "variantes.nombre": movement.variante_nombre},
-            {"$set": {"variantes.$.stock_actual": nuevo_stock}},
-        )
-    else:
-        await db.productos.update_one(
-            {"_id": ObjectId(movement.producto_id)},
-            {"$set": {"stock_actual": nuevo_stock}},
-        )
+    # 4. Actualizar el stock de esa sucursal (y el total)
+    await aplicar_delta(db, movement.producto_id, movement.variante_nombre, movement.sucursal, nuevo_stock - stock_actual)
 
     # 5. Recién ahora registrar el movimiento en el historial
     await db.stock_movimientos.insert_one({

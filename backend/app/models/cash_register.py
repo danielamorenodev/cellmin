@@ -23,6 +23,8 @@ class CashClose(BaseModel):
     # Efectivo que queda en la caja para el día siguiente (será el monto
     # inicial esperado de la próxima apertura). El resto se retira.
     dejar_en_caja: float = 0
+    # Solo el administrador: cerrar una caja que abrió otro usuario
+    caja_id: Optional[str] = None
     notas: Optional[str] = None
 
 class CashResponse(BaseModel):

@@ -14,6 +14,7 @@ class PurchaseCreate(BaseModel):
     proveedor_id: str
     items: List[PurchaseItem]
     total: float
+    sucursal: str = "sucursal_1"  # sucursal que recibe la mercadería
     numero_remito: Optional[str] = None
     notas: Optional[str] = None
 

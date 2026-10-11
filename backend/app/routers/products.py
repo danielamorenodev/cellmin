@@ -5,10 +5,28 @@ from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
+from app.utils.stock import completar, mapa, SUCURSALES
 
 router = APIRouter()
 
+def _con_stock(p):
+    """Producto con el stock por sucursal completo (también los datos viejos)."""
+    p = completar(dict(p))
+    p["variantes"] = [completar(dict(v)) for v in p.get("variantes", [])]
+    return p
+
+
+def _validar_mapas(item, etiqueta):
+    for campo in ("stock_sucursal", "stock_minimo_sucursal"):
+        for suc, valor in (item.get(campo) or {}).items():
+            if suc not in SUCURSALES:
+                raise HTTPException(status_code=400, detail="Sucursal inválida")
+            if valor < 0:
+                raise HTTPException(status_code=400, detail=f"{etiqueta}: el stock no puede ser negativo")
+
+
 def format_product(p):
+    p = _con_stock(p)
     return {
         "id": str(p["_id"]),
         "nombre": p["nombre"],
@@ -22,6 +40,8 @@ def format_product(p):
         "precio_venta": p.get("precio_venta"),
         "stock_actual": p.get("stock_actual", 0),
         "stock_minimo": p.get("stock_minimo", 0),
+        "stock_sucursal": p["stock_sucursal"],
+        "stock_minimo_sucursal": p["stock_minimo_sucursal"],
         "activo": p.get("activo", True),
         "fecha_creacion": p.get("fecha_creacion")
     }
@@ -50,8 +70,17 @@ async def create_product(product: ProductCreate, current_user: dict = Depends(ge
     existing = await db.productos.find_one({"nombre": {"$regex": f"^{product.nombre}$", "$options": "i"}})
     if existing:
         raise HTTPException(status_code=400, detail=f"Ya existe un producto con el nombre '{product.nombre}'")
+    datos = product.dict()
+    _validar_mapas(datos, "Producto")
+    for v in datos["variantes"]:
+        _validar_mapas(v, f"Variante '{v['nombre']}'")
+    if datos["tiene_variantes"]:
+        datos["stock_sucursal"] = mapa()
+        datos["stock_minimo_sucursal"] = mapa()
+    datos = completar(datos)
+    datos["variantes"] = [completar(v) for v in datos["variantes"]]
     new_product = {
-        **product.dict(),
+        **datos,
         "fecha_creacion": datetime.utcnow()
     }
     result = await db.productos.insert_one(new_product)
@@ -70,6 +99,30 @@ async def update_product(product_id: str, product: ProductUpdate, current_user: 
         if existing:
             raise HTTPException(status_code=400, detail=f"Ya existe un producto con el nombre '{product.nombre}'")
     update_data = {k: v for k, v in product.dict().items() if v is not None}
+    actual = await db.productos.find_one({"_id": ObjectId(product_id)})
+    if not actual:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    actual = _con_stock(actual)
+
+    # El stock se modifica solo con movimientos, compras y ventas. Desde acá
+    # se editan los mínimos; las variantes nuevas entran con su stock inicial.
+    if "stock_minimo_sucursal" in update_data:
+        _validar_mapas(update_data, "Producto")
+        update_data["stock_minimo_sucursal"] = mapa(update_data["stock_minimo_sucursal"])
+        update_data["stock_minimo"] = sum(update_data["stock_minimo_sucursal"].values())
+    elif "stock_minimo" in update_data:
+        update_data.pop("stock_minimo")  # el total se calcula con los mínimos de cada sucursal
+    if "variantes" in update_data:
+        previas = {v["nombre"]: v for v in actual.get("variantes", [])}
+        nuevas = []
+        for v in update_data["variantes"]:
+            _validar_mapas(v, f"Variante '{v['nombre']}'")
+            previa = previas.get(v["nombre"])
+            if previa:
+                v["stock_sucursal"] = previa["stock_sucursal"]
+                v["stock_actual"] = previa["stock_actual"]
+            nuevas.append(completar(v))
+        update_data["variantes"] = nuevas
     await db.productos.update_one({"_id": ObjectId(product_id)}, {"$set": update_data})
     updated = await db.productos.find_one({"_id": ObjectId(product_id)})
     return format_product(updated)
