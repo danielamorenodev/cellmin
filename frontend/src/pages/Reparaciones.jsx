@@ -8,8 +8,10 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  DollarSign,
   Edit,
   ExternalLink,
+  Eye,
   Filter,
   PenLine,
   Plus,
@@ -33,6 +35,7 @@ import {
 } from "../utils/helpers";
 import { cajaService } from "../services/caja.service";
 import { useAuth } from "../context/AuthContext";
+import { useSucursales } from "../hooks/useSucursales";
 import OrdenReparacion, { imprimirOrden } from "../components/ui/OrdenReparacion";
 import DetalleReparacion from "../components/ui/DetalleReparacion";
 import MenuAcciones from "../components/ui/MenuAcciones";
@@ -287,6 +290,9 @@ function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle }) {
 }
 
 function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
+  // La orden queda en la sucursal de la caja del usuario (el servidor lo define);
+  // si no tiene caja abierta, en su primera sucursal.
+  const { porDefecto: sucursalUsuario } = useSucursales();
   const [clientes, setClientes] = useState([]);
   const [tiposDisponibles, setTiposDisponibles] = useState([]);
   const [showNuevoCliente, setShowNuevoCliente] = useState(false);
@@ -303,7 +309,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
     },
     notas_internas: "",
     garantia_dias: 90,
-    sucursal: "sucursal_1",
+    sucursal: sucursalUsuario,
     estado: "en_diagnostico",
   });
   const [loading, setLoading] = useState(false);
@@ -1210,8 +1216,27 @@ function construirAcciones({
   onUpdate,
   onCancelar,
   onImprimir,
+  onVerDetalle,
+  puedeCobrar,
+  onCobrar,
 }) {
   return [
+    {
+      label: "Ver detalle",
+      icono: <Eye size={15} />,
+      onClick: () => onVerDetalle(reparacion),
+    },
+    {
+      label: "Abrir en pestaña nueva",
+      icono: <ExternalLink size={15} />,
+      onClick: () =>
+        window.open(`/reparaciones/${reparacion.id}`, "_blank", "noopener"),
+    },
+    puedeCobrar && {
+      label: "Cobrar",
+      icono: <DollarSign size={15} />,
+      onClick: onCobrar,
+    },
     reparacion.estado === "en_diagnostico" && {
       label: "Definir reparación",
       icono: <PenLine size={15} />,
@@ -1246,15 +1271,6 @@ function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir }) {
             Orden {reparacion.numero_orden}
           </h2>
           <div className="flex items-center gap-3">
-            <a
-              href={`/reparaciones/${reparacion.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
-            >
-              <ExternalLink size={14} />
-              Pestaña nueva
-            </a>
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition"
@@ -1316,60 +1332,56 @@ function FilaReparacion({
 
   const siguienteEstado = FLUJO_ESTADOS[reparacion.estado];
 
+  const puedeCobrar =
+    reparacion.precio_total > 0 &&
+    reparacion.saldo_pendiente > 0 &&
+    reparacion.estado !== "cancelada" &&
+    (cajaAbierta || userRol !== "tecnico");
+  const onCobrar = () => {
+    if (!cajaAbierta) {
+      toast.error("Para cobrar necesitás tener tu caja abierta");
+      return;
+    }
+    onPago(reparacion);
+  };
+
   return (
     <>
       <tr className="hover:bg-gray-50 transition-[background-color]">
-        <td className="px-6 py-4">
+        <td className="col-centro px-6 py-4">
           <button
             onClick={() => onVerDetalle(reparacion)}
             className="font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
           >
             {reparacion.numero_orden}
           </button>
-          <p className="text-xs text-gray-400">
-            {formatDateTime(reparacion.fecha_ingreso)}
-          </p>
+        </td>
+        <td className="col-centro px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+          {formatDateTime(reparacion.fecha_ingreso)}
         </td>
         <td className="px-6 py-4 text-sm text-gray-700">
           {cliente ? `${cliente.nombre} ${cliente.apellido || ""}` : "-"}
-          {cliente?.telefono && (
-            <p className="text-xs text-gray-400">{cliente.telefono}</p>
-          )}
         </td>
         <td className="px-6 py-4 text-sm text-gray-700">
-          <p className="font-medium">
-            {reparacion.equipo?.marca} {reparacion.equipo?.modelo}
-          </p>
-          {reparacion.equipo?.imei && (
-            <p className="text-xs text-gray-400">
-              IMEI: {reparacion.equipo.imei}
-            </p>
-          )}
+          {reparacion.equipo?.marca} {reparacion.equipo?.modelo}
         </td>
-        <td className="px-6 py-4">
+        <td className="col-centro px-6 py-4">
           <span
-            className={`px-2 py-1 rounded-lg text-xs font-medium ${estadoInfo.color}`}
+            className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${estadoInfo.color}`}
           >
             {estadoInfo.label}
           </span>
         </td>
-        <td className="px-6 py-4 text-sm">
+        <td className="col-num px-6 py-4 text-sm font-semibold text-gray-800">
           {reparacion.tipos_reparacion?.length > 0 ? (
-            <div>
-              {reparacion.tipos_reparacion.map((t, i) => (
-                <p key={i} className="text-xs text-gray-600">
-                  {t.nombre}
-                </p>
-              ))}
-              <p className="font-semibold text-gray-800 mt-1">
-                {formatCurrency(reparacion.precio_total || 0)}
-              </p>
-            </div>
+            formatCurrency(reparacion.precio_total || 0)
           ) : (
-            <span className="text-gray-400 text-xs">En diagnóstico</span>
+            <span className="text-gray-400 text-xs font-normal">
+              En diagnóstico
+            </span>
           )}
         </td>
-        <td className="px-6 py-4 text-sm">
+        <td className="col-num px-6 py-4 text-sm ">
           {reparacion.estado === "cancelada" ? (
             <span className="text-gray-400 text-xs">
               {reparacion.total_devuelto > 0
@@ -1388,35 +1400,8 @@ function FilaReparacion({
             "-"
           )}
         </td>
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-1 flex-wrap">
-            {reparacion.precio_total > 0 &&
-              reparacion.saldo_pendiente > 0 &&
-              cajaAbierta && (
-                <button
-                  onClick={() => onPago(reparacion)}
-                  className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition"
-                >
-                  Cobrar
-                </button>
-              )}
-            {reparacion.precio_total > 0 &&
-              reparacion.saldo_pendiente > 0 &&
-              !cajaAbierta &&
-              userRol !== "tecnico" && (
-                <span className="px-2 py-1 text-xs bg-gray-100 text-gray-400 rounded-lg cursor-not-allowed">
-                  Caja cerrada
-                </span>
-              )}
-            <a
-              href={`/reparaciones/${reparacion.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Ver detalle en pestaña nueva"
-              className="p-1 text-gray-400 hover:text-blue-600"
-            >
-              <ExternalLink size={16} />
-            </a>
+        <td className="col-acc px-6 py-4 ">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => setExpandido(!expandido)}
               className="p-1 text-gray-400 hover:text-gray-600"
@@ -1431,6 +1416,9 @@ function FilaReparacion({
                 onUpdate,
                 onCancelar,
                 onImprimir,
+                onVerDetalle,
+                puedeCobrar,
+                onCobrar,
               })}
             />
           </div>
@@ -1439,7 +1427,7 @@ function FilaReparacion({
 
       {expandido && (
         <tr>
-          <td colSpan={7} className="px-6 pb-4 bg-gray-50">
+          <td colSpan={8} className="px-6 pb-4 bg-gray-50">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div className="bg-white rounded-xl p-4 space-y-2">
                 <p className="text-sm font-semibold text-gray-700">
@@ -1572,6 +1560,19 @@ function CardReparacionMobile({
 
   const siguienteEstado = FLUJO_ESTADOS[reparacion.estado];
 
+  const puedeCobrar =
+    reparacion.precio_total > 0 &&
+    reparacion.saldo_pendiente > 0 &&
+    reparacion.estado !== "cancelada" &&
+    (cajaAbierta || userRol !== "tecnico");
+  const onCobrar = () => {
+    if (!cajaAbierta) {
+      toast.error("Para cobrar necesitás tener tu caja abierta");
+      return;
+    }
+    onPago(reparacion);
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       <div className="p-4">
@@ -1628,52 +1629,26 @@ function CardReparacionMobile({
           </p>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {reparacion.precio_total > 0 &&
-            reparacion.saldo_pendiente > 0 &&
-            cajaAbierta && (
-              <button
-                onClick={() => onPago(reparacion)}
-                className="px-3 py-1.5 text-xs bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition"
-              >
-                Cobrar
-              </button>
-            )}
-          {reparacion.precio_total > 0 &&
-            reparacion.saldo_pendiente > 0 &&
-            !cajaAbierta &&
-            userRol !== "tecnico" && (
-              <span className="px-3 py-1.5 text-xs bg-gray-100 text-gray-400 rounded-lg cursor-not-allowed">
-                Caja cerrada
-              </span>
-            )}
+        <div className="flex items-center justify-end gap-1">
           <button
             onClick={() => setExpandido(!expandido)}
-            className="px-3 py-1.5 text-xs bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition"
+            className="p-1 text-gray-400 hover:text-gray-600"
           >
-            {expandido ? "Ocultar" : "Ver más"}
+            {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
-          <a
-            href={`/reparaciones/${reparacion.id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Ver detalle en pestaña nueva"
-            className="p-1.5 text-gray-400 hover:text-blue-600"
-          >
-            <ExternalLink size={16} />
-          </a>
-          <div className="ml-auto">
-            <MenuAcciones
-              acciones={construirAcciones({
-                reparacion,
-                siguienteEstado,
-                onEditarTipos,
-                onUpdate,
-                onCancelar,
-                onImprimir,
-              })}
-            />
-          </div>
+          <MenuAcciones
+            acciones={construirAcciones({
+              reparacion,
+              siguienteEstado,
+              onEditarTipos,
+              onUpdate,
+              onCancelar,
+              onImprimir,
+              onVerDetalle,
+              puedeCobrar,
+              onCobrar,
+            })}
+          />
         </div>
       </div>
 
@@ -1884,6 +1859,23 @@ function GestionTiposReparacion() {
     }
   };
 
+  const accionesTipo = (tipo) => [
+    {
+      label: "Editar",
+      icono: <Edit size={15} />,
+      onClick: () => {
+        setSelected(tipo);
+        setShowModal(true);
+      },
+    },
+    {
+      label: tipo.activo ? "Desactivar" : "Activar",
+      icono: tipo.activo ? <Trash2 size={15} /> : <ToggleLeft size={15} />,
+      peligro: tipo.activo,
+      onClick: () => handleToggle(tipo),
+    },
+  ];
+
 
   const tabla = useTabla(filtered, {
     porPagina: 20,
@@ -1978,36 +1970,12 @@ function GestionTiposReparacion() {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {tipo.descripcion || "-"}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-gray-800">
+                    <td className="col-num px-6 py-4 text-sm font-semibold text-gray-800">
                       {formatCurrency(tipo.precio)}
                       <PrecioUSD pesos={tipo.precio} className="block" />
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setSelected(tipo);
-                            setShowModal(true);
-                          }}
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(tipo)}
-                          className={`p-1.5 rounded-lg transition ${
-                            tipo.activo
-                              ? "text-gray-500 hover:text-red-600 hover:bg-red-50"
-                              : "text-gray-500 hover:text-green-600 hover:bg-green-50"
-                          }`}
-                        >
-                          {tipo.activo ? (
-                            <Trash2 size={16} />
-                          ) : (
-                            <ToggleLeft size={16} />
-                          )}
-                        </button>
-                      </div>
+                    <td className="col-acc px-6 py-4 ">
+                      <MenuAcciones acciones={accionesTipo(tipo)} />
                     </td>
                   </tr>
                 ))}
@@ -2049,31 +2017,7 @@ function GestionTiposReparacion() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelected(tipo);
-                        setShowModal(true);
-                      }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleToggle(tipo)}
-                      className={`p-2 rounded-lg transition ${
-                        tipo.activo
-                          ? "text-red-600 hover:bg-red-50"
-                          : "text-green-600 hover:bg-green-50"
-                      }`}
-                    >
-                      {tipo.activo ? (
-                        <Trash2 size={16} />
-                      ) : (
-                        <ToggleLeft size={16} />
-                      )}
-                    </button>
-                  </div>
+                  <MenuAcciones acciones={accionesTipo(tipo)} />
                 </div>
               </div>
             ))}
@@ -2188,6 +2132,7 @@ export default function Reparaciones() {
     ordenInicial: { campo: "orden", dir: "desc" },
     accessors: {
       orden: (r) => r.numero_orden,
+      fecha: (r) => (r.fecha_ingreso ? new Date(r.fecha_ingreso).getTime() : null),
       cliente: nombreCliente,
       equipo: (r) => `${r.equipo?.marca || ""} ${r.equipo?.modelo || ""}`.trim(),
       estado: (r) => ordenEstados.indexOf(r.estado),
@@ -2367,6 +2312,9 @@ export default function Reparaciones() {
                       <ThOrdenable campo="orden" tabla={tabla}>
                         Orden
                       </ThOrdenable>
+                      <ThOrdenable campo="fecha" tabla={tabla}>
+                        Fecha
+                      </ThOrdenable>
                       <ThOrdenable campo="cliente" tabla={tabla}>
                         Cliente
                       </ThOrdenable>
@@ -2377,7 +2325,7 @@ export default function Reparaciones() {
                         Estado
                       </ThOrdenable>
                       <ThOrdenable campo="reparaciones" tabla={tabla}>
-                        Reparaciones
+                        Total
                       </ThOrdenable>
                       <ThOrdenable campo="saldo" tabla={tabla}>
                         Saldo

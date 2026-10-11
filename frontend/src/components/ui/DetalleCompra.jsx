@@ -1,4 +1,4 @@
-import { formatCurrency, formatDateTime } from "../../utils/helpers";
+import { formatCurrency, formatDateTime, nombreSucursal } from "../../utils/helpers";
 
 function Dato({ titulo, children }) {
   return (
@@ -16,7 +16,7 @@ export default function DetalleCompra({ compra, proveedor }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Dato titulo="Fecha">
           {compra.fecha ? formatDateTime(compra.fecha) : "-"}
         </Dato>
@@ -25,6 +25,9 @@ export default function DetalleCompra({ compra, proveedor }) {
           {proveedor?.telefono && (
             <p className="text-xs text-gray-400">{proveedor.telefono}</p>
           )}
+        </Dato>
+        <Dato titulo="Sucursal">
+          {nombreSucursal(compra.sucursal || "sucursal_1")}
         </Dato>
         <Dato titulo="Remito">{compra.numero_remito || "-"}</Dato>
         <Dato titulo="Estado">
@@ -48,7 +51,7 @@ export default function DetalleCompra({ compra, proveedor }) {
                 (t) => (
                   <th
                     key={t}
-                    className="text-center px-4 py-2 text-xs font-medium text-gray-500"
+                    className="px-4 py-2 text-xs font-medium text-gray-500"
                   >
                     {t}
                   </th>
@@ -59,19 +62,19 @@ export default function DetalleCompra({ compra, proveedor }) {
           <tbody className="divide-y divide-gray-100">
             {compra.items?.map((item, i) => (
               <tr key={i} className="bg-white">
-                <td className="px-4 py-2 text-center font-medium text-gray-700">
+                <td className="px-4 py-2 font-medium text-gray-700">
                   {item.nombre_producto}
                 </td>
-                <td className="px-4 py-2 text-center text-gray-500">
+                <td className="px-4 py-2 text-gray-500">
                   {item.variante_nombre || "-"}
                 </td>
-                <td className="px-4 py-2 text-center text-gray-600">
+                <td className="col-num px-4 py-2 text-gray-600">
                   {item.cantidad}
                 </td>
-                <td className="px-4 py-2 text-center text-gray-600">
+                <td className="col-num px-4 py-2 text-gray-600">
                   {formatCurrency(item.precio_unitario)}
                 </td>
-                <td className="px-4 py-2 text-center font-medium text-gray-700">
+                <td className="col-num px-4 py-2 font-medium text-gray-700">
                   {formatCurrency(item.subtotal)}
                 </td>
               </tr>

@@ -76,6 +76,22 @@ export const SUCURSALES = [
   { value: "sucursal_2", label: "Sucursal 2" },
 ];
 
+export const nombreSucursal = (valor) =>
+  SUCURSALES.find((s) => s.value === valor)?.label || valor || "-";
+
+// Stock / mínimo de un producto o variante en una sucursal.
+// Con sucursal vacía devuelve el total de todas las sucursales.
+export const stockEn = (item, sucursal) => {
+  if (!item) return 0;
+  if (!sucursal) return item.stock_actual ?? 0;
+  return item.stock_sucursal?.[sucursal] ?? 0;
+};
+export const minimoEn = (item, sucursal) => {
+  if (!item) return 0;
+  if (!sucursal) return item.stock_minimo ?? 0;
+  return item.stock_minimo_sucursal?.[sucursal] ?? 0;
+};
+
 export const formatInputMoneda = (valor) => {
   // Permitir solo números, punto y coma
   const limpio = valor.replace(/[^\d.,]/g, "");

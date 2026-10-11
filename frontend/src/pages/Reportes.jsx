@@ -8,7 +8,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import { reportesService } from "../services/reportes.service";
-import { formatCurrency } from "../utils/helpers";
+import { formatCurrency, nombreSucursal } from "../utils/helpers";
 import {
   BarChart,
   Bar,
@@ -450,16 +450,16 @@ export default function Reportes() {
                     <table className="w-full">
                       <thead className="bg-gray-50 border-t border-gray-100">
                         <tr>
-                          <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                             #
                           </th>
-                          <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                             Producto
                           </th>
-                          <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                             Cantidad
                           </th>
-                          <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                          <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                             Total vendido
                           </th>
                         </tr>
@@ -467,16 +467,16 @@ export default function Reportes() {
                       <tbody className="divide-y divide-gray-50">
                         {productosData.map((p, i) => (
                           <tr key={i} className="hover:bg-gray-50">
-                            <td className="px-6 py-3 text-sm text-gray-500">
+                            <td className="col-centro px-6 py-3 text-sm text-gray-500">
                               {i + 1}
                             </td>
                             <td className="px-6 py-3 text-sm font-medium text-gray-800">
                               {p.nombre}
                             </td>
-                            <td className="px-6 py-3 text-sm text-gray-600">
+                            <td className="col-num px-6 py-3 text-sm text-gray-600">
                               {p.cantidad_total}
                             </td>
-                            <td className="px-6 py-3 text-sm font-semibold text-gray-800">
+                            <td className="col-num px-6 py-3 text-sm font-semibold text-gray-800">
                               {formatCurrency(p.total_vendido)}
                             </td>
                           </tr>
@@ -589,41 +589,47 @@ export default function Reportes() {
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-100">
                       <tr>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                           Producto
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                           Variante
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                          Sucursal
+                        </th>
+                        <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                           Stock actual
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                           Stock mínimo
                         </th>
-                        <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                        <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                           Diferencia
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {stockBajoData.map((p, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
+                        <tr key={`${p.nombre}-${p.variante}-${p.sucursal}-${i}`} className="hover:bg-gray-50">
                           <td className="px-6 py-3 text-sm font-medium text-gray-800">
                             {p.nombre}
                           </td>
                           <td className="px-6 py-3 text-sm text-gray-600">
                             {p.variante || "-"}
                           </td>
-                          <td className="px-6 py-3">
+                          <td className="px-6 py-3 text-sm text-gray-600">
+                            {nombreSucursal(p.sucursal)}
+                          </td>
+                          <td className="col-num px-6 py-3 ">
                             <span className="px-2 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-medium">
                               {p.stock_actual}
                             </span>
                           </td>
-                          <td className="px-6 py-3 text-sm text-gray-600">
+                          <td className="col-num px-6 py-3 text-sm text-gray-600">
                             {p.stock_minimo}
                           </td>
-                          <td className="px-6 py-3 text-sm font-semibold text-red-600">
+                          <td className="col-num px-6 py-3 text-sm font-semibold text-red-600">
                             -{p.stock_minimo - p.stock_actual}
                           </td>
                         </tr>

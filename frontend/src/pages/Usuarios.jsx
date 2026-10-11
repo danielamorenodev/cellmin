@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { usuariosService } from "../services/usuarios.service";
 import toast from "react-hot-toast";
+import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
@@ -259,6 +260,23 @@ export default function Usuarios() {
     }
   };
 
+  const construirAcciones = (usuario) => [
+    {
+      label: "Editar",
+      icono: <Edit size={15} />,
+      onClick: () => {
+        setSelected(usuario);
+        setShowModal(true);
+      },
+    },
+    {
+      label: usuario.activo ? "Desactivar" : "Activar",
+      icono: usuario.activo ? <Trash2 size={15} /> : <UserCheck size={15} />,
+      onClick: () => handleToggleActivo(usuario),
+      peligro: !!usuario.activo,
+    },
+  ];
+
   const getRolInfo = (rol) =>
     ROLES.find((r) => r.value === rol) || {
       label: rol,
@@ -356,7 +374,7 @@ export default function Usuarios() {
                   <ThOrdenable campo="rol" tabla={tabla} className="px-6 py-3">Rol</ThOrdenable>
                   <ThOrdenable campo="sucursal" tabla={tabla} className="px-6 py-3">Sucursal</ThOrdenable>
                   <ThOrdenable campo="estado" tabla={tabla} className="px-6 py-3">Estado</ThOrdenable>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                     Acciones
                   </th>
                 </tr>
@@ -391,7 +409,7 @@ export default function Usuarios() {
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {usuario.email}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="col-centro px-6 py-4">
                         <span
                           className={`px-2 py-1 rounded-lg text-xs font-medium ${rolInfo.color}`}
                         >
@@ -405,7 +423,7 @@ export default function Usuarios() {
                             ? "Sucursal 1"
                             : "Sucursal 2"}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="col-centro px-6 py-4">
                         <span
                           className={`px-2 py-1 rounded-lg text-xs font-medium ${
                             usuario.activo
@@ -416,33 +434,8 @@ export default function Usuarios() {
                           {usuario.activo ? "Activo" : "Inactivo"}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => {
-                              setSelected(usuario);
-                              setShowModal(true);
-                            }}
-                            className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          >
-                            <Edit size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleToggleActivo(usuario)}
-                            className={`p-1.5 rounded-lg transition ${
-                              usuario.activo
-                                ? "text-gray-500 hover:text-red-600 hover:bg-red-50"
-                                : "text-gray-500 hover:text-green-600 hover:bg-green-50"
-                            }`}
-                            title={usuario.activo ? "Desactivar" : "Activar"}
-                          >
-                            {usuario.activo ? (
-                              <Trash2 size={16} />
-                            ) : (
-                              <UserCheck size={16} />
-                            )}
-                          </button>
-                        </div>
+                      <td className="col-acc px-6 py-4 ">
+                        <MenuAcciones acciones={construirAcciones(usuario)} />
                       </td>
                     </tr>
                   );
@@ -481,31 +474,7 @@ export default function Usuarios() {
                         <p className="text-xs text-gray-500">{usuario.email}</p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setSelected(usuario);
-                          setShowModal(true);
-                        }}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleToggleActivo(usuario)}
-                        className={`p-2 rounded-lg transition ${
-                          usuario.activo
-                            ? "text-red-600 hover:bg-red-50"
-                            : "text-green-600 hover:bg-green-50"
-                        }`}
-                      >
-                        {usuario.activo ? (
-                          <Trash2 size={16} />
-                        ) : (
-                          <UserCheck size={16} />
-                        )}
-                      </button>
-                    </div>
+                    <MenuAcciones acciones={construirAcciones(usuario)} />
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span

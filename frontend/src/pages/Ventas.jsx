@@ -1,6 +1,6 @@
 import { cajaService } from "../services/caja.service";
 import InputNumero from "../components/ui/InputNumero";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   Plus,
   Search,
@@ -27,7 +27,10 @@ import {
   formatCurrency,
   formatDateTime,
   METODOS_PAGO,
+  minimoEn,
+  nombreSucursal,
   parsearMetodoPago,
+  stockEn,
 } from "../utils/helpers";
 import { useAuth } from "../context/AuthContext";
 import Paginacion from "../components/ui/Paginacion";
@@ -64,33 +67,40 @@ function ChipStock({ stock, minimo }) {
   );
 }
 
-function FilaAgregable({ nombre, precio, stock, minimo, enCarrito, onAdd }) {
-  const agotado = stock <= 0;
+function OpcionBusqueda({ opcion, activa, enCarrito, onElegir, onHover }) {
+  const agotado = opcion.stock <= 0;
   return (
     <button
       type="button"
+      role="option"
+      aria-selected={activa}
       disabled={agotado}
-      onClick={onAdd}
-      className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl border text-left transition ${
+      data-activa={activa ? "1" : undefined}
+      onMouseDown={(e) => e.preventDefault()}
+      onMouseEnter={onHover}
+      onClick={onElegir}
+      className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${
         agotado
-          ? "bg-gray-50 border-gray-200 cursor-not-allowed"
-          : "bg-white border-gray-200 hover:border-blue-400 hover:bg-blue-50"
+          ? "bg-gray-50 cursor-not-allowed"
+          : activa
+            ? "bg-blue-50"
+            : "bg-white hover:bg-gray-50"
       }`}
     >
       <div className="flex-1 min-w-0">
         <p
           className={`text-sm font-medium truncate ${agotado ? "text-gray-400" : "text-gray-800"}`}
         >
-          {nombre}
+          {opcion.nombre}
         </p>
-        <div className="flex items-center gap-2 mt-0.5">
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span
             className={`text-sm font-semibold ${agotado ? "text-gray-400" : "text-gray-700"}`}
           >
-            {formatCurrency(precio)}
+            {formatCurrency(opcion.precio)}
           </span>
-          <PrecioUSD pesos={precio} />
-          <ChipStock stock={stock} minimo={minimo} />
+          <PrecioUSD pesos={opcion.precio} />
+          <ChipStock stock={opcion.stock} minimo={opcion.minimo} />
         </div>
       </div>
       {enCarrito > 0 && (
@@ -98,18 +108,12 @@ function FilaAgregable({ nombre, precio, stock, minimo, enCarrito, onAdd }) {
           ×{enCarrito}
         </span>
       )}
-      <span
-        className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-          agotado ? "bg-gray-200 text-gray-400" : "bg-blue-600 text-white"
-        }`}
-      >
-        <Plus size={16} />
-      </span>
     </button>
   );
 }
 
-function NuevaVentaModal({ onClose, onSave }) {
+// "sucursal" es la de la caja del usuario: de ahí sale el stock y ahí entra la venta
+function NuevaVentaModal({ onClose, onSave, sucursal }) {
   const { user } = useAuth();
   const [productos, setProductos] = useState([]);
   const [clientes, setClientes] = useState([]);
@@ -118,8 +122,12 @@ function NuevaVentaModal({ onClose, onSave }) {
   const [form, setForm] = useState({
     cliente_id: "",
     notas: "",
-    sucursal: user?.sucursal || "sucursal_1",
+    sucursal,
   });
+  const [abierto, setAbierto] = useState(false);
+  const [activo, setActivo] = useState(0);
+  const buscadorRef = useRef(null);
+  const listaRef = useRef(null);
   const [tipoAjuste, setTipoAjuste] = useState("ninguno");
   const [porcentajeAjuste, setPorcentajeAjuste] = useState(0);
   const [pagoMixto, setPagoMixto] = useState(false);
@@ -145,46 +153,85 @@ function NuevaVentaModal({ onClose, onSave }) {
   }, []);
 
   const termino = search.trim().toLowerCase();
-  const coincide = (p) =>
-    !termino ||
-    p.nombre.toLowerCase().includes(termino) ||
-    p.codigo_barras?.toLowerCase().includes(termino) ||
-    p.variantes?.some(
-      (v) =>
-        v.nombre?.toLowerCase().includes(termino) ||
-        v.sku?.toLowerCase().includes(termino) ||
-        v.codigo_barras?.toLowerCase().includes(termino),
-    );
-  const productosFiltrados = termino ? productos.filter(coincide) : [];
   const LIMITE_LISTA = 30;
-  const productosVisibles = productosFiltrados.slice(0, LIMITE_LISTA);
 
-  // Enter en el buscador: si el texto es un código exacto (lector de código de
-  // barras o SKU), agrega ese producto o variante directamente
+  // Opciones del combo: cada producto simple y cada variante es una opción
+  const opciones = useMemo(() => {
+    if (!termino) return [];
+    const out = [];
+    for (const p of productos) {
+      if (p.activo === false) continue;
+      const coincideProducto =
+        p.nombre.toLowerCase().includes(termino) ||
+        p.codigo_barras?.toLowerCase().includes(termino);
+      if (p.tiene_variantes) {
+        for (const v of p.variantes || []) {
+          const coincideVariante =
+            v.nombre?.toLowerCase().includes(termino) ||
+            v.sku?.toLowerCase().includes(termino) ||
+            v.codigo_barras?.toLowerCase().includes(termino);
+          if (coincideProducto || coincideVariante) {
+            out.push({
+              key: `${p.id}-${v.nombre}`,
+              producto: p,
+              variante: v,
+              nombre: `${p.nombre} — ${v.nombre}`,
+              precio: v.precio_venta,
+              stock: stockEn(v, sucursal),
+              minimo: minimoEn(v, sucursal),
+            });
+          }
+        }
+      } else if (coincideProducto) {
+        out.push({
+          key: p.id,
+          producto: p,
+          variante: null,
+          nombre: p.nombre,
+          precio: p.precio_venta,
+          stock: stockEn(p, sucursal),
+          minimo: minimoEn(p, sucursal),
+        });
+      }
+    }
+    return out;
+  }, [productos, termino, sucursal]);
+  const opcionesVisibles = opciones.slice(0, LIMITE_LISTA);
+
+  const elegirOpcion = (o) => {
+    if (!o) return;
+    agregarAlCarrito(o.producto, o.variante);
+    setSearch("");
+    setActivo(0);
+    setAbierto(false);
+    buscadorRef.current?.focus();
+  };
+
+  // Enter en el buscador: un código exacto (lector de código de barras o SKU)
+  // agrega ese producto o variante; si no, la opción resaltada del combo
   const agregarPorCodigo = () => {
     if (!termino) return;
     for (const p of productos) {
+      if (p.activo === false) continue;
       if (p.codigo_barras?.toLowerCase() === termino && !p.tiene_variantes) {
-        agregarAlCarrito(p);
-        setSearch("");
-        return;
+        return elegirOpcion({ producto: p, variante: null });
       }
       const v = p.variantes?.find(
         (x) =>
           x.codigo_barras?.toLowerCase() === termino ||
           x.sku?.toLowerCase() === termino,
       );
-      if (v) {
-        agregarAlCarrito(p, v);
-        setSearch("");
-        return;
-      }
+      if (v) return elegirOpcion({ producto: p, variante: v });
     }
-    if (productosFiltrados.length === 1 && !productosFiltrados[0].tiene_variantes) {
-      agregarAlCarrito(productosFiltrados[0]);
-      setSearch("");
-    }
+    elegirOpcion(opcionesVisibles[activo] || opcionesVisibles[0]);
   };
+
+  // Mantiene visible la opción resaltada al navegar con el teclado
+  useEffect(() => {
+    listaRef.current
+      ?.querySelector('[data-activa="1"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activo, abierto]);
 
   const cantidadEnCarrito = (producto, variante = null) =>
     carrito.find(
@@ -194,9 +241,7 @@ function NuevaVentaModal({ onClose, onSave }) {
 
   const agregarAlCarrito = (producto, variante = null) => {
     const key = variante ? `${producto.id}-${variante.nombre}` : producto.id;
-    const stockDisponible = variante
-      ? (variante.stock_actual ?? 0)
-      : (producto.stock_actual ?? 0);
+    const stockDisponible = stockEn(variante || producto, sucursal);
     const existente = carrito.find((item) => item.key === key);
 
     if (stockDisponible <= 0) {
@@ -438,7 +483,12 @@ function NuevaVentaModal({ onClose, onSave }) {
       <div className="bg-white rounded-2xl w-full max-w-6xl shadow-xl h-[90vh] flex flex-col overflow-hidden">
         {/* Encabezado fijo */}
         <div className="shrink-0 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-800">Nueva Venta</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            Nueva Venta
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              {nombreSucursal(sucursal)}
+            </span>
+          </h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
@@ -449,28 +499,45 @@ function NuevaVentaModal({ onClose, onSave }) {
 
         {/* Contenido: en pantallas grandes cada columna tiene su propio scroll */}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 overflow-y-auto lg:overflow-hidden">
-          {/* Productos: el listado aparece solo al escribir o escanear */}
+          {/* Izquierda: buscador con combo + carrito */}
           <div className="flex flex-col min-h-0 p-6 gap-3 lg:border-r border-gray-100">
-            <h3 className="font-medium text-gray-700 shrink-0">Productos</h3>
-            <div className="relative shrink-0">
+            <h3 className="font-medium text-gray-700 shrink-0">Agregar productos</h3>
+            <div className="relative shrink-0 z-20">
               <Search
                 size={16}
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
               />
               <input
+                ref={buscadorRef}
                 type="text"
                 autoFocus
+                role="combobox"
+                aria-expanded={abierto && !!termino}
+                aria-autocomplete="list"
                 placeholder="Buscar por nombre, SKU o escanear código de barras..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setActivo(0);
+                  setAbierto(true);
+                }}
+                onFocus={() => setAbierto(true)}
+                onBlur={() => setAbierto(false)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setAbierto(true);
+                    setActivo((a) => Math.min(a + 1, opcionesVisibles.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setActivo((a) => Math.max(a - 1, 0));
+                  } else if (e.key === "Enter") {
                     e.preventDefault();
                     agregarPorCodigo();
-                  }
-                  if (e.key === "Escape" && search) {
+                  } else if (e.key === "Escape" && (search || abierto)) {
                     e.stopPropagation();
                     setSearch("");
+                    setAbierto(false);
                   }
                 }}
                 className={`${inputBase} pl-9 pr-9`}
@@ -478,76 +545,52 @@ function NuevaVentaModal({ onClose, onSave }) {
               {search && (
                 <button
                   type="button"
-                  onClick={() => setSearch("")}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setSearch("");
+                    buscadorRef.current?.focus();
+                  }}
                   title="Limpiar búsqueda"
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700"
                 >
                   <X size={16} />
                 </button>
               )}
+
+              {abierto && termino && (
+                <div
+                  ref={listaRef}
+                  role="listbox"
+                  className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-72 overflow-y-auto divide-y divide-gray-100"
+                >
+                  {opcionesVisibles.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-4">
+                      No se encontraron productos
+                    </p>
+                  ) : (
+                    opcionesVisibles.map((o, i) => (
+                      <OpcionBusqueda
+                        key={o.key}
+                        opcion={o}
+                        activa={i === activo}
+                        enCarrito={cantidadEnCarrito(o.producto, o.variante)}
+                        onHover={() => setActivo(i)}
+                        onElegir={() => elegirOpcion(o)}
+                      />
+                    ))
+                  )}
+                  {opciones.length > LIMITE_LISTA && (
+                    <p className="text-xs text-gray-400 text-center py-2">
+                      Mostrando {LIMITE_LISTA} de {opciones.length}. Escribí más
+                      para afinar la búsqueda.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
-            {!termino ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center gap-2 py-8 text-gray-400">
-                <Search size={28} className="text-gray-300" />
-                <p className="text-sm">
-                  Escribí un nombre o escaneá un código para agregar productos
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3 overflow-y-auto min-h-0 max-h-80 lg:max-h-none lg:flex-1 pr-1">
-                {productosVisibles.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center py-8">
-                    No se encontraron productos
-                  </p>
-                ) : (
-                  productosVisibles.map((producto) =>
-                    producto.tiene_variantes ? (
-                      <div
-                        key={producto.id}
-                        className="border border-gray-200 rounded-xl p-3 space-y-2"
-                      >
-                        <p className="font-medium text-gray-800 text-sm">
-                          {producto.nombre}
-                        </p>
-                        {producto.variantes.map((v) => (
-                          <FilaAgregable
-                            key={v.nombre}
-                            nombre={v.nombre}
-                            precio={v.precio_venta}
-                            stock={v.stock_actual ?? 0}
-                            minimo={v.stock_minimo ?? 0}
-                            enCarrito={cantidadEnCarrito(producto, v)}
-                            onAdd={() => agregarAlCarrito(producto, v)}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <FilaAgregable
-                        key={producto.id}
-                        nombre={producto.nombre}
-                        precio={producto.precio_venta}
-                        stock={producto.stock_actual ?? 0}
-                        minimo={producto.stock_minimo ?? 0}
-                        enCarrito={cantidadEnCarrito(producto)}
-                        onAdd={() => agregarAlCarrito(producto)}
-                      />
-                    ),
-                  )
-                )}
-                {productosFiltrados.length > LIMITE_LISTA && (
-                  <p className="text-xs text-gray-400 text-center py-2">
-                    Mostrando {LIMITE_LISTA} de {productosFiltrados.length}.
-                    Escribí más para afinar la búsqueda.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Carrito y datos */}
-          <div className="min-h-0 p-6 space-y-4 lg:overflow-y-auto">
-            <h3 className="font-medium text-gray-700">
+            <div className="flex flex-col gap-3 lg:flex-1 lg:min-h-0 lg:overflow-y-auto pr-1">
+            <h3 className="font-medium text-gray-700 shrink-0">
               Carrito
               {carrito.length > 0 && (
                 <span className="ml-2 text-xs text-gray-400 font-normal">
@@ -559,7 +602,7 @@ function NuevaVentaModal({ onClose, onSave }) {
               <div className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-gray-200 rounded-xl">
                 <ShoppingCart size={20} className="text-gray-300 shrink-0" />
                 <p className="text-sm text-gray-400">
-                  El carrito está vacío. Buscá o escaneá un producto.
+                  El carrito está vacío. Buscá o escaneá un producto arriba.
                 </p>
               </div>
             ) : (
@@ -574,7 +617,8 @@ function NuevaVentaModal({ onClose, onSave }) {
                         {item.nombre_producto}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {formatCurrency(item.precio_unitario)} c/u
+                        {formatCurrency(item.precio_unitario)} c/u · stock{" "}
+                        {item.stock_disponible}
                       </p>
                     </div>
                     <div className="flex items-center gap-1">
@@ -596,12 +640,18 @@ function NuevaVentaModal({ onClose, onSave }) {
                       />
                       <button
                         type="button"
+                        disabled={item.cantidad >= item.stock_disponible}
+                        title={
+                          item.cantidad >= item.stock_disponible
+                            ? "No hay más stock disponible"
+                            : "Agregar una unidad"
+                        }
                         onClick={() =>
                           actualizarCantidad(item.key, item.cantidad + 1)
                         }
-                        className="w-7 h-7 bg-gray-200 rounded-lg hover:bg-gray-300 transition flex items-center justify-center text-sm"
+                        className="w-7 h-7 bg-gray-200 rounded-lg hover:bg-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center"
                       >
-                        +
+                        <Plus size={12} />
                       </button>
                     </div>
                     <span className="text-sm font-semibold text-gray-700 sm:w-24 text-right ml-auto sm:ml-0">
@@ -620,6 +670,11 @@ function NuevaVentaModal({ onClose, onSave }) {
               </div>
             )}
 
+            </div>
+          </div>
+
+          {/* Derecha: cliente, ajuste, cobro */}
+          <div className="min-h-0 p-6 space-y-4 lg:overflow-y-auto">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Cliente
@@ -936,7 +991,7 @@ function FilaVenta({
     <>
       {/* Desktop */}
       <tr className="hidden md:table-row hover:bg-gray-50 transition-[background-color]">
-        <td className="px-6 py-4 text-center">
+        <td className="col-centro px-6 py-4 ">
           <button
             onClick={() => onVerDetalle(venta)}
             className="font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
@@ -944,27 +999,27 @@ function FilaVenta({
             {venta.numero_venta}
           </button>
         </td>
-        <td className="px-6 py-4 text-sm text-center text-gray-700">
+        <td className="col-centro px-6 py-4 text-sm  text-gray-700">
           {venta.fecha ? formatDateTime(venta.fecha) : "-"}
         </td>
-        <td className="px-6 py-4 text-sm text-center text-gray-600">
+        <td className="px-6 py-4 text-sm  text-gray-600">
           {cliente
             ? `${cliente.nombre} ${cliente.apellido || ""}`
             : "Consumidor final"}
         </td>
-        <td className="px-6 py-4 text-sm text-center text-gray-600">
+        <td className="px-6 py-4 text-sm  text-gray-600">
           {venta.sucursal === "sucursal_1" ? "Sucursal 1" : "Sucursal 2"}
         </td>
-        <td className="px-6 py-4 text-sm text-center text-gray-600">
+        <td className="col-num px-6 py-4 text-sm text-gray-600">
           {venta.items?.length || 0}
         </td>
-        <td className="px-6 py-4 text-center">
+        <td className="col-centro px-6 py-4 ">
           <BadgePago metodoPago={venta.metodo_pago} />
         </td>
-        <td className="px-6 py-4 text-sm text-center font-semibold text-gray-800">
+        <td className="col-num px-6 py-4 text-sm font-semibold text-gray-800">
           {formatCurrency(venta.total)}
         </td>
-        <td className="px-6 py-4 text-center">
+        <td className="col-centro px-6 py-4 ">
           <span
             className={`px-2 py-1 rounded-lg text-xs font-medium ${
               venta.estado === "completada"
@@ -975,7 +1030,7 @@ function FilaVenta({
             {venta.estado === "completada" ? "Completada" : "Cancelada"}
           </span>
         </td>
-        <td className="px-6 py-4 text-center">
+        <td className="col-acc px-6 py-4 ">
           <div className="flex items-center justify-center gap-2">
             <button
               onClick={() => setExpandido(!expandido)}
@@ -1021,16 +1076,16 @@ function FilaVenta({
                 <tbody className="divide-y divide-gray-100">
                   {venta.items?.map((item, i) => (
                     <tr key={i} className="bg-white">
-                      <td className="px-4 py-2 text-center font-medium text-gray-700">
+                      <td className="px-4 py-2  font-medium text-gray-700">
                         {item.nombre_producto}
                       </td>
-                      <td className="px-4 py-2 text-center text-gray-600">
+                      <td className="col-num px-4 py-2 text-gray-600">
                         {item.cantidad}
                       </td>
-                      <td className="px-4 py-2 text-center text-gray-600">
+                      <td className="col-num px-4 py-2 text-gray-600">
                         {formatCurrency(item.precio_unitario)}
                       </td>
-                      <td className="px-4 py-2 text-center font-medium text-gray-700">
+                      <td className="col-num px-4 py-2 font-medium text-gray-700">
                         {formatCurrency(item.subtotal)}
                       </td>
                     </tr>
@@ -1057,15 +1112,6 @@ function FilaVenta({
                   </span>
                 )}
               </div>
-            </div>
-            <div className="mt-3 flex justify-end">
-              <button
-                onClick={() => onImprimir(venta)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 text-white rounded-lg text-xs hover:bg-gray-800 transition"
-              >
-                <Printer size={14} />
-                Imprimir ticket
-              </button>
             </div>
           </td>
         </tr>
@@ -1180,15 +1226,6 @@ function CardVentaMobile({
             <span>Total</span>
             <span>{formatCurrency(venta.total)}</span>
           </div>
-          <div className="flex justify-end mt-2">
-            <button
-              onClick={() => onImprimir(venta)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-700 text-white rounded-lg text-xs hover:bg-gray-800 transition"
-            >
-              <Printer size={14} />
-              Imprimir ticket
-            </button>
-          </div>
         </div>
       )}
     </div>
@@ -1204,15 +1241,6 @@ function ModalDetalleVenta({ venta, cliente, onClose, onImprimir }) {
             Venta {venta.numero_venta}
           </h2>
           <div className="flex items-center gap-2">
-            <a
-              href={`/ventas/${venta._id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-            >
-              <ExternalLink size={14} />
-              Pestaña nueva
-            </a>
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition"
@@ -1655,7 +1683,9 @@ export default function Ventas() {
                   <ThOrdenable campo="estado" tabla={tabla} align="center">
                     Estado
                   </ThOrdenable>
-                  <th className="px-6 py-3"></th>
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -1714,6 +1744,7 @@ export default function Ventas() {
 
       {showModal && (
         <NuevaVentaModal
+          sucursal={cajaActual?.sucursal}
           onClose={() => setShowModal(false)}
           onSave={() => {
             setShowModal(false);

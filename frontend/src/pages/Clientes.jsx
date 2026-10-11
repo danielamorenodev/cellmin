@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { clientesService } from "../services/clientes.service";
 import toast from "react-hot-toast";
+import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
@@ -206,6 +207,20 @@ export default function Clientes() {
     fetchClientes();
   };
 
+  const construirAcciones = (cliente) => [
+    {
+      label: "Editar",
+      icono: <Edit size={15} />,
+      onClick: () => handleEdit(cliente),
+    },
+    {
+      label: cliente.activo ? "Desactivar" : "Activar",
+      icono: cliente.activo ? <Trash2 size={15} /> : <ToggleLeft size={15} />,
+      onClick: () => handleToggle(cliente),
+      peligro: !!cliente.activo,
+    },
+  ];
+
   const filtered = clientes.filter((c) => {
     if (
       filtros.busqueda &&
@@ -294,7 +309,7 @@ export default function Clientes() {
                   <ThOrdenable campo="dni" tabla={tabla} className="px-6 py-3">DNI</ThOrdenable>
                   <ThOrdenable campo="telefono" tabla={tabla} className="px-6 py-3">Teléfono</ThOrdenable>
                   <ThOrdenable campo="email" tabla={tabla} className="px-6 py-3">Email</ThOrdenable>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                     Acciones
                   </th>
                 </tr>
@@ -322,7 +337,7 @@ export default function Clientes() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="col-centro px-6 py-4 text-sm text-gray-600">
                       {cliente.dni || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
@@ -331,30 +346,8 @@ export default function Clientes() {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {cliente.email || "-"}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEdit(cliente)}
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(cliente)}
-                          className={`p-1.5 rounded-lg transition ${
-                            cliente.activo
-                              ? "text-gray-500 hover:text-red-600 hover:bg-red-50"
-                              : "text-gray-500 hover:text-green-600 hover:bg-green-50"
-                          }`}
-                          title={cliente.activo ? "Desactivar" : "Activar"}
-                        >
-                          {cliente.activo ? (
-                            <Trash2 size={16} />
-                          ) : (
-                            <ToggleLeft size={16} />
-                          )}
-                        </button>
-                      </div>
+                    <td className="col-acc px-6 py-4 ">
+                      <MenuAcciones acciones={construirAcciones(cliente)} />
                     </td>
                   </tr>
                 ))}
@@ -391,28 +384,7 @@ export default function Clientes() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEdit(cliente)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleToggle(cliente)}
-                      className={`p-2 rounded-lg transition ${
-                        cliente.activo
-                          ? "text-red-600 hover:bg-red-50"
-                          : "text-green-600 hover:bg-green-50"
-                      }`}
-                    >
-                      {cliente.activo ? (
-                        <Trash2 size={16} />
-                      ) : (
-                        <ToggleLeft size={16} />
-                      )}
-                    </button>
-                  </div>
+                  <MenuAcciones acciones={construirAcciones(cliente)} />
                 </div>
                 <div className="space-y-1">
                   {cliente.telefono && (

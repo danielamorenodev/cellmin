@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { proveedoresService } from "../services/proveedores.service";
 import toast from "react-hot-toast";
+import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
@@ -188,6 +189,23 @@ export default function Proveedores() {
     }
   };
 
+  const construirAcciones = (proveedor) => [
+    {
+      label: "Editar",
+      icono: <Edit size={15} />,
+      onClick: () => {
+        setSelectedProveedor(proveedor);
+        setShowModal(true);
+      },
+    },
+    {
+      label: proveedor.activo ? "Desactivar" : "Activar",
+      icono: proveedor.activo ? <Trash2 size={15} /> : <ToggleLeft size={15} />,
+      onClick: () => handleToggle(proveedor),
+      peligro: !!proveedor.activo,
+    },
+  ];
+
   const filtered = proveedores.filter((p) =>
     `${p.nombre} ${p.cuit} ${p.contacto}`
       .toLowerCase()
@@ -256,7 +274,7 @@ export default function Proveedores() {
                   <ThOrdenable campo="cuit" tabla={tabla} className="px-6 py-3">CUIT</ThOrdenable>
                   <ThOrdenable campo="contacto" tabla={tabla} className="px-6 py-3">Contacto</ThOrdenable>
                   <ThOrdenable campo="telefono" tabla={tabla} className="px-6 py-3">Teléfono</ThOrdenable>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                     Acciones
                   </th>
                 </tr>
@@ -291,7 +309,7 @@ export default function Proveedores() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="col-centro px-6 py-4 text-sm text-gray-600">
                       {proveedor.cuit || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
@@ -300,32 +318,8 @@ export default function Proveedores() {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {proveedor.telefono || "-"}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedProveedor(proveedor);
-                            setShowModal(true);
-                          }}
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(proveedor)}
-                          className={`p-1.5 rounded-lg transition ${
-                            proveedor.activo
-                              ? "text-gray-500 hover:text-red-600 hover:bg-red-50"
-                              : "text-gray-500 hover:text-green-600 hover:bg-green-50"
-                          }`}
-                        >
-                          {proveedor.activo ? (
-                            <Trash2 size={16} />
-                          ) : (
-                            <ToggleLeft size={16} />
-                          )}
-                        </button>
-                      </div>
+                    <td className="col-acc px-6 py-4 ">
+                      <MenuAcciones acciones={construirAcciones(proveedor)} />
                     </td>
                   </tr>
                 ))}
@@ -359,31 +353,7 @@ export default function Proveedores() {
                       CUIT: {proveedor.cuit || "-"}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedProveedor(proveedor);
-                        setShowModal(true);
-                      }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleToggle(proveedor)}
-                      className={`p-2 rounded-lg transition ${
-                        proveedor.activo
-                          ? "text-red-600 hover:bg-red-50"
-                          : "text-green-600 hover:bg-green-50"
-                      }`}
-                    >
-                      {proveedor.activo ? (
-                        <Trash2 size={16} />
-                      ) : (
-                        <ToggleLeft size={16} />
-                      )}
-                    </button>
-                  </div>
+                  <MenuAcciones acciones={construirAcciones(proveedor)} />
                 </div>
                 <div className="space-y-1">
                   {proveedor.contacto && (

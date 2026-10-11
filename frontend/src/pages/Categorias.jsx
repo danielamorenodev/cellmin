@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Plus, Edit, Trash2, Tag, ToggleLeft } from "lucide-react";
 import { categoriasService } from "../services/categorias.service";
 import toast from "react-hot-toast";
+import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
@@ -149,6 +150,23 @@ export default function Categorias() {
     }
   };
 
+  const construirAcciones = (categoria) => [
+    {
+      label: "Editar",
+      icono: <Edit size={15} />,
+      onClick: () => {
+        setSelectedCategoria(categoria);
+        setShowModal(true);
+      },
+    },
+    {
+      label: categoria.activo ? "Desactivar" : "Activar",
+      icono: categoria.activo ? <Trash2 size={15} /> : <ToggleLeft size={15} />,
+      onClick: () => handleToggle(categoria),
+      peligro: !!categoria.activo,
+    },
+  ];
+
   const getNombrePadre = (id) => {
     const padre = categorias.find((c) => c.id === id);
     return padre?.nombre || "-";
@@ -201,7 +219,7 @@ export default function Categorias() {
                   <ThOrdenable campo="nombre" tabla={tabla} className="px-6 py-3">Nombre</ThOrdenable>
                   <ThOrdenable campo="descripcion" tabla={tabla} className="px-6 py-3 hidden md:table-cell">Descripción</ThOrdenable>
                   <ThOrdenable campo="padre" tabla={tabla} className="px-6 py-3 hidden md:table-cell">Categoría Padre</ThOrdenable>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                     Acciones
                   </th>
                 </tr>
@@ -237,32 +255,8 @@ export default function Categorias() {
                         ? getNombrePadre(categoria.categoria_padre_id)
                         : "-"}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedCategoria(categoria);
-                            setShowModal(true);
-                          }}
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(categoria)}
-                          className={`p-1.5 rounded-lg transition ${
-                            categoria.activo
-                              ? "text-gray-500 hover:text-red-600 hover:bg-red-50"
-                              : "text-gray-500 hover:text-green-600 hover:bg-green-50"
-                          }`}
-                        >
-                          {categoria.activo ? (
-                            <Trash2 size={16} />
-                          ) : (
-                            <ToggleLeft size={16} />
-                          )}
-                        </button>
-                      </div>
+                    <td className="col-acc px-6 py-4 ">
+                      <MenuAcciones acciones={construirAcciones(categoria)} />
                     </td>
                   </tr>
                 ))}
@@ -306,31 +300,7 @@ export default function Categorias() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedCategoria(categoria);
-                        setShowModal(true);
-                      }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleToggle(categoria)}
-                      className={`p-2 rounded-lg transition ${
-                        categoria.activo
-                          ? "text-red-600 hover:bg-red-50"
-                          : "text-green-600 hover:bg-green-50"
-                      }`}
-                    >
-                      {categoria.activo ? (
-                        <Trash2 size={16} />
-                      ) : (
-                        <ToggleLeft size={16} />
-                      )}
-                    </button>
-                  </div>
+                  <MenuAcciones acciones={construirAcciones(categoria)} />
                 </div>
               </div>
             ))}

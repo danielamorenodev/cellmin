@@ -4,6 +4,7 @@ import { Plus, Edit, Trash2, Wrench, ToggleLeft } from "lucide-react";
 import { tiposReparacionService } from "../services/tiposReparacion.service";
 import toast from "react-hot-toast";
 import PrecioUSD from "../components/ui/PrecioUSD";
+import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
@@ -147,6 +148,23 @@ export default function TiposReparacion() {
   };
 
 
+  const construirAcciones = (tipo) => [
+    {
+      label: "Editar",
+      icono: <Edit size={15} />,
+      onClick: () => {
+        setSelected(tipo);
+        setShowModal(true);
+      },
+    },
+    {
+      label: tipo.activo ? "Desactivar" : "Activar",
+      icono: tipo.activo ? <Trash2 size={15} /> : <ToggleLeft size={15} />,
+      onClick: () => handleToggle(tipo),
+      peligro: !!tipo.activo,
+    },
+  ];
+
   const tabla = useTabla(tipos, {
     porPagina: 20,
     ordenInicial: { campo: "nombre", dir: "asc" },
@@ -195,7 +213,7 @@ export default function TiposReparacion() {
                   <ThOrdenable campo="nombre" tabla={tabla} className="px-6 py-3">Nombre</ThOrdenable>
                   <ThOrdenable campo="descripcion" tabla={tabla} className="px-6 py-3">Descripción</ThOrdenable>
                   <ThOrdenable campo="precio" tabla={tabla} className="px-6 py-3">Precio</ThOrdenable>
-                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                  <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                     Acciones
                   </th>
                 </tr>
@@ -223,36 +241,12 @@ export default function TiposReparacion() {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {tipo.descripcion || "-"}
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-gray-800">
+                    <td className="col-num px-6 py-4 text-sm font-semibold text-gray-800">
                       {formatCurrency(tipo.precio)}
                       <PrecioUSD pesos={tipo.precio} className="block" />
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setSelected(tipo);
-                            setShowModal(true);
-                          }}
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(tipo)}
-                          className={`p-1.5 rounded-lg transition ${
-                            tipo.activo
-                              ? "text-gray-500 hover:text-red-600 hover:bg-red-50"
-                              : "text-gray-500 hover:text-green-600 hover:bg-green-50"
-                          }`}
-                        >
-                          {tipo.activo ? (
-                            <Trash2 size={16} />
-                          ) : (
-                            <ToggleLeft size={16} />
-                          )}
-                        </button>
-                      </div>
+                    <td className="col-acc px-6 py-4 ">
+                      <MenuAcciones acciones={construirAcciones(tipo)} />
                     </td>
                   </tr>
                 ))}
@@ -294,31 +288,7 @@ export default function TiposReparacion() {
                       )}
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelected(tipo);
-                        setShowModal(true);
-                      }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleToggle(tipo)}
-                      className={`p-2 rounded-lg transition ${
-                        tipo.activo
-                          ? "text-red-600 hover:bg-red-50"
-                          : "text-green-600 hover:bg-green-50"
-                      }`}
-                    >
-                      {tipo.activo ? (
-                        <Trash2 size={16} />
-                      ) : (
-                        <ToggleLeft size={16} />
-                      )}
-                    </button>
-                  </div>
+                  <MenuAcciones acciones={construirAcciones(tipo)} />
                 </div>
               </div>
             ))}

@@ -13,6 +13,8 @@ import {
   Mail,
   User,
   ExternalLink,
+  Eye,
+  XCircle,
   X,
 } from "lucide-react";
 import { comprasService } from "../services/compras.service";
@@ -22,7 +24,9 @@ import toast from "react-hot-toast";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
-import { formatCurrency, formatDateTime } from "../utils/helpers";
+import { formatCurrency, formatDateTime, nombreSucursal } from "../utils/helpers";
+import MenuAcciones from "../components/ui/MenuAcciones";
+import { useSucursales } from "../hooks/useSucursales";
 import DetalleCompra from "../components/ui/DetalleCompra";
 
 function ProveedorModal({ proveedor, onClose, onSave }) {
@@ -159,8 +163,11 @@ function ProveedorModal({ proveedor, onClose, onSave }) {
 function NuevaCompraModal({ onClose, onSave }) {
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
+  const { opciones: sucursalesOpc, unica: sucursalUnica, porDefecto } =
+    useSucursales();
   const [form, setForm] = useState({
     proveedor_id: "",
+    sucursal: sucursalUnica || "",
     numero_remito: "",
     notas: "",
     items: [],
@@ -242,6 +249,7 @@ function NuevaCompraModal({ onClose, onSave }) {
     try {
       const data = {
         ...form,
+        sucursal: form.sucursal || porDefecto,
         total,
         items: form.items.map((item) => ({
           ...item,
@@ -255,7 +263,9 @@ function NuevaCompraModal({ onClose, onSave }) {
       toast.success("Compra registrada correctamente");
       onSave();
     } catch (error) {
-      toast.error("Error al registrar la compra");
+      toast.error(
+        error.response?.data?.detail || "Error al registrar la compra",
+      );
     } finally {
       setLoading(false);
     }
@@ -290,6 +300,32 @@ function NuevaCompraModal({ onClose, onSave }) {
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Sucursal que recibe la mercadería *
+              </label>
+              {sucursalUnica ? (
+                <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-700">
+                  {nombreSucursal(sucursalUnica)}
+                </div>
+              ) : (
+                <select
+                  required
+                  value={form.sucursal}
+                  onChange={(e) =>
+                    setForm({ ...form, sucursal: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Seleccionar sucursal</option>
+                  {sucursalesOpc.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Número de remito
               </label>
@@ -511,23 +547,12 @@ function ModalDetalleCompra({ compra, proveedor, onClose }) {
           <h2 className="text-lg font-semibold text-gray-800">
             Compra {compra.numero_compra}
           </h2>
-          <div className="flex items-center gap-3">
-            <a
-              href={`/compras/${compra._id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
-            >
-              <ExternalLink size={14} />
-              Pestaña nueva
-            </a>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition"
-            >
-              <X size={18} className="text-gray-500" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 rounded-lg transition"
+          >
+            <X size={18} className="text-gray-500" />
+          </button>
         </div>
         <div className="p-6 overflow-y-auto">
           <DetalleCompra compra={compra} proveedor={proveedor} />
@@ -545,6 +570,29 @@ function ModalDetalleCompra({ compra, proveedor, onClose }) {
   );
 }
 
+function accionesCompra({ compra, onCancel, onVerDetalle }) {
+  const cancelada = compra.estado === "cancelada";
+  return [
+    {
+      label: "Ver detalle",
+      icono: <Eye size={14} />,
+      onClick: () => onVerDetalle(compra),
+    },
+    {
+      label: "Abrir en pestaña nueva",
+      icono: <ExternalLink size={14} />,
+      onClick: () =>
+        window.open(`/compras/${compra._id}`, "_blank", "noopener"),
+    },
+    !cancelada && {
+      label: "Cancelar compra",
+      icono: <XCircle size={14} />,
+      peligro: true,
+      onClick: () => onCancel(compra._id, compra.numero_compra),
+    },
+  ];
+}
+
 function FilaCompra({ compra, proveedores, onCancel, onVerDetalle }) {
   const [expandido, setExpandido] = useState(false);
   const proveedor = proveedores.find((p) => p.id === compra.proveedor_id);
@@ -552,16 +600,10 @@ function FilaCompra({ compra, proveedores, onCancel, onVerDetalle }) {
 
   return (
     <>
-      <tr
-        className="hover:bg-gray-50 transition cursor-pointer"
-        onClick={() => setExpandido(!expandido)}
-      >
-        <td className="px-6 py-4">
+      <tr className="hover:bg-gray-50 transition-[background-color]">
+        <td className="col-centro px-6 py-4">
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onVerDetalle(compra);
-            }}
+            onClick={() => onVerDetalle(compra)}
             className="font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
           >
             {compra.numero_compra}
@@ -571,17 +613,20 @@ function FilaCompra({ compra, proveedores, onCancel, onVerDetalle }) {
           {proveedor?.nombre || "-"}
         </td>
         <td className="px-6 py-4 text-sm text-gray-600">
+          {nombreSucursal(compra.sucursal || "sucursal_1")}
+        </td>
+        <td className="col-num px-6 py-4 text-sm text-gray-600 ">
           {compra.items?.length || 0}
         </td>
         <td
-          className={`px-6 py-4 text-sm font-semibold ${cancelada ? "text-gray-400 line-through" : "text-gray-800"}`}
+          className={`col-num px-6 py-4 text-sm font-semibold ${cancelada ? "text-gray-400 line-through" : "text-gray-800"}`}
         >
           {formatCurrency(compra.total)}
         </td>
-        <td className="px-6 py-4 text-sm text-gray-500">
+        <td className="col-centro px-6 py-4 text-sm text-gray-500">
           {compra.fecha ? formatDateTime(compra.fecha) : "-"}
         </td>
-        <td className="px-6 py-4">
+        <td className="col-centro px-6 py-4">
           <span
             className={`px-2 py-1 rounded-lg text-xs font-medium ${
               cancelada
@@ -592,59 +637,37 @@ function FilaCompra({ compra, proveedores, onCancel, onVerDetalle }) {
             {cancelada ? "Cancelada" : "Completada"}
           </span>
         </td>
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-2">
-            {!cancelada && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCancel(compra._id, compra.numero_compra);
-                }}
-                className="px-3 py-1 text-xs text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition"
-              >
-                Cancelar
-              </button>
-            )}
-            <a
-              href={`/compras/${compra._id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              title="Ver detalle en pestaña nueva"
-              className="p-1 text-gray-400 hover:text-blue-600"
+        <td className="col-acc px-6 py-4 ">
+          <div className="flex items-center justify-center gap-2">
+            <button
+              onClick={() => setExpandido(!expandido)}
+              className="p-1 text-gray-400 hover:text-gray-600"
             >
-              <ExternalLink size={16} />
-            </a>
-            {expandido ? (
-              <ChevronUp size={16} className="text-gray-400" />
-            ) : (
-              <ChevronDown size={16} className="text-gray-400" />
-            )}
+              {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            <MenuAcciones
+              acciones={accionesCompra({ compra, onCancel, onVerDetalle })}
+            />
           </div>
         </td>
       </tr>
       {expandido && (
         <tr>
-          <td colSpan={7} className="px-6 pb-4 bg-gray-50">
+          <td colSpan={8} className="px-6 pb-4 bg-gray-50">
             <div className="rounded-xl border border-gray-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">
-                      Producto
-                    </th>
-                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">
-                      Variante
-                    </th>
-                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">
-                      Cantidad
-                    </th>
-                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">
-                      Precio unit.
-                    </th>
-                    <th className="text-left px-4 py-2 text-xs font-medium text-gray-500">
-                      Subtotal
-                    </th>
+                    {["Producto", "Variante", "Cantidad", "Precio unit.", "Subtotal"].map(
+                      (t) => (
+                        <th
+                          key={t}
+                          className="px-4 py-2 text-xs font-medium text-gray-500"
+                        >
+                          {t}
+                        </th>
+                      ),
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -656,24 +679,27 @@ function FilaCompra({ compra, proveedores, onCancel, onVerDetalle }) {
                       <td className="px-4 py-2 text-gray-500">
                         {item.variante_nombre || "-"}
                       </td>
-                      <td className="px-4 py-2 text-gray-600">
+                      <td className="col-num px-4 py-2 text-gray-600 ">
                         {item.cantidad}
                       </td>
-                      <td className="px-4 py-2 text-gray-600">
+                      <td className="col-num px-4 py-2 text-gray-600 ">
                         {formatCurrency(item.precio_unitario)}
                       </td>
-                      <td className="px-4 py-2 font-medium text-gray-700">
+                      <td className="col-num px-4 py-2 font-medium text-gray-700 ">
                         {formatCurrency(item.subtotal)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {compra.numero_remito && (
-                <div className="px-4 py-2 bg-gray-50 text-xs text-gray-500">
-                  Remito: {compra.numero_remito}
-                </div>
-              )}
+              <div className="px-4 py-2 bg-gray-50 text-xs text-gray-500 flex flex-wrap gap-x-4">
+                <span>
+                  Sucursal: {nombreSucursal(compra.sucursal || "sucursal_1")}
+                </span>
+                {compra.numero_remito && (
+                  <span>Remito: {compra.numero_remito}</span>
+                )}
+              </div>
             </div>
           </td>
         </tr>
@@ -711,6 +737,9 @@ function CardCompraMobile({ compra, proveedor, onCancel, onVerDetalle }) {
           <p className="font-medium text-gray-700">
             {proveedor?.nombre || "-"}
           </p>
+          <p className="text-xs text-gray-500">
+            {nombreSucursal(compra.sucursal || "sucursal_1")}
+          </p>
           <p className="text-xs text-gray-400">
             {compra.fecha ? formatDateTime(compra.fecha) : "-"}
           </p>
@@ -731,23 +760,9 @@ function CardCompraMobile({ compra, proveedor, onCancel, onVerDetalle }) {
             {expandido ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             {expandido ? "Ocultar detalle" : "Ver detalle"}
           </button>
-          <a
-            href={`/compras/${compra._id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            title="Ver detalle en pestaña nueva"
-            className="p-1 text-gray-400 hover:text-blue-600"
-          >
-            <ExternalLink size={16} />
-          </a>
-          {!cancelada && (
-            <button
-              onClick={() => onCancel(compra._id, compra.numero_compra)}
-              className="px-3 py-1 text-xs text-red-600 hover:bg-red-50 border border-red-200 rounded-lg transition"
-            >
-              Cancelar
-            </button>
-          )}
+          <MenuAcciones
+            acciones={accionesCompra({ compra, onCancel, onVerDetalle })}
+          />
         </div>
       </div>
 
@@ -835,6 +850,23 @@ function GestionProveedores() {
     }
   };
 
+
+  const accionesProveedor = (proveedor) => [
+    {
+      label: "Editar",
+      icono: <Edit size={14} />,
+      onClick: () => {
+        setSelected(proveedor);
+        setShowModal(true);
+      },
+    },
+    {
+      label: proveedor.activo ? "Desactivar" : "Activar",
+      icono: proveedor.activo ? <Trash2 size={14} /> : <ToggleLeft size={14} />,
+      peligro: proveedor.activo,
+      onClick: () => handleToggle(proveedor),
+    },
+  ];
 
   const tabla = useTabla(filtered, {
     porPagina: 20,
@@ -936,7 +968,7 @@ function GestionProveedores() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="col-centro px-6 py-4 text-sm text-gray-600">
                       {proveedor.cuit || "-"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
@@ -945,31 +977,9 @@ function GestionProveedores() {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {proveedor.telefono || "-"}
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setSelected(proveedor);
-                            setShowModal(true);
-                          }}
-                          className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleToggle(proveedor)}
-                          className={`p-1.5 rounded-lg transition ${
-                            proveedor.activo
-                              ? "text-gray-500 hover:text-red-600 hover:bg-red-50"
-                              : "text-gray-500 hover:text-green-600 hover:bg-green-50"
-                          }`}
-                        >
-                          {proveedor.activo ? (
-                            <Trash2 size={16} />
-                          ) : (
-                            <ToggleLeft size={16} />
-                          )}
-                        </button>
+                    <td className="col-acc px-6 py-4 ">
+                      <div className="flex items-center justify-center gap-2">
+                        <MenuAcciones acciones={accionesProveedor(proveedor)} />
                       </div>
                     </td>
                   </tr>
@@ -1006,31 +1016,7 @@ function GestionProveedores() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelected(proveedor);
-                        setShowModal(true);
-                      }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleToggle(proveedor)}
-                      className={`p-2 rounded-lg transition ${
-                        proveedor.activo
-                          ? "text-red-600 hover:bg-red-50"
-                          : "text-green-600 hover:bg-green-50"
-                      }`}
-                    >
-                      {proveedor.activo ? (
-                        <Trash2 size={16} />
-                      ) : (
-                        <ToggleLeft size={16} />
-                      )}
-                    </button>
-                  </div>
+                  <MenuAcciones acciones={accionesProveedor(proveedor)} />
                 </div>
                 <div className="space-y-1">
                   {proveedor.contacto && (
@@ -1138,6 +1124,7 @@ export default function Compras() {
     accessors: {
       proveedor: (c) => proveedores.find((p) => p.id === c.proveedor_id)?.nombre || "",
       cantidad: (c) => c.items?.length || 0,
+      sucursal: (c) => nombreSucursal(c.sucursal || "sucursal_1"),
       fecha: (c) => (c.fecha ? new Date(c.fecha).getTime() : null)
     },
   });
@@ -1219,11 +1206,14 @@ export default function Compras() {
                     <tr>
                       <ThOrdenable campo="numero_compra" tabla={tabla} className="px-6 py-3">Número</ThOrdenable>
                       <ThOrdenable campo="proveedor" tabla={tabla} className="px-6 py-3">Proveedor</ThOrdenable>
+                      <ThOrdenable campo="sucursal" tabla={tabla} className="px-6 py-3">Sucursal</ThOrdenable>
                       <ThOrdenable campo="cantidad" tabla={tabla} className="px-6 py-3">Cant.</ThOrdenable>
                       <ThOrdenable campo="total" tabla={tabla} className="px-6 py-3">Total</ThOrdenable>
                       <ThOrdenable campo="fecha" tabla={tabla} className="px-6 py-3">Fecha</ThOrdenable>
                       <ThOrdenable campo="estado" tabla={tabla} className="px-6 py-3">Estado</ThOrdenable>
-                      <th className="px-6 py-3"></th>
+                      <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                        Acciones
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">

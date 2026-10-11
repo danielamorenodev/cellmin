@@ -1,28 +1,43 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import InputNumero from "../components/ui/InputNumero";
 import {
   AlertTriangle,
   ArrowDownCircle,
   ArrowUpCircle,
+  ArrowLeftRight,
   Check,
+  ChevronDown,
+  ChevronUp,
   Package,
+  History,
   Plus,
   RefreshCw,
   Search,
 } from "lucide-react";
 import { stockService } from "../services/stock.service";
 import { productosService } from "../services/productos.service";
+import { categoriasService } from "../services/categorias.service";
+import MenuAcciones from "../components/ui/MenuAcciones";
 import toast from "react-hot-toast";
-import { formatCurrency, formatDateTime } from "../utils/helpers";
+import {
+  SUCURSALES,
+  formatDateTime,
+  minimoEn,
+  nombreSucursal,
+  stockEn,
+} from "../utils/helpers";
+import { useSucursales } from "../hooks/useSucursales";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
 import { useAuth } from "../context/AuthContext";
 
-function MovimientoModal({ onClose, onSave }) {
+function MovimientoModal({ onClose, onSave, productoInicial = null, sucursalInicial = "" }) {
   const [productos, setProductos] = useState([]);
+  const { opciones: sucursalesOpc, unica: sucursalUnica } = useSucursales();
   const [form, setForm] = useState({
-    producto_id: "",
+    sucursal: sucursalUnica || sucursalInicial || "",
+    producto_id: productoInicial?.id || "",
     variante_nombre: "",
     tipo: "entrada",
     cantidad: 1,
@@ -33,7 +48,12 @@ function MovimientoModal({ onClose, onSave }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    productosService.getAll().then(setProductos);
+    productosService.getAll().then((lista) => {
+      setProductos(lista);
+      if (productoInicial) {
+        setProductoSeleccionado(lista.find((p) => p.id === productoInicial.id));
+      }
+    });
   }, []);
 
   const handleProductoChange = (id) => {
@@ -42,8 +62,27 @@ function MovimientoModal({ onClose, onSave }) {
     setForm({ ...form, producto_id: id, variante_nombre: "" });
   };
 
+  const varianteSel = productoSeleccionado?.variantes?.find(
+    (v) => v.nombre === form.variante_nombre,
+  );
+  const itemStock = productoSeleccionado?.tiene_variantes
+    ? varianteSel
+    : productoSeleccionado;
+  const stockDisponible = itemStock ? stockEn(itemStock, form.sucursal) : 0;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.sucursal) {
+      toast.error("Elegí la sucursal del movimiento");
+      return;
+    }
+    const cantidad = parseInt(form.cantidad);
+    if (form.tipo === "salida" && cantidad > stockDisponible) {
+      toast.error(
+        `Stock insuficiente en ${nombreSucursal(form.sucursal)}: hay ${stockDisponible}`,
+      );
+      return;
+    }
     setLoading(true);
     try {
       await stockService.crearMovimiento({
@@ -71,6 +110,31 @@ function MovimientoModal({ onClose, onSave }) {
           </h2>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sucursal *
+            </label>
+            {sucursalUnica ? (
+              <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-700">
+                {nombreSucursal(sucursalUnica)}
+              </div>
+            ) : (
+              <select
+                required
+                value={form.sucursal}
+                onChange={(e) => setForm({ ...form, sucursal: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Seleccionar sucursal</option>
+                {sucursalesOpc.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Producto *
@@ -106,11 +170,20 @@ function MovimientoModal({ onClose, onSave }) {
                 <option value="">Seleccionar variante</option>
                 {productoSeleccionado.variantes.map((v) => (
                   <option key={v.nombre} value={v.nombre}>
-                    {v.nombre} (Stock: {v.stock_actual})
+                    {v.nombre} (Stock: {stockEn(v, form.sucursal)})
                   </option>
                 ))}
               </select>
             </div>
+          )}
+
+          {itemStock && form.sucursal && (
+            <p className="text-sm text-gray-600 bg-gray-50 rounded-xl px-3 py-2">
+              Stock actual en {nombreSucursal(form.sucursal)}:{" "}
+              <span className="font-semibold text-gray-800">
+                {stockDisponible}
+              </span>
+            </p>
           )}
 
           <div className="grid grid-cols-2 gap-3">
@@ -200,8 +273,22 @@ export default function Stock() {
   const [tab, setTab] = useState("inventario");
   const [showModal, setShowModal] = useState(false);
   const { user } = useAuth();
+  const [sucursal, setSucursal] = useState("");
+  const [categorias, setCategorias] = useState([]);
+  const [filtros, setFiltros] = useState({ categoria_id: "", stock: "" });
+  const [showFiltros, setShowFiltros] = useState(false);
+  const [productoMovimiento, setProductoMovimiento] = useState(null);
+  const filtrosActivos = Object.values(filtros).some((v) => v !== "");
+  const [expandidos, setExpandidos] = useState(() => new Set());
+  const alternarExpandido = (id) =>
+    setExpandidos((prev) => {
+      const nuevo = new Set(prev);
+      nuevo.has(id) ? nuevo.delete(id) : nuevo.add(id);
+      return nuevo;
+    });
   const [filtrosMovimientos, setFiltrosMovimientos] = useState({
     busqueda: "",
+    sucursal: "",
     tipo: "",
     motivo: "",
     fecha_desde: "",
@@ -225,18 +312,38 @@ export default function Stock() {
 
   useEffect(() => {
     fetchData();
+    categoriasService.getAll().then(setCategorias).catch(() => {});
   }, []);
 
-  const filteredProductos = productos.filter((p) =>
-    p.nombre.toLowerCase().includes(search.toLowerCase()),
-  );
+  // Stock del producto en la sucursal elegida (o total); suma las variantes
+  const stockDelProducto = (p) =>
+    p.tiene_variantes
+      ? (p.variantes || []).reduce((a, v) => a + (stockEn(v, sucursal) || 0), 0)
+      : stockEn(p, sucursal) || 0;
+
+  const filteredProductos = productos.filter((p) => {
+    if (!p.nombre.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filtros.categoria_id && p.categoria_id !== filtros.categoria_id)
+      return false;
+    if (filtros.stock === "con_stock" && stockDelProducto(p) <= 0) return false;
+    if (filtros.stock === "sin_stock" && stockDelProducto(p) > 0) return false;
+    return true;
+  });
+
+  // Stock / mínimo según la sucursal elegida (vacía = total)
+  const stockDe = (item) => stockEn(item, sucursal);
+  const minimoDe = (item) => minimoEn(item, sucursal);
+  // Con una sucursal elegida se mira esa; en "todas", si alguna está por debajo de su mínimo
+  const esBajo = (item) =>
+    sucursal
+      ? stockDe(item) < minimoDe(item)
+      : SUCURSALES.some((o) => stockEn(item, o.value) < minimoEn(item, o.value));
 
   // Un artículo es un producto simple o cada variante de un producto
   const articulosBajos = (p) =>
     p.tiene_variantes
-      ? (p.variantes || []).filter((v) => v.stock_actual < v.stock_minimo)
-          .length
-      : p.stock_actual < p.stock_minimo
+      ? (p.variantes || []).filter(esBajo).length
+      : esBajo(p)
         ? 1
         : 0;
   const alertas = productos.filter((p) => articulosBajos(p) > 0);
@@ -247,8 +354,107 @@ export default function Stock() {
 
   const stockTotal = (p) =>
     p.tiene_variantes
-      ? (p.variantes || []).reduce((a, v) => a + (v.stock_actual || 0), 0)
-      : p.stock_actual || 0;
+      ? (p.variantes || []).reduce((a, v) => a + (stockDe(v) || 0), 0)
+      : stockDe(p) || 0;
+
+  // Para un producto con variantes se suman las variantes; un producto simple
+  // usa sus propios valores. "Bajo" = algún artículo está bajo su mínimo.
+  const valorEn = (it, suc) =>
+    it.tiene_variantes
+      ? (it.variantes || []).reduce((a, v) => a + (stockEn(v, suc) || 0), 0)
+      : stockEn(it, suc);
+  const minimoSumado = (it, suc) =>
+    it.tiene_variantes
+      ? (it.variantes || []).reduce((a, v) => a + (minimoEn(v, suc) || 0), 0)
+      : minimoEn(it, suc);
+  const bajoEnSuc = (it, suc) =>
+    it.tiene_variantes
+      ? (it.variantes || []).some((v) => stockEn(v, suc) < minimoEn(v, suc))
+      : stockEn(it, suc) < minimoEn(it, suc);
+
+  // Con una sucursal elegida: stock y mínimo de esa sucursal.
+  // En "todas": una columna de stock por sucursal (rojo si está bajo su mínimo).
+  const CeldasStock = ({ item }) =>
+    sucursal ? (
+      <>
+        <td
+          className={`col-num px-6 py-4 text-sm ${bajoEnSuc(item, sucursal) ? "font-semibold text-red-600" : "font-medium text-gray-800"}`}
+        >
+          {valorEn(item, sucursal)}
+        </td>
+        <td className="col-num px-6 py-4 text-sm text-gray-500">
+          {minimoSumado(item, sucursal)}
+        </td>
+      </>
+    ) : (
+      SUCURSALES.map((o) => {
+        const bajo = bajoEnSuc(item, o.value);
+        return (
+          <td
+            key={o.value}
+            title={bajo ? "Stock bajo el mínimo" : undefined}
+            className={`col-num px-6 py-4 text-sm ${bajo ? "font-semibold text-red-600" : "text-gray-800"}`}
+          >
+            {valorEn(item, o.value)}
+          </td>
+        );
+      })
+    );
+
+  const puedeMover = user?.rol !== "cajero" && user?.rol !== "vendedor";
+  const accionesProducto = (producto) => {
+    const acciones = [];
+    if (puedeMover) {
+      acciones.push({
+        label: "Registrar movimiento",
+        icono: <ArrowLeftRight size={14} />,
+        onClick: () => {
+          setProductoMovimiento(producto);
+          setShowModal(true);
+        },
+      });
+      acciones.push({
+        label: "Ver movimientos",
+        icono: <History size={14} />,
+        onClick: () => {
+          setFiltrosMovimientos((f) => ({ ...f, busqueda: producto.nombre }));
+          setTab("movimientos");
+        },
+      });
+    }
+    if (producto.tiene_variantes) {
+      acciones.push({
+        label: expandidos.has(producto.id) ? "Ocultar variantes" : "Ver variantes",
+        icono: expandidos.has(producto.id) ? <ChevronUp size={14} /> : <ChevronDown size={14} />,
+        onClick: () => alternarExpandido(producto.id),
+      });
+    }
+    return acciones;
+  };
+
+  const EstadoBadge = ({ bajo, cantidad }) => (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap ${
+        bajo ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+      }`}
+    >
+      {bajo ? (
+        <>
+          <AlertTriangle size={10} /> Stock bajo
+          {cantidad > 1 ? ` (${cantidad})` : ""}
+        </>
+      ) : (
+        "OK"
+      )}
+    </span>
+  );
+
+  const Desglose = ({ item }) =>
+    sucursal ? null : (
+      <p className="text-xs text-gray-400 font-normal">
+        {SUCURSALES.map((o) => `${o.label.replace("Sucursal ", "S")}: ${stockEn(item, o.value)}`).join(" · ")}
+      </p>
+    );
 
   const tablaProductos = useTabla(filteredProductos, {
     porPagina: 20,
@@ -268,6 +474,11 @@ export default function Stock() {
       !m.variante_nombre
         ?.toLowerCase()
         .includes(filtrosMovimientos.busqueda.toLowerCase())
+    )
+      return false;
+    if (
+      filtrosMovimientos.sucursal &&
+      (m.sucursal || "sucursal_1") !== filtrosMovimientos.sucursal
     )
       return false;
     if (filtrosMovimientos.tipo && m.tipo !== filtrosMovimientos.tipo)
@@ -293,6 +504,7 @@ export default function Stock() {
       producto: (m) =>
         productos.find((p) => p.id === m.producto_id)?.nombre || "",
       fecha: (m) => (m.fecha ? new Date(m.fecha).getTime() : null),
+      sucursal: (m) => nombreSucursal(m.sucursal || "sucursal_1"),
     },
   });
 
@@ -304,11 +516,15 @@ export default function Stock() {
           <h1 className="text-2xl font-bold text-gray-800">Stock</h1>
           <p className="text-gray-500 text-sm mt-1">
             {productos.length} productos en inventario
+            {sucursal && ` · ${nombreSucursal(sucursal)}`}
           </p>
         </div>
         {user?.rol !== "cajero" && user?.rol !== "vendedor" && (
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              setProductoMovimiento(null);
+              setShowModal(true);
+            }}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
           >
             <Plus size={18} />
@@ -327,6 +543,7 @@ export default function Stock() {
               {totalArticulosBajos === 1 ? "artículo" : "artículos"}
             </span>{" "}
             con stock bajo o agotado
+            {sucursal && ` en ${nombreSucursal(sucursal)}`}
             {alertas.length !== totalArticulosBajos &&
               ` (en ${alertas.length} productos)`}
           </p>
@@ -361,19 +578,97 @@ export default function Stock() {
 
       {tab === "inventario" && (
         <>
-          <div className="relative">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-            />
-            <input
-              type="text"
-              placeholder="Buscar producto..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+          <div className="flex flex-wrap gap-2">
+            <div className="relative flex-1 min-w-48">
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="text"
+                placeholder="Buscar producto..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <select
+              value={sucursal}
+              onChange={(e) => setSucursal(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas las sucursales</option>
+              {SUCURSALES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowFiltros(!showFiltros)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition ${
+                filtrosActivos
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              Filtros{" "}
+              {filtrosActivos &&
+                `(${Object.values(filtros).filter((v) => v !== "").length})`}
+            </button>
+            {filtrosActivos && (
+              <button
+                type="button"
+                onClick={() => setFiltros({ categoria_id: "", stock: "" })}
+                className="px-4 py-2 rounded-xl text-sm text-red-600 border border-red-200 hover:bg-red-50 transition"
+              >
+                Limpiar
+              </button>
+            )}
           </div>
+
+          {showFiltros && (
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Categoría
+                </label>
+                <select
+                  value={filtros.categoria_id}
+                  onChange={(e) =>
+                    setFiltros({ ...filtros, categoria_id: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Todas las categorías</option>
+                  {categorias
+                    .filter((c) => c.activo !== false)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Stock{sucursal ? ` en ${nombreSucursal(sucursal)}` : ""}
+                </label>
+                <select
+                  value={filtros.stock}
+                  onChange={(e) =>
+                    setFiltros({ ...filtros, stock: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Todos</option>
+                  <option value="con_stock">Con stock</option>
+                  <option value="sin_stock">Sin stock</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           {loading ? (
             <div className="text-center py-12 text-gray-500">Cargando...</div>
@@ -385,104 +680,112 @@ export default function Stock() {
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
                       <ThOrdenable campo="nombre" tabla={tablaProductos} className="px-6 py-3">Producto</ThOrdenable>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
-                        Variante
-                      </th>
-                      <ThOrdenable campo="stock" tabla={tablaProductos} className="px-6 py-3">Stock Actual</ThOrdenable>
-                      <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
-                        Stock Mínimo
-                      </th>
+                      {sucursal ? (
+                        <>
+                          <ThOrdenable campo="stock" tabla={tablaProductos} className="px-6 py-3">Stock Actual</ThOrdenable>
+                          <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                            Stock Mínimo
+                          </th>
+                        </>
+                      ) : (
+                        SUCURSALES.map((o) => (
+                          <th key={o.value} className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                            Stock {o.label.replace("Sucursal", "Suc.")}
+                          </th>
+                        ))
+                      )}
                       <ThOrdenable campo="estado" tabla={tablaProductos} className="px-6 py-3">Estado</ThOrdenable>
+                      <th className="w-28 px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                        Acciones
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {tablaProductos.filas.map((producto) =>
-                      producto.tiene_variantes ? (
-                        producto.variantes.map((v, i) => (
-                          <tr
-                            key={`${producto.id}-${i}`}
-                            className={`hover:bg-gray-50 transition-[background-color] ${i === 0 ? "border-t-2 border-gray-200" : ""}`}
-                          >
-                            {i === 0 && (
-                              <td
-                                className="px-6 py-4 font-medium text-gray-800"
-                                rowSpan={producto.variantes.length}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <Package
-                                    size={16}
-                                    className="text-gray-400"
-                                  />
-                                  {producto.nombre}
-                                </div>
-                              </td>
-                            )}
-                            <td className="px-6 py-4 text-sm text-gray-600">
-                              {v.nombre}
-                            </td>
-                            <td className="px-6 py-4 text-sm font-medium text-gray-800">
-                              {v.stock_actual}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500">
-                              {v.stock_minimo}
-                            </td>
-                            <td className="px-6 py-4">
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
-                                  v.stock_actual < v.stock_minimo
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-green-100 text-green-700"
-                                }`}
-                              >
-                                {v.stock_actual < v.stock_minimo ? (
-                                  <>
-                                    <AlertTriangle size={10} /> Stock bajo
-                                  </>
-                                ) : (
-                                  "OK"
+                    {tablaProductos.filas.map((producto) => {
+                      const abierto = expandidos.has(producto.id);
+                      const cantBajos = articulosBajos(producto);
+                      return (
+                        <Fragment key={producto.id}>
+                          <tr className="hover:bg-gray-50 transition-[background-color]">
+                            <td className="px-6 py-4 font-medium text-gray-800">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Package size={16} className="text-gray-400 shrink-0" />
+                                {producto.nombre}
+                                {producto.tiene_variantes && (
+                                  <button
+                                    type="button"
+                                    onClick={() => alternarExpandido(producto.id)}
+                                    className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-xs rounded-md hover:bg-blue-100 transition"
+                                  >
+                                    {producto.variantes.length} variantes
+                                  </button>
                                 )}
-                              </span>
+                              </div>
+                            </td>
+                            <CeldasStock item={producto} />
+                            <td className="col-centro px-6 py-4">
+                              <EstadoBadge bajo={cantBajos > 0} cantidad={cantBajos} />
+                            </td>
+                            <td className="col-acc px-6 py-4">
+                              <div className="flex items-center justify-end gap-1">
+                                {producto.tiene_variantes && (
+                                  <button
+                                    type="button"
+                                    onClick={() => alternarExpandido(producto.id)}
+                                    className="p-1 text-gray-400 hover:text-blue-600 transition"
+                                    title={abierto ? "Contraer" : "Ver variantes"}
+                                  >
+                                    {abierto ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                  </button>
+                                )}
+                                {accionesProducto(producto).length > 0 && (
+                                  <MenuAcciones acciones={accionesProducto(producto)} />
+                                )}
+                              </div>
                             </td>
                           </tr>
-                        ))
-                      ) : (
-                        <tr
-                          key={producto.id}
-                          className="hover:bg-gray-50 transition border-t-2 border-gray-200"
-                        >
-                          <td className="px-6 py-4 font-medium text-gray-800">
-                            <div className="flex items-center gap-2">
-                              <Package size={16} className="text-gray-400" />
-                              {producto.nombre}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-400">-</td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-800">
-                            {producto.stock_actual}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            {producto.stock_minimo}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
-                                producto.stock_actual < producto.stock_minimo
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-green-100 text-green-700"
-                              }`}
-                            >
-                              {producto.stock_actual < producto.stock_minimo ? (
-                                <>
-                                  <AlertTriangle size={10} /> Stock bajo
-                                </>
-                              ) : (
-                                "OK"
-                              )}
-                            </span>
-                          </td>
-                        </tr>
-                      ),
-                    )}
+                          {abierto && producto.tiene_variantes && (
+                            <tr>
+                              <td colSpan={sucursal ? 5 : 2 + SUCURSALES.length + 1} className="px-6 pb-4 bg-gray-50">
+                                <div className="rounded-xl border border-gray-200 overflow-hidden">
+                                  <table className="w-full text-sm">
+                                    <thead className="bg-gray-100">
+                                      <tr>
+                                        <th className="px-4 py-2 text-xs font-medium text-gray-500">Variante</th>
+                                        {sucursal ? (
+                                          <>
+                                            <th className="px-4 py-2 text-xs font-medium text-gray-500">Stock</th>
+                                            <th className="px-4 py-2 text-xs font-medium text-gray-500">Mínimo</th>
+                                          </>
+                                        ) : (
+                                          SUCURSALES.map((o) => (
+                                            <th key={o.value} className="px-4 py-2 text-xs font-medium text-gray-500">
+                                              {o.label.replace("Sucursal", "Suc.")}
+                                            </th>
+                                          ))
+                                        )}
+                                        <th className="px-4 py-2 text-xs font-medium text-gray-500">Estado</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                      {producto.variantes.map((v, i) => (
+                                        <tr key={i} className="bg-white">
+                                          <td className="px-4 py-2 text-gray-700">{v.nombre}</td>
+                                          <CeldasStock item={v} />
+                                          <td className="col-centro px-4 py-2">
+                                            <EstadoBadge bajo={esBajo(v)} />
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
                 <Paginacion
@@ -503,11 +806,28 @@ export default function Stock() {
                     <div className="p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <Package size={16} className="text-gray-400 shrink-0" />
-                        <p className="font-medium text-gray-800">
+                        <p className="font-medium text-gray-800 flex-1">
                           {producto.nombre}
                         </p>
+                        {accionesProducto(producto).length > 0 && (
+                          <MenuAcciones acciones={accionesProducto(producto)} />
+                        )}
                       </div>
-                      {producto.tiene_variantes ? (
+                      {producto.tiene_variantes && (
+                        <button
+                          type="button"
+                          onClick={() => alternarExpandido(producto.id)}
+                          className="mb-2 inline-flex items-center gap-1 text-xs text-blue-600"
+                        >
+                          {expandidos.has(producto.id) ? (
+                            <ChevronUp size={14} />
+                          ) : (
+                            <ChevronDown size={14} />
+                          )}
+                          {producto.variantes.length} variantes
+                        </button>
+                      )}
+                      {producto.tiene_variantes && expandidos.has(producto.id) ? (
                         <div className="space-y-2">
                           {producto.variantes.map((v, i) => (
                             <div
@@ -519,21 +839,22 @@ export default function Stock() {
                                   {v.nombre}
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                  Mínimo: {v.stock_minimo}
+                                  Mínimo: {minimoDe(v)}
                                 </p>
+                                <Desglose item={v} />
                               </div>
                               <div className="text-right">
                                 <p className="text-sm font-bold text-gray-800">
-                                  {v.stock_actual}
+                                  {stockDe(v)}
                                 </p>
                                 <span
                                   className={`text-xs font-medium ${
-                                    v.stock_actual < v.stock_minimo
+                                    esBajo(v)
                                       ? "text-red-600"
                                       : "text-green-600"
                                   }`}
                                 >
-                                  {v.stock_actual < v.stock_minimo ? (
+                                  {esBajo(v) ? (
                     <span className="inline-flex items-center gap-1">
                       <AlertTriangle size={14} /> Stock bajo
                     </span>
@@ -554,21 +875,26 @@ export default function Stock() {
                               Stock actual
                             </p>
                             <p className="text-lg font-bold text-gray-800">
-                              {producto.stock_actual}
+                              {sucursal ? valorEn(producto, sucursal) : stockTotal(producto)}
                             </p>
+                            {!sucursal && (
+                              <p className="text-xs text-gray-400 font-normal">
+                                {SUCURSALES.map((o) => `${o.label.replace("Sucursal ", "S")}: ${valorEn(producto, o.value)}`).join(" · ")}
+                              </p>
+                            )}
                           </div>
                           <div className="text-right">
                             <p className="text-xs text-gray-500">
-                              Mínimo: {producto.stock_minimo}
+                              Mínimo: {sucursal ? minimoSumado(producto, sucursal) : "-"}
                             </p>
                             <span
                               className={`text-xs font-medium ${
-                                producto.stock_actual < producto.stock_minimo
+                                articulosBajos(producto) > 0
                                   ? "text-red-600"
                                   : "text-green-600"
                               }`}
                             >
-                              {producto.stock_actual < producto.stock_minimo ? (
+                              {articulosBajos(producto) > 0 ? (
                     <span className="inline-flex items-center gap-1">
                       <AlertTriangle size={14} /> Stock bajo
                     </span>
@@ -617,6 +943,23 @@ export default function Stock() {
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+            <select
+              value={filtrosMovimientos.sucursal}
+              onChange={(e) =>
+                setFiltrosMovimientos({
+                  ...filtrosMovimientos,
+                  sucursal: e.target.value,
+                })
+              }
+              className="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Todas las sucursales</option>
+              {SUCURSALES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
             <select
               value={filtrosMovimientos.tipo}
               onChange={(e) =>
@@ -681,6 +1024,7 @@ export default function Stock() {
                 <tr>
                   <ThOrdenable campo="tipo" tabla={tablaMov} className="px-6 py-3">Tipo</ThOrdenable>
                   <ThOrdenable campo="producto" tabla={tablaMov} className="px-6 py-3">Producto</ThOrdenable>
+                  <ThOrdenable campo="sucursal" tabla={tablaMov} className="px-6 py-3">Sucursal</ThOrdenable>
                   <ThOrdenable campo="cantidad" tabla={tablaMov} className="px-6 py-3">Cantidad</ThOrdenable>
                   <ThOrdenable campo="motivo" tabla={tablaMov} className="px-6 py-3">Motivo</ThOrdenable>
                   <ThOrdenable campo="fecha" tabla={tablaMov} className="px-6 py-3">Fecha</ThOrdenable>
@@ -704,7 +1048,7 @@ export default function Stock() {
                     }[m.motivo] || m.motivo;
                   return (
                     <tr key={i} className="hover:bg-gray-50 transition-[background-color]">
-                      <td className="px-6 py-4">
+                      <td className="col-centro px-6 py-4">
                         <span
                           className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
                             m.tipo === "entrada"
@@ -739,13 +1083,16 @@ export default function Stock() {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-800">
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {nombreSucursal(m.sucursal || "sucursal_1")}
+                      </td>
+                      <td className="col-num px-6 py-4 text-sm font-medium text-gray-800 ">
                         {m.cantidad}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {motivoLabel}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
+                      <td className="col-centro px-6 py-4 text-sm text-gray-500">
                         {m.fecha ? formatDateTime(m.fecha) : "-"}
                       </td>
                     </tr>
@@ -754,7 +1101,7 @@ export default function Stock() {
                 {movimientos.length === 0 && (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-6 py-12 text-center text-gray-400"
                     >
                       No hay movimientos registrados
@@ -826,7 +1173,9 @@ export default function Stock() {
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">{motivoLabel}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {nombreSucursal(m.sucursal || "sucursal_1")} · {motivoLabel}
+                    </p>
                     <p className="text-xs text-gray-400 mt-1">
                       {m.fecha ? formatDateTime(m.fecha) : "-"}
                     </p>
@@ -847,9 +1196,15 @@ export default function Stock() {
 
       {showModal && (
         <MovimientoModal
-          onClose={() => setShowModal(false)}
+          productoInicial={productoMovimiento}
+          sucursalInicial={sucursal}
+          onClose={() => {
+            setShowModal(false);
+            setProductoMovimiento(null);
+          }}
           onSave={() => {
             setShowModal(false);
+            setProductoMovimiento(null);
             fetchData();
           }}
         />

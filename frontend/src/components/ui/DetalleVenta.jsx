@@ -83,14 +83,14 @@ export default function DetalleVenta({ venta, cliente }) {
           <tbody className="divide-y divide-gray-100">
             {venta.items?.map((item, i) => (
               <tr key={i} className="bg-white">
-                <td className="px-4 py-2 text-center font-medium text-gray-700">
+                <td className="px-4 py-2 font-medium text-gray-700">
                   {item.nombre_producto}
                 </td>
-                <td className="px-4 py-2 text-center text-gray-600">{item.cantidad}</td>
-                <td className="px-4 py-2 text-center text-gray-600">
+                <td className="col-num px-4 py-2 text-gray-600">{item.cantidad}</td>
+                <td className="col-num px-4 py-2 text-gray-600">
                   {formatCurrency(item.precio_unitario)}
                 </td>
-                <td className="px-4 py-2 text-center font-medium text-gray-700">
+                <td className="col-num px-4 py-2 font-medium text-gray-700">
                   {formatCurrency(item.subtotal)}
                 </td>
               </tr>

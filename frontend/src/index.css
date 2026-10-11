@@ -21,12 +21,34 @@ input,
   font-variant-numeric: tabular-nums;
 }
 
-/* Tablas: el contenido de cada columna queda centrado bajo su título.
-   Las filas de detalle expandido (con colspan) conservan su alineación. */
-table th,
+/* Tablas: la alineación depende del tipo de dato.
+   - Texto (nombres, clientes, descripciones): izquierda (por defecto).
+   - Números, montos y cantidades: derecha -> clase "col-num".
+   - Fechas, códigos y estados (badges): centro -> clase "col-centro".
+   - Acciones (última columna): derecha -> clase "col-acc".
+   Se pone la clase en las celdas (td); el encabezado (th) copia la de su
+   columna automáticamente (ver components/ui/AlineacionTablas.jsx), así
+   título y datos siempre quedan alineados igual. */
+table th {
+  text-align: left;
+}
 table td:not([colspan]) {
+  text-align: left;
+}
+table th.col-num,
+table td.col-num:not([colspan]),
+table th.col-acc,
+table td.col-acc:not([colspan]) {
+  text-align: right;
+}
+table th.col-centro,
+table td.col-centro:not([colspan]) {
   text-align: center;
 }
-table td:not([colspan]) > .flex:not(.flex-col) {
+table td.col-centro:not([colspan]) > .flex:not(.flex-col) {
   justify-content: center;
+}
+table td.col-num:not([colspan]) > .flex:not(.flex-col),
+table td.col-acc:not([colspan]) > .flex:not(.flex-col) {
+  justify-content: flex-end;
 }

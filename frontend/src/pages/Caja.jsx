@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import InputNumero from "../components/ui/InputNumero";
 import {
   Check,
+  ArrowLeft,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
+  Eye,
   DollarSign,
   Lock,
   Minus,
@@ -18,11 +21,14 @@ import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
 import { useAuth } from "../context/AuthContext";
+import { useSucursales } from "../hooks/useSucursales";
+import MenuAcciones from "../components/ui/MenuAcciones";
 import { useCotizacion } from "../hooks/useCotizacion";
 import {
   formatCurrency,
   formatDateTime,
   formatUSD,
+  nombreSucursal,
   parsearMoneda,
 } from "../utils/helpers";
 
@@ -69,11 +75,9 @@ const totalesMovimientos = (movs = []) => {
 };
 
 function AbrirCajaModal({ onClose, onSave }) {
-  const { user } = useAuth();
+  const { opciones, unica, porDefecto } = useSucursales();
   const [monto, setMonto] = useState("");
-  const [sucursal, setSucursal] = useState(
-    user?.sucursales?.[0] || "sucursal_1",
-  );
+  const [sucursal, setSucursal] = useState(porDefecto);
   const [notas, setNotas] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -156,17 +160,23 @@ function AbrirCajaModal({ onClose, onSave }) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Sucursal *
             </label>
-            <select
-              value={sucursal}
-              onChange={(e) => setSucursal(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {(user?.sucursales || ["sucursal_1"]).map((s) => (
-                <option key={s} value={s}>
-                  {s === "sucursal_1" ? "Sucursal 1" : "Sucursal 2"}
-                </option>
-              ))}
-            </select>
+            {unica ? (
+              <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-700">
+                {nombreSucursal(unica)}
+              </div>
+            ) : (
+              <select
+                value={sucursal}
+                onChange={(e) => setSucursal(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {opciones.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -369,6 +379,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
         })),
         dejar_en_caja: dejar.monto || 0,
         notas,
+        caja_id: caja.es_mia ? undefined : caja.id,
       });
       toast.success("Caja cerrada correctamente");
       onSave(result);
@@ -662,15 +673,25 @@ function MovimientoModal({ onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!(parseFloat(form.monto) > 0)) {
+      toast.error("Ingresá un monto mayor a 0");
+      return;
+    }
     setLoading(true);
     try {
-      await cajaService.abrir({
-        monto_inicial: parsearMoneda(montoDisplay),
-        sucursal,
-        notas,
+      await cajaService.agregarMovimiento({
+        tipo: form.tipo,
+        monto: parseFloat(form.monto),
+        motivo: form.motivo,
+        metodo_pago: form.metodo_pago,
+        notas: form.notas || null,
       });
+      toast.success("Movimiento registrado");
+      onSave();
     } catch (error) {
-      toast.error("Error al registrar movimiento");
+      toast.error(
+        error.response?.data?.detail || "Error al registrar movimiento",
+      );
     } finally {
       setLoading(false);
     }
@@ -950,8 +971,174 @@ function ResumenCierre({ resultado, onClose }) {
   );
 }
 
+function ListadoCajas({ abiertas, esAdmin, miCajaAbierta, onAbrir, onVer }) {
+  const tabla = useTabla(abiertas, {
+    porPagina: 10,
+    ordenInicial: { campo: "fecha_apertura", dir: "asc" },
+    accessors: {
+      fecha_apertura: (c) =>
+        c.fecha_apertura ? new Date(c.fecha_apertura).getTime() : null,
+    },
+  });
+
+  if (abiertas.length === 0) {
+    return (
+      <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
+        <Lock size={48} className="mx-auto text-gray-300 mb-3" />
+        <p className="text-gray-500 font-medium">No hay cajas abiertas</p>
+        <p className="text-gray-400 text-sm mt-1">
+          Abrí la caja para comenzar a registrar ventas
+        </p>
+        {!miCajaAbierta && (
+          <button
+            onClick={onAbrir}
+            className="mt-4 px-6 py-2 bg-green-600 text-white rounded-xl text-sm hover:bg-green-700 transition"
+          >
+            Abrir Caja Ahora
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const acciones = (c) => [
+    {
+      label: "Ver detalle",
+      icono: <Eye size={15} />,
+      onClick: () => onVer(c),
+    },
+    c.es_mia && {
+      label: "Registrar movimiento",
+      icono: <Plus size={15} />,
+      onClick: () => onVer(c, "movimiento"),
+    },
+    (c.es_mia || esAdmin) && {
+      label: "Cerrar caja",
+      icono: <Lock size={15} />,
+      peligro: true,
+      onClick: () => onVer(c, "cerrar"),
+    },
+  ];
+
+  const saldo = (c) => c.esperado_total ?? c.monto_inicial;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* Desktop */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <ThOrdenable campo="sucursal" tabla={tabla} className="px-6 py-3">Sucursal</ThOrdenable>
+              <ThOrdenable campo="usuario_apertura_nombre" tabla={tabla} className="px-6 py-3">Abierta por</ThOrdenable>
+              <ThOrdenable campo="fecha_apertura" tabla={tabla} className="px-6 py-3">Apertura</ThOrdenable>
+              <ThOrdenable campo="monto_inicial" tabla={tabla} className="px-6 py-3">Monto inicial</ThOrdenable>
+              <ThOrdenable campo="total_ventas_hoy" tabla={tabla} className="px-6 py-3">Ventas del día</ThOrdenable>
+              <ThOrdenable campo="esperado_total" tabla={tabla} className="px-6 py-3">Saldo estimado</ThOrdenable>
+              <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {tabla.filas.map((c) => (
+              <tr key={c.id} className="hover:bg-gray-50 transition-[background-color]">
+                <td className="px-6 py-4">
+                  <button
+                    onClick={() => onVer(c)}
+                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline whitespace-nowrap"
+                  >
+                    {nombreSucursal(c.sucursal)}
+                  </button>
+                  {c.es_mia && (
+                    <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium">
+                      Tu caja
+                    </span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-700">
+                  {c.usuario_apertura_nombre || "—"}
+                </td>
+                <td className="col-centro px-6 py-4 text-sm text-gray-600">
+                  {c.fecha_apertura ? formatDateTime(c.fecha_apertura) : "-"}
+                </td>
+                <td className="col-num px-6 py-4 text-sm text-gray-700">
+                  {formatCurrency(c.monto_inicial)}
+                </td>
+                <td className="col-num px-6 py-4 text-sm font-medium text-green-600">
+                  {formatCurrency(c.total_ventas_hoy || 0)}
+                </td>
+                <td className="col-num px-6 py-4 text-sm font-semibold text-gray-800">
+                  {formatCurrency(saldo(c))}
+                </td>
+                <td className="col-acc px-6 py-4 ">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onVer(c)}
+                      title="Ver detalle"
+                      className="p-1 text-gray-400 hover:text-gray-600"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                    <MenuAcciones acciones={acciones(c)} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile */}
+      <div className="md:hidden divide-y divide-gray-100">
+        {tabla.filas.map((c) => (
+          <div key={c.id} className="p-4 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <button
+                  onClick={() => onVer(c)}
+                  className="font-medium text-blue-600"
+                >
+                  {nombreSucursal(c.sucursal)}
+                </button>
+                {c.es_mia && (
+                  <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 rounded-lg text-xs font-medium">
+                    Tu caja
+                  </span>
+                )}
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {c.usuario_apertura_nombre || "—"} ·{" "}
+                  {c.fecha_apertura ? formatDateTime(c.fecha_apertura) : "-"}
+                </p>
+              </div>
+              <MenuAcciones acciones={acciones(c)} />
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">
+                Ventas: <b className="text-green-600">{formatCurrency(c.total_ventas_hoy || 0)}</b>
+              </span>
+              <span className="text-gray-500">
+                Saldo: <b className="text-gray-800">{formatCurrency(saldo(c))}</b>
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <Paginacion
+        total={tabla.total}
+        porPagina={tabla.porPagina}
+        paginaActual={tabla.pagina}
+        onChange={tabla.setPagina}
+        compacto
+      />
+    </div>
+  );
+}
+
 export default function Caja() {
-  const [caja, setCaja] = useState(null);
+  const { user } = useAuth();
+  const esAdmin = user?.rol === "administrador";
+  const [miCaja, setMiCaja] = useState(null); // la caja que abrí yo
+  const [abiertas, setAbiertas] = useState([]); // listado de cajas abiertas
+  const [caja, setCaja] = useState(null); // detalle de la caja que se está viendo
   const [historial, setHistorial] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("actual");
@@ -962,14 +1149,26 @@ export default function Caja() {
   const [expandedCaja, setExpandedCaja] = useState(null);
   const [busquedaHistorial, setBusquedaHistorial] = useState("");
 
-  const fetchData = async () => {
+  const miCajaAbierta = miCaja?.estado === "abierta";
+
+  // Recarga el listado y, si se está viendo una caja, también su detalle
+  const fetchData = async (idVista = caja?.id) => {
     try {
-      const [actual, hist] = await Promise.all([
+      const [mia, lista, hist] = await Promise.all([
         cajaService.getActual(),
+        cajaService.getAbiertas(),
         cajaService.getHistorial(),
       ]);
-      setCaja(actual);
+      setMiCaja(mia);
+      setAbiertas(lista);
       setHistorial(hist);
+      if (idVista) {
+        const detalle =
+          mia.id === idVista
+            ? mia
+            : await cajaService.getDetalle(idVista).catch(() => null);
+        setCaja(detalle);
+      }
     } catch (error) {
       toast.error("Error al cargar caja");
     } finally {
@@ -981,7 +1180,25 @@ export default function Caja() {
     fetchData();
   }, []);
 
-  const cajaAbierta = caja?.estado === "abierta";
+  // Abre el detalle de una caja del listado (y opcionalmente una acción)
+  const verCaja = async (c, accion) => {
+    try {
+      const detalle = await cajaService.getDetalle(c.id);
+      setCaja(detalle);
+      if (accion === "cerrar") setShowCerrarModal(true);
+      if (accion === "movimiento") setShowMovimientoModal(true);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "No se pudo abrir la caja");
+      fetchData(null);
+    }
+  };
+
+  const volverAlListado = () => {
+    setCaja(null);
+    fetchData(null);
+  };
+
+  const cajaAbierta = !!caja && caja.estado === "abierta";
 
   const totalMovimientos = cajaAbierta
     ? (caja.movimientos || []).reduce(
@@ -1019,38 +1236,61 @@ export default function Caja() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Caja</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {cajaAbierta ? "Caja abierta" : "Caja cerrada"}
-          </p>
+        <div className="flex items-center gap-3">
+          {cajaAbierta && tab === "actual" && (
+            <button
+              onClick={volverAlListado}
+              title="Volver al listado de cajas"
+              className="p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition"
+            >
+              <ArrowLeft size={20} />
+            </button>
+          )}
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              {cajaAbierta && tab === "actual"
+                ? `Caja · ${nombreSucursal(caja.sucursal)}`
+                : "Caja"}
+            </h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {cajaAbierta && tab === "actual"
+                ? `Abierta por ${caja.usuario_apertura_nombre || "—"}${caja.es_mia ? " (vos)" : ""}`
+                : `${abiertas.length} ${abiertas.length === 1 ? "caja abierta" : "cajas abiertas"}`}
+            </p>
+          </div>
         </div>
         <div className="flex gap-2">
-          {cajaAbierta ? (
+          {cajaAbierta && tab === "actual" ? (
             <>
-              <button
-                onClick={() => setShowMovimientoModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
-              >
-                <Plus size={18} />
-                Movimiento
-              </button>
-              <button
-                onClick={() => setShowCerrarModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition text-sm font-medium"
-              >
-                <Lock size={18} />
-                Cerrar Caja
-              </button>
+              {caja.es_mia && (
+                <button
+                  onClick={() => setShowMovimientoModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
+                >
+                  <Plus size={18} />
+                  Movimiento
+                </button>
+              )}
+              {(caja.es_mia || esAdmin) && (
+                <button
+                  onClick={() => setShowCerrarModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition text-sm font-medium"
+                >
+                  <Lock size={18} />
+                  Cerrar Caja
+                </button>
+              )}
             </>
           ) : (
-            <button
-              onClick={() => setShowAbrirModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition text-sm font-medium"
-            >
-              <Unlock size={18} />
-              Abrir Caja
-            </button>
+            !miCajaAbierta && (
+              <button
+                onClick={() => setShowAbrirModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition text-sm font-medium"
+              >
+                <Unlock size={18} />
+                Abrir Caja
+              </button>
+            )
           )}
         </div>
       </div>
@@ -1065,7 +1305,7 @@ export default function Caja() {
               : "text-gray-500 hover:text-gray-700"
           }`}
         >
-          Caja Actual
+          Cajas abiertas
         </button>
         <button
           onClick={() => setTab("historial")}
@@ -1084,19 +1324,13 @@ export default function Caja() {
       ) : tab === "actual" ? (
         <div className="space-y-4">
           {!cajaAbierta ? (
-            <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
-              <Lock size={48} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500 font-medium">No hay caja abierta</p>
-              <p className="text-gray-400 text-sm mt-1">
-                Abrí la caja para comenzar a registrar ventas
-              </p>
-              <button
-                onClick={() => setShowAbrirModal(true)}
-                className="mt-4 px-6 py-2 bg-green-600 text-white rounded-xl text-sm hover:bg-green-700 transition"
-              >
-                Abrir Caja Ahora
-              </button>
-            </div>
+            <ListadoCajas
+              abiertas={abiertas}
+              esAdmin={esAdmin}
+              miCajaAbierta={miCajaAbierta}
+              onAbrir={() => setShowAbrirModal(true)}
+              onVer={verCaja}
+            />
           ) : (
             <>
               {/* Cards resumen */}
@@ -1173,7 +1407,7 @@ export default function Caja() {
                         <tbody className="divide-y divide-gray-50">
                           {tablaMov.filas.map((m, i) => (
                             <tr key={i} className="hover:bg-gray-50 transition-[background-color]">
-                              <td className="px-6 py-3">
+                              <td className="col-centro px-6 py-3">
                                 <span
                                   className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${
                                     m.concepto === "venta"
@@ -1197,7 +1431,7 @@ export default function Caja() {
                                   : etiquetaMetodo(m.metodo_pago)}
                               </td>
                               <td
-                                className={`px-6 py-3 text-sm font-semibold ${
+                                className={`col-num px-6 py-3 text-sm font-semibold ${
                                   m.tipo === "ingreso"
                                     ? "text-green-600"
                                     : "text-red-600"
@@ -1212,7 +1446,7 @@ export default function Caja() {
                                   </span>
                                 )}
                               </td>
-                              <td className="px-6 py-3 text-sm text-gray-500">
+                              <td className="col-centro px-6 py-3 text-sm text-gray-500">
                                 {m.fecha ? formatDateTime(m.fecha) : "-"}
                               </td>
                             </tr>
@@ -1493,7 +1727,7 @@ export default function Caja() {
                           <tbody className="divide-y divide-gray-100">
                             {c.movimientos.map((m, j) => (
                               <tr key={j}>
-                                <td className="px-3 py-2">
+                                <td className="col-centro px-3 py-2">
                                   <span
                                     className={`text-xs font-medium ${m.tipo === "ingreso" ? "text-green-600" : "text-red-600"}`}
                                   >
@@ -1511,7 +1745,7 @@ export default function Caja() {
                                   {m.motivo}
                                 </td>
                                 <td
-                                  className={`px-3 py-2 font-medium ${m.tipo === "ingreso" ? "text-green-600" : "text-red-600"}`}
+                                  className={`col-num px-3 py-2 font-medium ${m.tipo === "ingreso" ? "text-green-600" : "text-red-600"}`}
                                 >
                                   {m.tipo === "ingreso" ? "+" : "-"}
                                   {formatCurrency(m.monto)}
@@ -1553,7 +1787,8 @@ export default function Caja() {
           onSave={(result) => {
             setShowCerrarModal(false);
             setResumenCierre(result);
-            fetchData();
+            setCaja(null);
+            fetchData(null);
           }}
         />
       )}
