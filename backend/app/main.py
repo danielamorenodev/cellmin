@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from app.config import settings
 from app.database import connect_db, close_db
 from app.routers import (
     auth, users, categories, products,
@@ -24,15 +25,19 @@ async def lifespan(app: FastAPI):
     yield
     await close_db()
 
+# En producción no se publica la documentación interactiva de la API
 app = FastAPI(
     title="Sistema de Ventas y Stock",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url=None if settings.es_produccion else "/docs",
+    redoc_url=None if settings.es_produccion else "/redoc",
+    openapi_url=None if settings.es_produccion else "/openapi.json",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"],
+    allow_origins=settings.origenes_permitidos,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

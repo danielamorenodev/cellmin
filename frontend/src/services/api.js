@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const API_URL = "http://127.0.0.1:8000/api";
+// Ruta relativa: en desarrollo la atiende el proxy de Vite y en producción nginx
+// (mismo dominio que el sitio). VITE_API_URL permite apuntar a otra dirección.
+const API_URL = import.meta.env.VITE_API_URL || "/api";
 const api = axios.create({
   baseURL: API_URL,
   headers: {
