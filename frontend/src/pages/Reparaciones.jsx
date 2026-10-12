@@ -356,7 +356,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
     tiposSeleccionados.length > 0 && userRol !== "tecnico" && cajaAbierta;
   const senaActiva = cobrarSena && senaDisponible;
   // Con medio "dólares" el monto de la seña es en US$: se convierte a pesos
-  // con el dólar blue; lo que supere el total se devuelve en pesos.
+  // con el dólar; lo que supere el total se devuelve en pesos.
   const senaEsUSD = sena.metodo === "usd";
   const montoIngresado = parseFloat(sena.monto) || 0;
   const senaEnPesos = senaEsUSD
@@ -774,7 +774,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                         <span className="font-medium text-gray-700">
                           {formatCurrency(senaEnPesos)}
                         </span>{" "}
-                        (dólar blue {formatCurrency(cotizacion.venta || 0)})
+                        (dólar {formatCurrency(cotizacion.venta || 0)})
                         {vueltoSena > 0 && (
                           <span className="text-green-700">
                             {" "}
@@ -1145,7 +1145,7 @@ function PagoModal({ reparacion, onClose, onSave }) {
                     <span className="font-medium text-gray-700">
                       {formatCurrency(pesosDe(pago))}
                     </span>{" "}
-                    (dólar blue {formatCurrency(cotizacion.venta || 0)})
+                    (dólar {formatCurrency(cotizacion.venta || 0)})
                   </p>
                 )}
               </div>

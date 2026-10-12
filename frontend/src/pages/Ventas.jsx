@@ -324,7 +324,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
         : subtotal;
 
   // Con medio "dólares" el monto de la línea es en US$. Todo se compara en
-  // pesos con la cotización (dólar blue venta); lo que sobra es el vuelto.
+  // pesos con la cotización del dólar; lo que sobra es el vuelto.
   const esUSD = (p) => p.metodo === "usd";
   const pesosDe = (p) =>
     esUSD(p)
@@ -804,7 +804,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                       <span className="font-medium text-gray-700">
                         {formatCurrency(pesosDe(pago))}
                       </span>{" "}
-                      (dólar blue {formatCurrency(cotizacion.venta || 0)})
+                      (dólar {formatCurrency(cotizacion.venta || 0)})
                     </p>
                   )}
                 </div>

@@ -20,13 +20,13 @@ def formato_usd(monto: float) -> str:
 
 
 async def cotizacion_para_cobro(db) -> float:
-    """Dólar blue (venta) con el que se convierte el cobro. Sin cotización
+    """Dólar (cargado a mano) con el que se convierte el cobro. Sin cotización
     no se puede cobrar en dólares."""
     valor = await cotizacion_venta(db)
     if not valor:
         raise HTTPException(
             status_code=400,
-            detail="No hay cotización del dólar disponible, por ahora no se puede cobrar en dólares.",
+            detail="Todavía no se cargó el valor del dólar. Cargalo en la sección Dólar para poder cobrar en dólares.",
         )
     return valor
 

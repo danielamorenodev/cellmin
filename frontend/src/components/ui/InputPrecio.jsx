@@ -7,7 +7,7 @@ import { formatCurrency, formatUSD } from "../../utils/helpers";
 // - `pesos` es siempre el valor real (lo que se guarda).
 // - moneda "ars": se escribe en pesos y debajo se ve el equivalente en USD.
 // - moneda "usd": se escribe en dólares y debajo se ve el equivalente en pesos,
-//   calculado con el dólar blue (venta) del momento.
+//   calculado con el valor del dólar cargado en el sistema.
 // Para que el campo se reinicie al cambiar de moneda, el padre debe usar
 // key={moneda}.
 export default function InputPrecio({
@@ -92,7 +92,7 @@ export function SelectorMoneda({ moneda, onChange }) {
       </div>
       {disponible ? (
         <span className="text-gray-400">
-          Dólar blue $ {new Intl.NumberFormat("es-AR").format(venta)}
+          Dólar $ {new Intl.NumberFormat("es-AR").format(venta)}
         </span>
       ) : (
         <span className="text-red-500">

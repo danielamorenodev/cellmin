@@ -9,6 +9,7 @@ export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const cotizacion = useCotizacion();
+  const esAdmin = user?.rol === "administrador";
 
   const handleLogout = () => {
     logout();
@@ -31,32 +32,38 @@ export default function Header() {
         </span>
       </div>
       <div className="flex items-center gap-3">
-        {cotizacion.cargado && !cotizacion.disponible && (
-          <div
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-500"
-            title="No se pudo obtener la cotización del dólar. Los precios en USD no se muestran."
-          >
-            <DollarSign size={13} />
-            <span>Dólar no disponible</span>
-          </div>
-        )}
-        {cotizacion.disponible && (
-          <div
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium ${
-              cotizacion.obsoleta
-                ? "bg-yellow-50 text-yellow-700"
-                : "bg-green-50 text-green-700"
-            }`}
+        {cotizacion.cargado && (
+          <button
+            type="button"
+            onClick={() => esAdmin && navigate("/dolar")}
+            disabled={!esAdmin}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+              !cotizacion.disponible
+                ? "bg-gray-100 text-gray-500"
+                : cotizacion.obsoleta
+                  ? "bg-yellow-50 text-yellow-700"
+                  : "bg-green-50 text-green-700"
+            } ${esAdmin ? "hover:opacity-80 cursor-pointer" : "cursor-default"}`}
             title={
-              cotizacion.obsoleta
-                ? "No se pudo actualizar: se usa el último valor conocido"
-                : "Dólar blue (venta)"
+              !cotizacion.disponible
+                ? "Todavía no se cargó el valor del dólar. Los precios en USD no se muestran."
+                : cotizacion.obsoleta
+                  ? "Este valor no se actualizó hoy"
+                  : "Valor del dólar cargado por el administrador"
             }
           >
             <DollarSign size={13} />
-            <span>Blue {formatCurrency(cotizacion.venta)}</span>
-            {cotizacion.obsoleta && <span className="hidden sm:inline">· desactualizado</span>}
-          </div>
+            {cotizacion.disponible ? (
+              <>
+                <span>Dólar {formatCurrency(cotizacion.venta)}</span>
+                {cotizacion.obsoleta && (
+                  <span className="hidden sm:inline">· sin actualizar hoy</span>
+                )}
+              </>
+            ) : (
+              <span>Dólar no cargado</span>
+            )}
+          </button>
         )}
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">

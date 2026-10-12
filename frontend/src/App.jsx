@@ -20,6 +20,7 @@ import ReparacionDetalle from "./pages/ReparacionDetalle";
 import TiposReparacion from "./pages/TiposReparacion";
 import Usuarios from "./pages/Usuarios";
 import Reportes from "./pages/Reportes";
+import Dolar from "./pages/Dolar";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -172,6 +173,14 @@ export default function App() {
         element={
           <PrivateLayout>
             <Reportes />
+          </PrivateLayout>
+        }
+      />
+      <Route
+        path="/dolar"
+        element={
+          <PrivateLayout>
+            <Dolar />
           </PrivateLayout>
         }
       />

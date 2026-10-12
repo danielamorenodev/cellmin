@@ -9,6 +9,7 @@ import {
   Truck,
   BarChart2,
   Wrench,
+  CircleDollarSign,
   DollarSign,
   Menu,
   X,
@@ -68,6 +69,12 @@ const allMenuItems = [
     path: "/reportes",
     label: "Reportes",
     icon: BarChart2,
+    roles: ["administrador"],
+  },
+  {
+    path: "/dolar",
+    label: "Dólar",
+    icon: CircleDollarSign,
     roles: ["administrador"],
   },
   {

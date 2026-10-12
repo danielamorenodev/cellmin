@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { cotizacionService } from "../services/cotizacion.service";
 
 // Cotización compartida por toda la app: se pide una sola vez y se
-// refresca cada 5 minutos, sin importar cuántos componentes la usen.
+// refresca cada 2 minutos (así todos ven el valor nuevo enseguida), sin importar cuántos componentes la usen.
 const SIN_DATOS = {
   disponible: false,
   venta: null,
   fecha: null,
+  actualizada_por: null,
   obsoleta: false,
   cargado: false, // true cuando ya se intentó pedir la cotización
 };
@@ -34,6 +35,9 @@ const cargar = async () => {
   }
 };
 
+// Vuelve a pedir la cotización ya (por ejemplo, justo después de guardarla)
+export const refrescarCotizacion = () => cargar();
+
 export function useCotizacion() {
   const [datos, setDatos] = useState(estado);
 
@@ -41,7 +45,7 @@ export function useCotizacion() {
     oyentes.add(setDatos);
     if (oyentes.size === 1) {
       cargar();
-      temporizador = setInterval(cargar, 5 * 60 * 1000);
+      temporizador = setInterval(cargar, 2 * 60 * 1000);
     } else {
       setDatos(estado);
     }

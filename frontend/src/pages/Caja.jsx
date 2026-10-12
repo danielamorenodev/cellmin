@@ -515,7 +515,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
                 Los dólares se valúan a {formatCurrency(tasaUSD)} cada uno
                 {esperadoUSD > 0
                   ? " (promedio con el que se cobraron)."
-                  : " (dólar blue actual)."}
+                  : " (dólar actual)."}
               </p>
             )}
           </div>
