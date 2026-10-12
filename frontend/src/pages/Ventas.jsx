@@ -22,6 +22,7 @@ import { clientesService } from "../services/clientes.service";
 import toast from "react-hot-toast";
 import PrecioUSD from "../components/ui/PrecioUSD";
 import { useCotizacion } from "../hooks/useCotizacion";
+import { useSucursales } from "../hooks/useSucursales";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import {
   formatCurrency,
@@ -1297,6 +1298,14 @@ function ModalConfirmar({ mensaje, onConfirmar, onCancelar }) {
 }
 
 export default function Ventas() {
+  const { user } = useAuth();
+  const { opciones: sucursalesOpc } = useSucursales();
+  // El vendedor vende en la caja abierta de su sucursal (el cajero, en la suya)
+  const esVendedor = user?.rol === "vendedor";
+  const [sucursalVendedor, setSucursalVendedor] = useState(
+    user?.sucursales?.length === 1 ? user.sucursales[0] : "",
+  );
+  const [motivoCaja, setMotivoCaja] = useState("");
   const [ventas, setVentas] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -1323,19 +1332,34 @@ export default function Ventas() {
     estado: "",
   });
 
+  // Caja en la que se va a registrar la venta
+  const cargarCaja = async (sucursal = sucursalVendedor) => {
+    try {
+      const caja = esVendedor
+        ? sucursal || user?.sucursales?.length === 1
+          ? await cajaService.getParaVender(sucursal || undefined)
+          : { estado: "cerrada", motivo: "Elegí la sucursal en la que vas a vender." }
+        : await cajaService.getActual();
+      setCajaAbierta(caja?.estado === "abierta");
+      setCajaActual(caja);
+      setMotivoCaja(caja?.motivo || "");
+    } catch {
+      setCajaAbierta(false);
+      setCajaActual(null);
+    }
+  };
+
   const fetchData = async () => {
     try {
-      const [vs, cs, ps, cajaHoy] = await Promise.all([
+      const [vs, cs, ps] = await Promise.all([
         ventasService.getAll(),
         clientesService.getAll(),
         productosService.getAll(),
-        cajaService.getActual(),
       ]);
       setVentas(vs);
       setClientes(cs);
       setProductos(ps);
-      setCajaAbierta(cajaHoy?.estado === "abierta");
-      setCajaActual(cajaHoy);
+      await cargarCaja();
     } catch (error) {
       toast.error("Error al cargar ventas");
     } finally {
@@ -1453,10 +1477,30 @@ export default function Ventas() {
             {ventas.length} ventas registradas
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        {esVendedor && user?.sucursales?.length > 1 && (
+          <select
+            value={sucursalVendedor}
+            onChange={(e) => {
+              setSucursalVendedor(e.target.value);
+              cargarCaja(e.target.value);
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Elegí la sucursal</option>
+            {sucursalesOpc.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           onClick={() => {
             if (!cajaAbierta) {
-              toast.error("Debe haber una caja abierta para registrar ventas");
+              toast.error(
+                motivoCaja || "Debe haber una caja abierta para registrar ventas",
+              );
               return;
             }
             setShowModal(true);
@@ -1473,6 +1517,7 @@ export default function Ventas() {
             <span className="text-xs opacity-75">(caja cerrada)</span>
           )}
         </button>
+        </div>
       </div>
 
       {/* Buscador y filtros */}

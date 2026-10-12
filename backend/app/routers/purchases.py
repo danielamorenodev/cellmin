@@ -6,7 +6,7 @@ from app.utils.logger import registrar_auditoria
 from bson import ObjectId
 from datetime import datetime
 from app.models.purchase import PurchaseCreate
-from app.utils.stock import validar_sucursal, stock_en, aplicar_delta
+from app.utils.stock import validar_sucursal, stock_en, aplicar_delta, descontar_varios
 
 
 router = APIRouter()
@@ -22,14 +22,14 @@ async def get_next_number(db, collection: str, prefix: str) -> str:
 
 @router.get("/")
 async def get_purchases(current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "*")
+    check_permission(current_user["role"], "compras:read")
     db = get_db()
     purchases = await db.compras.find().sort("fecha", -1).to_list(500)
     return [{**p, "_id": str(p["_id"])} for p in purchases]
 
 @router.get("/{purchase_id}")
 async def get_purchase(purchase_id: str, current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "*")
+    check_permission(current_user["role"], "compras:read")
     db = get_db()
     if not ObjectId.is_valid(purchase_id):
         raise HTTPException(status_code=404, detail="Compra no encontrada")
@@ -40,7 +40,7 @@ async def get_purchase(purchase_id: str, current_user: dict = Depends(get_curren
 
 @router.post("/")
 async def create_purchase(purchase: PurchaseCreate, current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "*")
+    check_permission(current_user["role"], "compras:create")
     db = get_db()
     validar_sucursal(purchase.sucursal)
     numero = await get_next_number(db, "compras", "C-")
@@ -69,7 +69,8 @@ async def create_purchase(purchase: PurchaseCreate, current_user: dict = Depends
 
 @router.put("/{purchase_id}/cancelar")
 async def cancel_purchase(purchase_id: str, current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "compras:create")
+    # Cancelar una compra revierte stock: administrador y depósito
+    check_permission(current_user["role"], "compras:cancel")
     db = get_db()
 
     compra = await db.compras.find_one({"_id": ObjectId(purchase_id)})
@@ -99,9 +100,19 @@ async def cancel_purchase(purchase_id: str, current_user: dict = Depends(get_cur
                 detail=f"No hay stock suficiente en la sucursal para revertir '{item['nombre_producto']}'. Stock actual: {stock_actual}, a restar: {item['cantidad']}",
             )
 
-    # Si todo está bien, restamos el stock y registramos los movimientos
+    # Si todo está bien, restamos el stock (atómico y todo o nada: si una venta
+    # se llevó stock mientras tanto, no queda negativo) y registramos los movimientos
+    faltante = await descontar_varios(
+        db,
+        [(i["producto_id"], i.get("variante_nombre"), i["cantidad"]) for i in compra.get("items", [])],
+        sucursal,
+    )
+    if faltante:
+        raise HTTPException(
+            status_code=409,
+            detail="El stock cambió mientras se cancelaba la compra y ya no alcanza para revertirla. Revisá el stock actual.",
+        )
     for item in compra.get("items", []):
-        await aplicar_delta(db, item["producto_id"], item.get("variante_nombre"), sucursal, -item["cantidad"])
         await db.stock_movimientos.insert_one({
             "producto_id": item["producto_id"],
             "variante_nombre": item.get("variante_nombre"),

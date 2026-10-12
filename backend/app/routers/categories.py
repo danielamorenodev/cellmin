@@ -28,7 +28,7 @@ async def get_categories(current_user: dict = Depends(get_current_user)):
 
 @router.post("/")
 async def create_category(cat: CategoryCreate, current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "*")
+    check_permission(current_user["role"], "categorias:create")
     db = get_db()
     existing = await db.categorias.find_one({
         "nombre": {"$regex": f"^{cat.nombre}$", "$options": "i"}
@@ -46,7 +46,7 @@ async def create_category(cat: CategoryCreate, current_user: dict = Depends(get_
 
 @router.put("/{cat_id}")
 async def update_category(cat_id: str, cat: CategoryUpdate, current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "*")
+    check_permission(current_user["role"], "categorias:update")
     db = get_db()
     if cat.nombre:
         existing = await db.categorias.find_one({

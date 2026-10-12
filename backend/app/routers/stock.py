@@ -5,7 +5,7 @@ from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
-from app.utils.stock import completar, stock_en, minimo_en, validar_sucursal, aplicar_delta, SUCURSALES
+from app.utils.stock import completar, stock_en, minimo_en, validar_sucursal, aplicar_delta, descontar_stock, SUCURSALES
 
 router = APIRouter()
 
@@ -97,8 +97,21 @@ async def create_movement(movement: StockMovement, current_user: dict = Depends(
     else:  # ajuste: la cantidad es el stock final
         nuevo_stock = movement.cantidad
 
-    # 4. Actualizar el stock de esa sucursal (y el total)
-    await aplicar_delta(db, movement.producto_id, movement.variante_nombre, movement.sucursal, nuevo_stock - stock_actual)
+    # 4. Actualizar el stock de esa sucursal (y el total). Si hay que restar,
+    #    el descuento es atómico y condicional: si mientras tanto una venta se
+    #    llevó stock, no se deja negativo.
+    delta = nuevo_stock - stock_actual
+    if delta < 0:
+        alcanzo = await descontar_stock(
+            db, movement.producto_id, movement.variante_nombre, movement.sucursal, -delta
+        )
+        if not alcanzo:
+            raise HTTPException(
+                status_code=409,
+                detail="El stock cambió mientras se registraba el movimiento. Revisá el stock actual y volvé a intentar.",
+            )
+    else:
+        await aplicar_delta(db, movement.producto_id, movement.variante_nombre, movement.sucursal, delta)
 
     # 5. Recién ahora registrar el movimiento en el historial
     await db.stock_movimientos.insert_one({

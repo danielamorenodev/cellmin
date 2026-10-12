@@ -26,7 +26,7 @@ PERMISSIONS = {
         "productos:read", "productos:create", "productos:update",
         "categorias:read", "categorias:create", "categorias:update",
         "stock:read", "stock:create", "stock:update",
-        "compras:read", "compras:create",
+        "compras:read", "compras:create", "compras:cancel",
         "proveedores:read", "proveedores:create", "proveedores:update",
     ],
     "tecnico": [

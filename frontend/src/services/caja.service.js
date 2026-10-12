@@ -6,6 +6,14 @@ export const cajaService = {
     return response.data;
   },
 
+  // Caja en la que puedo registrar ventas: la mía (cajero) o la de mi sucursal (vendedor)
+  getParaVender: async (sucursal) => {
+    const response = await api.get("/cash/para-vender", {
+      params: sucursal ? { sucursal } : {},
+    });
+    return response.data;
+  },
+
   getAbiertas: async () => {
     const response = await api.get("/cash/abiertas");
     return response.data;

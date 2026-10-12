@@ -6,7 +6,7 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
 from app.utils.logger import registrar_auditoria
-from app.utils.cajas import caja_propia, exigir_caja_propia, exigir_dueno_o_admin, es_admin, puede_sucursal, dia_local, nombre_sucursal
+from app.utils.cajas import caja_propia, exigir_caja_propia, exigir_dueno_o_admin, es_admin, puede_sucursal, dia_local, nombre_sucursal, caja_para_vender
 from app.utils.stock import validar_sucursal
 from app.utils.pagos import USD, cotizacion_para_cobro, pagos_de_venta, redondear
 
@@ -127,6 +127,28 @@ async def get_current_cash(current_user: dict = Depends(get_current_user)):
     if not caja:
         return {"estado": "cerrada"}
     return await detalle_caja(db, caja, current_user)
+
+
+@router.get("/para-vender")
+async def get_cash_for_sales(sucursal: str = None, current_user: dict = Depends(get_current_user)):
+    """Caja en la que este usuario puede registrar ventas ahora.
+
+    Cajero: la que abrió él. Vendedor: la caja abierta de su sucursal.
+    """
+    check_permission(current_user["role"], "ventas:create")
+    db = get_db()
+    try:
+        caja = await caja_para_vender(db, current_user, sucursal)
+    except HTTPException as e:
+        if e.status_code == 403:
+            raise
+        return {"estado": "cerrada", "motivo": e.detail}
+    return {
+        "estado": "abierta",
+        "id": str(caja["_id"]),
+        "sucursal": caja["sucursal"],
+        "fecha_apertura": caja.get("fecha_apertura"),
+    }
 
 
 @router.get("/abiertas")

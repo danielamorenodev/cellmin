@@ -4,6 +4,8 @@
 - Una caja por día por sucursal.
 - Un usuario no puede tener dos cajas abiertas al mismo tiempo.
 - Solo quien abrió la caja registra en ella (ventas, cobros y movimientos).
+  Excepción: un vendedor puede registrar ventas en la caja abierta de su
+  sucursal (no cobros de reparaciones ni movimientos).
 """
 from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException
@@ -44,6 +46,33 @@ async def exigir_caja_propia(db, user, para="registrar esta operación"):
         raise HTTPException(
             status_code=400,
             detail=f"Para {para} necesitás tener tu caja abierta. Solo quien abrió la caja puede registrar en ella.",
+        )
+    return caja
+
+
+async def caja_para_vender(db, user, sucursal=None):
+    """Caja en la que este usuario registra una venta.
+
+    - Cajero (o administrador): solo en la caja que abrió él.
+    - Vendedor: en la caja abierta de la sucursal a la que pertenece. Si
+      pertenece a las dos, tiene que indicar cuál.
+    """
+    if user.get("role") != "vendedor":
+        return await exigir_caja_propia(db, user, "registrar ventas")
+
+    propias = user.get("sucursales") or []
+    if sucursal is None:
+        if len(propias) == 1:
+            sucursal = propias[0]
+        else:
+            raise HTTPException(status_code=400, detail="Elegí la sucursal en la que vas a vender.")
+    if sucursal not in propias:
+        raise HTTPException(status_code=403, detail="No pertenecés a esa sucursal.")
+    caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
+    if not caja:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No hay una caja abierta en {nombre_sucursal(sucursal)}. Pedile a un cajero que la abra para poder vender.",
         )
     return caja
 

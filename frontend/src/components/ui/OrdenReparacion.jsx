@@ -180,6 +180,7 @@ function generarHTML(reparacion, cliente, tipo) {
         esTecnico
           ? ""
           : `<div style="text-align:center; font-size:11px;">
+        <p style="font-weight:bold; font-size:12px;">Comprobante no válido como factura</p>
         <p>Presente este comprobante al retirar su equipo</p>
       </div>`
       }

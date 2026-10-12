@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
 import InputNumero from "../components/ui/InputNumero";
 import {
   Plus,
@@ -584,7 +585,7 @@ function accionesCompra({ compra, onCancel, onVerDetalle }) {
       onClick: () =>
         window.open(`/compras/${compra._id}`, "_blank", "noopener"),
     },
-    !cancelada && {
+    !cancelada && onCancel && {
       label: "Cancelar compra",
       icono: <XCircle size={14} />,
       peligro: true,
@@ -1066,6 +1067,9 @@ function GestionProveedores() {
 }
 
 export default function Compras() {
+  const { user } = useAuth();
+  // Cancelar una compra revierte stock: administrador y depósito
+  const puedeCancelar = ["administrador", "deposito"].includes(user?.rol);
   const [tab, setTab] = useState("compras");
   const [compras, setCompras] = useState([]);
   const [proveedores, setProveedores] = useState([]);
@@ -1223,8 +1227,10 @@ export default function Compras() {
                         compra={compra}
                         proveedores={proveedores}
                         onVerDetalle={setCompraDetalle}
-                        onCancel={(id, numero) =>
-                          setCompraCancelar({ id, numero })
+                        onCancel={
+                          puedeCancelar
+                            ? (id, numero) => setCompraCancelar({ id, numero })
+                            : null
                         }
                       />
                     ))}
@@ -1244,8 +1250,10 @@ export default function Compras() {
                       compra={compra}
                       proveedor={proveedor}
                       onVerDetalle={setCompraDetalle}
-                      onCancel={(id, numero) =>
-                        setCompraCancelar({ id, numero })
+                      onCancel={
+                        puedeCancelar
+                          ? (id, numero) => setCompraCancelar({ id, numero })
+                          : null
                       }
                     />
                   );

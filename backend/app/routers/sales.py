@@ -6,8 +6,8 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
 from app.utils.logger import registrar_auditoria
-from app.utils.stock import stock_en, aplicar_delta
-from app.utils.cajas import exigir_caja_propia, exigir_dueno_o_admin
+from app.utils.stock import stock_en, aplicar_delta, descontar_varios
+from app.utils.cajas import caja_para_vender, exigir_dueno_o_admin
 from app.utils.idempotencia import resultado_previo, reclamar_clave, guardar_resultado, liberar_clave
 from app.utils.pagos import (
     METODOS_VALIDOS,
@@ -79,9 +79,10 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
     if porcentaje < 0 or porcentaje > 100:
         raise HTTPException(status_code=400, detail="El porcentaje debe estar entre 0 y 100")
 
-    # Toda venta se registra en la caja del usuario que vende, y esa caja
-    # define la sucursal: de ahí sale el stock y ahí entra el dinero.
-    caja_cobro = await exigir_caja_propia(db, current_user, "registrar ventas")
+    # Toda venta se registra en una caja, y esa caja define la sucursal: de ahí
+    # sale el stock y ahí entra el dinero. El cajero vende en la caja que abrió
+    # él; el vendedor, en la caja abierta de su sucursal.
+    caja_cobro = await caja_para_vender(db, current_user, sale.sucursal)
     sucursal = caja_cobro["sucursal"]
 
     # 2. Tomar precios y nombres de la base de datos (nunca del frontend)
@@ -244,6 +245,38 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
 
 async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
                            interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal):
+    # Reservar el stock ANTES de registrar nada. El descuento es atómico y
+    # condicional: si otra venta se llevó mientras tanto las últimas unidades,
+    # esta falla sin dejar el stock en negativo.
+    faltante = await descontar_varios(
+        db,
+        [(i["producto_id"], i["variante_nombre"], i["cantidad"]) for i in items_finales],
+        sucursal,
+    )
+    if faltante:
+        nombre = next(
+            i["nombre_producto"] for i in items_finales
+            if i["producto_id"] == faltante[0] and i["variante_nombre"] == faltante[1]
+        )
+        raise HTTPException(
+            status_code=409,
+            detail=f"Stock insuficiente para '{nombre}': otra venta se llevó las últimas unidades. Actualizá y revisá la venta.",
+        )
+
+    try:
+        return await _guardar_venta(
+            db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
+            interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal,
+        )
+    except Exception:
+        # Si algo falla después de reservar, el stock vuelve a su lugar
+        for i in items_finales:
+            await aplicar_delta(db, i["producto_id"], i["variante_nombre"], sucursal, i["cantidad"])
+        raise
+
+
+async def _guardar_venta(db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
+                         interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal):
     numero = await get_next_number(db, "ventas", "V-")
     new_sale = {
         "cliente_id": sale.cliente_id,
@@ -277,7 +310,7 @@ async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porc
             )}},
         )
 
-    # 6. Descontar stock y registrar movimientos
+    # 6. Registrar los movimientos de stock (el stock ya se descontó arriba)
     for item in items_finales:
         await db.stock_movimientos.insert_one({
             "producto_id": item["producto_id"],
@@ -290,7 +323,6 @@ async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porc
             "usuario_id": current_user["user_id"],
             "fecha": datetime.utcnow(),
         })
-        await aplicar_delta(db, item["producto_id"], item["variante_nombre"], sucursal, -item["cantidad"])
 
     await registrar_auditoria(
         db=db,

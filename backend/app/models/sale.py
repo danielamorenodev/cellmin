@@ -25,7 +25,7 @@ class SaleCreate(BaseModel):
     porcentaje_ajuste: float = 0
     metodo_pago: str = ""  # texto legado; si viene "pagos" se arma en el servidor
     pagos: Optional[List[PagoVenta]] = None
-    sucursal: str = "sucursal_1"
+    sucursal: Optional[str] = None  # solo la usa el vendedor que pertenece a ambas sucursales
     notas: Optional[str] = None
     clave_idempotencia: Optional[str] = None  # evita duplicar la venta por doble envio
 

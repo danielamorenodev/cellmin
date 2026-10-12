@@ -81,6 +81,57 @@ async def aplicar_delta(db, producto_id, variante_nombre, sucursal, delta):
         )
 
 
+async def descontar_stock(db, producto_id, variante_nombre, sucursal, cantidad):
+    """Resta stock SOLO si alcanza, en una única operación atómica de la base.
+
+    Devuelve True si descontó y False si no había stock suficiente. Como la
+    comprobación y el descuento son una sola operación, dos ventas al mismo
+    tiempo de la última unidad no pueden dejar el stock en negativo: la
+    segunda recibe False.
+    """
+    if cantidad <= 0:
+        return True
+    if variante_nombre:
+        res = await db.productos.update_one(
+            {
+                "_id": ObjectId(producto_id),
+                "variantes": {"$elemMatch": {
+                    "nombre": variante_nombre,
+                    f"stock_sucursal.{sucursal}": {"$gte": cantidad},
+                }},
+            },
+            {"$inc": {
+                f"variantes.$.stock_sucursal.{sucursal}": -cantidad,
+                "variantes.$.stock_actual": -cantidad,
+            }},
+        )
+    else:
+        res = await db.productos.update_one(
+            {"_id": ObjectId(producto_id), f"stock_sucursal.{sucursal}": {"$gte": cantidad}},
+            {"$inc": {f"stock_sucursal.{sucursal}": -cantidad, "stock_actual": -cantidad}},
+        )
+    return res.modified_count == 1
+
+
+async def descontar_varios(db, items, sucursal):
+    """Descuenta varios artículos: todo o nada.
+
+    items: lista de (producto_id, variante_nombre, cantidad).
+    Devuelve None si se descontó todo; si algún artículo no tenía stock
+    suficiente, devuelve ese artículo y deja el stock como estaba.
+    """
+    hechos = []
+    for it in items:
+        producto_id, variante, cantidad = it
+        if await descontar_stock(db, producto_id, variante, sucursal, cantidad):
+            hechos.append(it)
+        else:
+            for pid, var, cant in hechos:
+                await aplicar_delta(db, pid, var, sucursal, cant)
+            return it
+    return None
+
+
 async def migrar_stock_por_sucursal(db):
     """Productos creados antes del stock por sucursal: su stock pasa a la Sucursal 1."""
     cursor = db.productos.find({})

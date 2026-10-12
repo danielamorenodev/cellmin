@@ -93,6 +93,9 @@ export default function TicketVenta({ venta, cliente }) {
         }
       </div>
       <div class="divider"></div>
+      <div class="section center">
+        <p class="bold medium">Comprobante no válido como factura</p>
+      </div>
       <div class="section center small">
         <p>¡Gracias por su compra!</p>
         <p>Conserve este comprobante</p>
@@ -154,6 +157,10 @@ export default function TicketVenta({ venta, cliente }) {
           </div>
         )}
       </div>
+
+      <p className="text-center text-xs font-bold text-gray-700">
+        Comprobante no válido como factura
+      </p>
 
       <button
         onClick={handlePrint}

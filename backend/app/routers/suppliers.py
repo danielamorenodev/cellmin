@@ -40,7 +40,7 @@ async def get_supplier(supplier_id: str, current_user: dict = Depends(get_curren
 
 @router.post("/")
 async def create_supplier(supplier: SupplierCreate, current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "*")
+    check_permission(current_user["role"], "proveedores:create")
     db = get_db()
     existing = await db.proveedores.find_one({
         "nombre": {"$regex": f"^{supplier.nombre}$", "$options": "i"}
@@ -58,7 +58,7 @@ async def create_supplier(supplier: SupplierCreate, current_user: dict = Depends
 
 @router.put("/{supplier_id}")
 async def update_supplier(supplier_id: str, supplier: SupplierUpdate, current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "*")
+    check_permission(current_user["role"], "proveedores:update")
     db = get_db()
     if supplier.nombre:
         existing = await db.proveedores.find_one({
