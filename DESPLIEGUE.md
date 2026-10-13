@@ -7,7 +7,7 @@ Cómo queda armado:
 
 ```
 Navegador ──HTTPS──> nginx ──┬─> /          sitio (React ya compilado, /var/www/cellmin)
-                             └─> /api/...   backend (uvicorn, solo en 127.0.0.1:8000)
+                             └─> /api/...   backend (uvicorn, solo en 127.0.0.1:8002)
                                                 └─> MongoDB Atlas (base cellmin_prod)
 ```
 
@@ -17,6 +17,8 @@ Navegador ──HTTPS──> nginx ──┬─> /          sitio (React ya comp
 - **DNS:** un registro **A** de `cellmin.jybora.com` apuntando a la IP del VPS (en la zona DNS de `jybora.com`). Puede tardar un rato en propagarse; se comprueba con `nslookup cellmin.jybora.com`.
 - **Firewall de Hostinger** (hPanel → VPS → Seguridad): tienen que estar abiertos los puertos 22, 80 y 443.
 - Cuenta de **MongoDB Atlas**.
+
+> **Servidor compartido:** si el VPS ya aloja otros sistemas, Cellmin usa el puerto interno **8002** (el 8000 y el 8001 pueden estar ocupados por otras apps), su propio archivo de nginx, y no se borra el sitio `default` ni se toca `ufw` si ya está activo. Antes de empezar: `ss -tlnp` para ver puertos ocupados.
 
 ## 1. Seguridad previa (hacerlo ANTES de publicar)
 
@@ -138,7 +140,7 @@ sudo cp /opt/cellmin/deploy/cellmin-backend.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now cellmin-backend
 sudo systemctl status cellmin-backend --no-pager
-curl http://127.0.0.1:8000/
+curl http://127.0.0.1:8002/
 ```
 Tiene que responder `{"message":"Sistema de Ventas API funcionando ✅"}`. Si falla: `sudo journalctl -u cellmin-backend -n 50 --no-pager`.
 
@@ -158,7 +160,7 @@ sudo rsync -a --delete dist/ /var/www/cellmin/
 ```bash
 sudo cp /opt/cellmin/deploy/nginx-cellmin.conf /etc/nginx/sites-available/cellmin
 sudo ln -s /etc/nginx/sites-available/cellmin /etc/nginx/sites-enabled/cellmin
-sudo rm -f /etc/nginx/sites-enabled/default
+# (en un servidor nuevo y vacío podés borrar el sitio default; en uno compartido NO lo borres)
 sudo nginx -t && sudo systemctl reload nginx
 ```
 Probá `http://cellmin.jybora.com` (todavía sin candado).
@@ -183,7 +185,7 @@ sudo certbot renew --dry-run
 - [ ] Cargás un producto, abrís caja, hacés una venta, imprimís el ticket.
 - [ ] Recargás la página en una ruta interna (ej. `/ventas`): no da 404.
 - [ ] `https://cellmin.jybora.com/docs` da 404 (la documentación de la API no se publica).
-- [ ] Desde la PC, `http://cellmin.jybora.com:8000` no responde (el backend no está expuesto).
+- [ ] Desde la PC, `http://cellmin.jybora.com:8002` no responde (el backend no está expuesto).
 
 ## 9. Actualizar el sistema más adelante
 
