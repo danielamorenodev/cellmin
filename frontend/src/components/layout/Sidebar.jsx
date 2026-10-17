@@ -149,7 +149,7 @@ export default function Sidebar() {
               <img
                 src="/cellmin_logo.png"
                 alt="Cellmin"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
               />
             </div>
             {(expanded || mobileOpen) && (
@@ -221,7 +221,7 @@ export default function Sidebar() {
             <img
               src="/cellmin_logo.png"
               alt="Cellmin"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           </div>
           <span className="text-white font-bold text-base">Cellmin</span>
