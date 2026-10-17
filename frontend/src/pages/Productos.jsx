@@ -1026,7 +1026,7 @@ function CategoriaModal({ categoria, categorias, onClose, onSave }) {
   );
 }
 
-function GestionCategorias() {
+function GestionCategorias({ onCambio }) {
   const [categorias, setCategorias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -1046,6 +1046,9 @@ function GestionCategorias() {
     try {
       const data = await categoriasService.getAll();
       setCategorias(data);
+      // Avisa a la pantalla de Productos para que el modal de producto
+      // vea siempre las categorías actuales.
+      onCambio?.(data);
     } catch (error) {
       toast.error("Error al cargar categorías");
     } finally {
@@ -1412,7 +1415,14 @@ export default function Productos() {
       {/* Tabs */}
       <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
         <button
-          onClick={() => setTab("productos")}
+          onClick={() => {
+            setTab("productos");
+            // Las categorías pudieron cambiar en la otra pestaña
+            categoriasService
+              .getAll()
+              .then(setCategorias)
+              .catch(() => {});
+          }}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
             tab === "productos"
               ? "bg-white shadow text-gray-800"
@@ -1434,7 +1444,7 @@ export default function Productos() {
       </div>
 
       {tab === "categorias" ? (
-        <GestionCategorias />
+        <GestionCategorias onCambio={setCategorias} />
       ) : (
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

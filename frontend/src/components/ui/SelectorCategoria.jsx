@@ -31,7 +31,7 @@ export default function SelectorCategoria({
   const coincidencias = categorias
     .filter((c) => c.activo !== false && c.id !== excluirId)
     .filter((c) => c.nombre.toLowerCase().includes(termino))
-    .slice(0, 8);
+    .slice(0, 60);
 
   const elegir = (id) => {
     onChange(id);
