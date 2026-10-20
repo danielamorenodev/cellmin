@@ -45,4 +45,10 @@ export const reportesService = {
     const response = await api.get(url);
     return response.data;
   },
+
+  // Copia completa de los datos (solo administrador)
+  descargarRespaldo: async () => {
+    const response = await api.get("/backup/exportar");
+    return response.data;
+  },
 };

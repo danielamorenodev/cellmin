@@ -451,7 +451,7 @@ export default function Stock() {
 
   const Desglose = ({ item }) =>
     sucursal ? null : (
-      <p className="text-xs text-gray-400 font-normal">
+      <p className="text-xs text-gray-500 font-normal">
         {SUCURSALES.map((o) => `${o.label.replace("Sucursal ", "S")}: ${stockEn(item, o.value)}`).join(" · ")}
       </p>
     );
@@ -582,7 +582,7 @@ export default function Stock() {
             <div className="relative flex-1 min-w-48">
               <Search
                 size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
               />
               <input
                 type="text"
@@ -709,7 +709,7 @@ export default function Stock() {
                           <tr className="hover:bg-gray-50 transition-[background-color]">
                             <td className="px-6 py-4 font-medium text-gray-800">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <Package size={16} className="text-gray-400 shrink-0" />
+                                <Package size={16} className="text-gray-500 shrink-0" />
                                 {producto.nombre}
                                 {producto.tiene_variantes && (
                                   <button
@@ -732,7 +732,7 @@ export default function Stock() {
                                   <button
                                     type="button"
                                     onClick={() => alternarExpandido(producto.id)}
-                                    className="p-1 text-gray-400 hover:text-blue-600 transition"
+                                    className="p-1 text-gray-500 hover:text-blue-600 transition"
                                     title={abierto ? "Contraer" : "Ver variantes"}
                                   >
                                     {abierto ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -805,7 +805,7 @@ export default function Stock() {
                   >
                     <div className="p-4">
                       <div className="flex items-center gap-2 mb-3">
-                        <Package size={16} className="text-gray-400 shrink-0" />
+                        <Package size={16} className="text-gray-500 shrink-0" />
                         <p className="font-medium text-gray-800 flex-1">
                           {producto.nombre}
                         </p>
@@ -851,7 +851,7 @@ export default function Stock() {
                                   className={`text-xs font-medium ${
                                     esBajo(v)
                                       ? "text-red-600"
-                                      : "text-green-600"
+                                      : "text-green-700"
                                   }`}
                                 >
                                   {esBajo(v) ? (
@@ -878,7 +878,7 @@ export default function Stock() {
                               {sucursal ? valorEn(producto, sucursal) : stockTotal(producto)}
                             </p>
                             {!sucursal && (
-                              <p className="text-xs text-gray-400 font-normal">
+                              <p className="text-xs text-gray-500 font-normal">
                                 {SUCURSALES.map((o) => `${o.label.replace("Sucursal ", "S")}: ${valorEn(producto, o.value)}`).join(" · ")}
                               </p>
                             )}
@@ -891,7 +891,7 @@ export default function Stock() {
                               className={`text-xs font-medium ${
                                 articulosBajos(producto) > 0
                                   ? "text-red-600"
-                                  : "text-green-600"
+                                  : "text-green-700"
                               }`}
                             >
                               {articulosBajos(producto) > 0 ? (
@@ -928,7 +928,7 @@ export default function Stock() {
             <div className="relative flex-1 min-w-48">
               <Search
                 size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
               />
               <input
                 type="text"
@@ -1077,7 +1077,7 @@ export default function Stock() {
                           {producto?.nombre || "Producto eliminado"}
                         </span>
                         {m.variante_nombre && (
-                          <span className="text-gray-400">
+                          <span className="text-gray-500">
                             {" "}
                             — {m.variante_nombre}
                           </span>
@@ -1102,7 +1102,7 @@ export default function Stock() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="px-6 py-12 text-center text-gray-400"
+                      className="px-6 py-12 text-center text-gray-500"
                     >
                       No hay movimientos registrados
                     </td>
@@ -1115,7 +1115,7 @@ export default function Stock() {
           {/* Mobile */}
           <div className="md:hidden space-y-3">
             {movimientos.length === 0 ? (
-              <div className="text-center py-12 text-gray-400">
+              <div className="text-center py-12 text-gray-500">
                 No hay movimientos registrados
               </div>
             ) : (
@@ -1167,7 +1167,7 @@ export default function Stock() {
                     <p className="text-sm font-medium text-gray-800">
                       {producto?.nombre || "Producto eliminado"}
                       {m.variante_nombre && (
-                        <span className="text-gray-400 font-normal">
+                        <span className="text-gray-500 font-normal">
                           {" "}
                           — {m.variante_nombre}
                         </span>
@@ -1176,7 +1176,7 @@ export default function Stock() {
                     <p className="text-xs text-gray-500 mt-1">
                       {nombreSucursal(m.sucursal || "sucursal_1")} · {motivoLabel}
                     </p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-gray-500 mt-1">
                       {m.fecha ? formatDateTime(m.fecha) : "-"}
                     </p>
                   </div>

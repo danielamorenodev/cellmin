@@ -27,10 +27,46 @@ async def get_next_number(db) -> str:
     )
     return f"OR-{str(counter['seq']).zfill(4)}"
 
-def format_repair(r):
+def format_repair(r, user=None):
     r["id"] = str(r["_id"])
     del r["_id"]
+    if user is not None:
+        ocultar_bloqueo(r, user)
     return r
+
+
+# El código de desbloqueo del equipo es un dato sensible (Ley 25.326):
+# solo lo ven el técnico y el administrador, y se borra al entregar el equipo.
+ROLES_VEN_BLOQUEO = ("tecnico", "administrador")
+
+
+def ocultar_bloqueo(r, user):
+    equipo = r.get("equipo") or {}
+    if equipo.get("bloqueo_valor") and user.get("role") not in ROLES_VEN_BLOQUEO:
+        equipo["bloqueo_valor"] = None
+        equipo["bloqueo_oculto"] = True
+    return r
+
+
+# Orden de los estados de una reparación: se avanza o se retrocede de a un paso
+FLUJO_ESTADOS = ["en_diagnostico", "ingresada", "en_reparacion", "lista", "entregada"]
+NOMBRE_ESTADO = {
+    "en_diagnostico": "En diagnóstico", "ingresada": "Ingresada", "en_reparacion": "En reparación",
+    "lista": "Lista para entregar", "entregada": "Entregada", "cancelada": "Cancelada",
+}
+
+
+def validar_cambio_estado(actual: str, nuevo: str):
+    if actual in ("entregada", "cancelada"):
+        raise HTTPException(status_code=400, detail=f"La orden ya está {NOMBRE_ESTADO[actual].lower()} y no puede cambiar de estado.")
+    if nuevo not in FLUJO_ESTADOS:
+        raise HTTPException(status_code=400, detail="Estado inválido")
+    if abs(FLUJO_ESTADOS.index(nuevo) - FLUJO_ESTADOS.index(actual)) != 1:
+        siguiente = FLUJO_ESTADOS[FLUJO_ESTADOS.index(actual) + 1]
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se pueden saltear estados: de «{NOMBRE_ESTADO[actual]}» se pasa a «{NOMBRE_ESTADO[siguiente]}».",
+        )
 
 
 
@@ -123,7 +159,7 @@ async def get_repairs(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "reparaciones:read")
     db = get_db()
     repairs = await db.reparaciones.find().sort("fecha_ingreso", -1).to_list(500)
-    return [format_repair(r) for r in repairs]
+    return [format_repair(r, current_user) for r in repairs]
 
 @router.get("/pendientes")
 async def get_pending_repairs(current_user: dict = Depends(get_current_user)):
@@ -132,7 +168,7 @@ async def get_pending_repairs(current_user: dict = Depends(get_current_user)):
     repairs = await db.reparaciones.find({
         "estado": {"$in": ["en_diagnostico", "ingresada", "en_reparacion", "lista"]}
     }).sort("fecha_ingreso", -1).to_list(500)
-    return [format_repair(r) for r in repairs]
+    return [format_repair(r, current_user) for r in repairs]
 
 @router.get("/{repair_id}")
 async def get_repair(repair_id: str, current_user: dict = Depends(get_current_user)):
@@ -143,7 +179,7 @@ async def get_repair(repair_id: str, current_user: dict = Depends(get_current_us
     repair = await db.reparaciones.find_one({"_id": ObjectId(repair_id)})
     if not repair:
         raise HTTPException(status_code=404, detail="Reparación no encontrada")
-    return format_repair(repair)
+    return format_repair(repair, current_user)
 
 @router.post("/")
 async def create_repair(repair: RepairCreate, current_user: dict = Depends(get_current_user)):
@@ -240,27 +276,49 @@ async def update_repair(repair_id: str, repair: RepairUpdate, current_user: dict
     db = get_db()
     update_data = {k: v for k, v in repair.dict().items() if v is not None}
 
+    if not ObjectId.is_valid(repair_id):
+        raise HTTPException(status_code=404, detail="Reparación no encontrada")
+    repair_doc = await db.reparaciones.find_one({"_id": ObjectId(repair_id)})
+    if not repair_doc:
+        raise HTTPException(status_code=404, detail="Reparación no encontrada")
+    if repair_doc.get("estado") in ("entregada", "cancelada"):
+        raise HTTPException(status_code=400, detail=f"La orden ya está {NOMBRE_ESTADO[repair_doc['estado']].lower()} y no se puede modificar.")
+
+    total_pagado = repair_doc.get("total_pagado", 0)
+    precio_total = repair_doc.get("precio_total", 0)
+
     # Si se actualizan los tipos recalcular precio
     if "tipos_reparacion" in update_data:
         precio_total = sum(t["precio"] for t in update_data["tipos_reparacion"])
-        repair_doc = await db.reparaciones.find_one({"_id": ObjectId(repair_id)})
-        total_pagado = repair_doc.get("total_pagado", 0)
+        if precio_total < total_pagado - 0.01:
+            raise HTTPException(status_code=400, detail="El nuevo presupuesto no puede ser menor a lo que el cliente ya pagó.")
         update_data["precio_total"] = precio_total
         update_data["saldo_pendiente"] = precio_total - total_pagado
 
-    # Si se marca como entregada calcular garantía
-    if "estado" in update_data and update_data["estado"] == "entregada":
-        now = datetime.utcnow()
-        update_data["fecha_entrega"] = now
-        repair_doc = await db.reparaciones.find_one({"_id": ObjectId(repair_id)})
-        garantia_dias = update_data.get("garantia_dias", repair_doc.get("garantia_dias", 90))
-        update_data["fecha_vencimiento_garantia"] = now + timedelta(days=garantia_dias)
+    nuevo_estado = update_data.get("estado")
+    if nuevo_estado and nuevo_estado != repair_doc.get("estado"):
+        validar_cambio_estado(repair_doc.get("estado", "en_diagnostico"), nuevo_estado)
 
-    # Si pasa de en_diagnostico a ingresada necesita tipos
-    if "estado" in update_data and update_data["estado"] == "ingresada":
-        repair_doc = await db.reparaciones.find_one({"_id": ObjectId(repair_id)})
-        if not repair_doc.get("tipos_reparacion") and "tipos_reparacion" not in update_data:
+        # Para pasar a ingresada hacen falta tipos de reparación (presupuesto)
+        if nuevo_estado == "ingresada" and not (update_data.get("tipos_reparacion") or repair_doc.get("tipos_reparacion")):
             raise HTTPException(status_code=400, detail="Debe seleccionar al menos un tipo de reparación antes de cambiar el estado")
+
+        # Para entregar: permiso, cobro total, garantía y borrado del código de desbloqueo
+        if nuevo_estado == "entregada":
+            check_permission(current_user["role"], "reparaciones:entregar")
+            saldo = precio_total - total_pagado
+            if saldo > 0.01:
+                monto = f"{saldo:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+                raise HTTPException(status_code=400, detail=f"No se puede entregar el equipo con saldo pendiente ($ {monto}). Registrá el cobro primero.")
+            now = datetime.utcnow()
+            update_data["fecha_entrega"] = now
+            garantia_dias = update_data.get("garantia_dias", repair_doc.get("garantia_dias", 90))
+            update_data["fecha_vencimiento_garantia"] = now + timedelta(days=garantia_dias)
+            if (repair_doc.get("equipo") or {}).get("bloqueo_valor"):
+                update_data["equipo.bloqueo_valor"] = None
+                update_data["equipo.bloqueo_eliminado"] = True
+    elif "estado" in update_data:
+        del update_data["estado"]
 
     await db.reparaciones.update_one({"_id": ObjectId(repair_id)}, {"$set": update_data})
     updated = await db.reparaciones.find_one({"_id": ObjectId(repair_id)})
@@ -275,7 +333,7 @@ async def update_repair(repair_id: str, repair: RepairUpdate, current_user: dict
     descripcion=f"Reparación actualizada: {repair_id}"
     )
 
-    return format_repair(updated)
+    return format_repair(updated, current_user)
 
 @router.post("/{repair_id}/pago")
 async def add_payment(repair_id: str, pago: Pago, current_user: dict = Depends(get_current_user)):
@@ -341,7 +399,7 @@ async def get_repairs_by_client(cliente_id: str, current_user: dict = Depends(ge
     repairs = await db.reparaciones.find(
         {"cliente_id": cliente_id}
     ).sort("fecha_ingreso", -1).to_list(100)
-    return [format_repair(r) for r in repairs]
+    return [format_repair(r, current_user) for r in repairs]
 
 @router.put("/{repair_id}/cancelar")
 async def cancel_repair(repair_id: str, current_user: dict = Depends(get_current_user)):

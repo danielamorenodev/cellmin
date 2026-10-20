@@ -63,7 +63,7 @@ export default function MenuAcciones({ acciones }) {
         ref={botonRef}
         onClick={toggle}
         title="Acciones"
-        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition"
+        className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition"
       >
         <MoreVertical size={16} />
       </button>

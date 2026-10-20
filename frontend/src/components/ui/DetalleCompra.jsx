@@ -23,7 +23,7 @@ export default function DetalleCompra({ compra, proveedor }) {
         <Dato titulo="Proveedor">
           {proveedor?.nombre || "-"}
           {proveedor?.telefono && (
-            <p className="text-xs text-gray-400">{proveedor.telefono}</p>
+            <p className="text-xs text-gray-500">{proveedor.telefono}</p>
           )}
         </Dato>
         <Dato titulo="Sucursal">
@@ -87,7 +87,7 @@ export default function DetalleCompra({ compra, proveedor }) {
         <div className="bg-gray-50 rounded-xl p-4 w-full md:w-72">
           <div
             className={`flex justify-between font-bold text-lg ${
-              cancelada ? "text-gray-400 line-through" : "text-gray-800"
+              cancelada ? "text-gray-500 line-through" : "text-gray-800"
             }`}
           >
             <span>Total</span>

@@ -58,7 +58,7 @@ export default function SelectorCliente({
         <div className="relative">
           <Search
             size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
           />
           <input
             type="text"
@@ -84,7 +84,7 @@ export default function SelectorCliente({
             {textoVacio}
           </button>
           {coincidencias.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-gray-400 text-center">
+            <p className="px-3 py-3 text-sm text-gray-500 text-center">
               No se encontraron clientes
             </p>
           ) : (
@@ -99,7 +99,7 @@ export default function SelectorCliente({
                   {c.nombre} {c.apellido}
                 </span>
                 {c.telefono && (
-                  <span className="text-xs text-gray-400 ml-2">
+                  <span className="text-xs text-gray-500 ml-2">
                     {c.telefono}
                   </span>
                 )}

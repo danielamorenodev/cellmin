@@ -24,7 +24,7 @@ function StatCard({ title, value, icon: Icon, color, subtitle }) {
       </div>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
       <p className="text-sm font-medium text-gray-600 mt-1">{title}</p>
-      {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+      {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
     </div>
   );
 }
@@ -67,7 +67,7 @@ export default function Dashboard() {
       {
         label: "Nueva Reparación",
         icon: Wrench,
-        color: "bg-orange-50 text-orange-600 hover:bg-orange-100",
+        color: "bg-orange-50 text-orange-700 hover:bg-orange-100",
         path: "/reparaciones",
       },
       {
@@ -79,7 +79,7 @@ export default function Dashboard() {
       {
         label: "Gestionar Stock",
         icon: Package,
-        color: "bg-green-50 text-green-600 hover:bg-green-100",
+        color: "bg-green-50 text-green-700 hover:bg-green-100",
         path: "/stock",
       },
     ],
@@ -93,13 +93,13 @@ export default function Dashboard() {
       {
         label: "Nueva Reparación",
         icon: Wrench,
-        color: "bg-orange-50 text-orange-600 hover:bg-orange-100",
+        color: "bg-orange-50 text-orange-700 hover:bg-orange-100",
         path: "/reparaciones",
       },
       {
         label: "Caja",
         icon: TrendingUp,
-        color: "bg-green-50 text-green-600 hover:bg-green-100",
+        color: "bg-green-50 text-green-700 hover:bg-green-100",
         path: "/caja",
       },
       {
@@ -119,7 +119,7 @@ export default function Dashboard() {
       {
         label: "Nueva Reparación",
         icon: Wrench,
-        color: "bg-orange-50 text-orange-600 hover:bg-orange-100",
+        color: "bg-orange-50 text-orange-700 hover:bg-orange-100",
         path: "/reparaciones",
       },
       {
@@ -131,7 +131,7 @@ export default function Dashboard() {
       {
         label: "Ver Stock",
         icon: Package,
-        color: "bg-green-50 text-green-600 hover:bg-green-100",
+        color: "bg-green-50 text-green-700 hover:bg-green-100",
         path: "/stock",
       },
     ],
@@ -139,7 +139,7 @@ export default function Dashboard() {
       {
         label: "Ver Reparaciones",
         icon: Wrench,
-        color: "bg-orange-50 text-orange-600 hover:bg-orange-100",
+        color: "bg-orange-50 text-orange-700 hover:bg-orange-100",
         path: "/reparaciones",
       },
       {
@@ -153,7 +153,7 @@ export default function Dashboard() {
       {
         label: "Ver Stock",
         icon: Package,
-        color: "bg-green-50 text-green-600 hover:bg-green-100",
+        color: "bg-green-50 text-green-700 hover:bg-green-100",
         path: "/stock",
       },
       {
@@ -165,7 +165,7 @@ export default function Dashboard() {
       {
         label: "Ver Productos",
         icon: Package,
-        color: "bg-orange-50 text-orange-600 hover:bg-orange-100",
+        color: "bg-orange-50 text-orange-700 hover:bg-orange-100",
         path: "/productos",
       },
     ],

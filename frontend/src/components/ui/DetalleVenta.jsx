@@ -128,7 +128,7 @@ export default function DetalleVenta({ venta, cliente }) {
             <span>{formatCurrency(subtotalItems)}</span>
           </div>
           {descuento > 0 && (
-            <div className="flex justify-between text-sm text-green-600">
+            <div className="flex justify-between text-sm text-green-700">
               <span>Descuento</span>
               <span>- {formatCurrency(descuento)}</span>
             </div>

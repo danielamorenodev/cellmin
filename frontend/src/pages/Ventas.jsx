@@ -90,13 +90,13 @@ function OpcionBusqueda({ opcion, activa, enCarrito, onElegir, onHover }) {
     >
       <div className="flex-1 min-w-0">
         <p
-          className={`text-sm font-medium truncate ${agotado ? "text-gray-400" : "text-gray-800"}`}
+          className={`text-sm font-medium truncate ${agotado ? "text-gray-500" : "text-gray-800"}`}
         >
           {opcion.nombre}
         </p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span
-            className={`text-sm font-semibold ${agotado ? "text-gray-400" : "text-gray-700"}`}
+            className={`text-sm font-semibold ${agotado ? "text-gray-500" : "text-gray-700"}`}
           >
             {formatCurrency(opcion.precio)}
           </span>
@@ -506,7 +506,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
             <div className="relative shrink-0 z-20">
               <Search
                 size={16}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
               />
               <input
                 ref={buscadorRef}
@@ -552,7 +552,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                     buscadorRef.current?.focus();
                   }}
                   title="Limpiar búsqueda"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-700"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700"
                 >
                   <X size={16} />
                 </button>
@@ -565,7 +565,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                   className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-72 overflow-y-auto divide-y divide-gray-100"
                 >
                   {opcionesVisibles.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-4">
+                    <p className="text-sm text-gray-500 text-center py-4">
                       No se encontraron productos
                     </p>
                   ) : (
@@ -581,7 +581,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                     ))
                   )}
                   {opciones.length > LIMITE_LISTA && (
-                    <p className="text-xs text-gray-400 text-center py-2">
+                    <p className="text-xs text-gray-500 text-center py-2">
                       Mostrando {LIMITE_LISTA} de {opciones.length}. Escribí más
                       para afinar la búsqueda.
                     </p>
@@ -594,7 +594,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
             <h3 className="font-medium text-gray-700 shrink-0">
               Carrito
               {carrito.length > 0 && (
-                <span className="ml-2 text-xs text-gray-400 font-normal">
+                <span className="ml-2 text-xs text-gray-500 font-normal">
                   {carrito.length} {carrito.length === 1 ? "artículo" : "artículos"}
                 </span>
               )}
@@ -602,7 +602,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
             {carrito.length === 0 ? (
               <div className="flex items-center gap-3 px-4 py-3 border-2 border-dashed border-gray-200 rounded-xl">
                 <ShoppingCart size={20} className="text-gray-300 shrink-0" />
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-gray-500">
                   El carrito está vacío. Buscá o escaneá un producto arriba.
                 </p>
               </div>
@@ -662,7 +662,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                       type="button"
                       onClick={() => quitarDelCarrito(item.key)}
                       title="Quitar del carrito"
-                      className="p-1 text-gray-400 hover:text-red-600"
+                      className="p-1 text-gray-500 hover:text-red-600"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -732,7 +732,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                   />
                   <span className="text-gray-500 font-medium">%</span>
                   <span
-                    className={`text-sm font-medium ${tipoAjuste === "descuento" ? "text-green-600" : "text-orange-500"}`}
+                    className={`text-sm font-medium ${tipoAjuste === "descuento" ? "text-green-700" : "text-orange-500"}`}
                   >
                     {tipoAjuste === "descuento" ? "-" : "+"}
                     {formatCurrency(montoAjuste)}
@@ -863,10 +863,10 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
               <p
                 className={`font-medium ${
                   tipoAjuste === "descuento"
-                    ? "text-green-600"
+                    ? "text-green-700"
                     : tipoAjuste === "interes"
                       ? "text-orange-500"
-                      : "text-gray-400"
+                      : "text-gray-500"
                 }`}
               >
                 {tipoAjuste === "ninguno"
@@ -885,7 +885,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
               {vuelto !== null && (
                 <>
                   <p className="text-xs text-gray-500">Vuelto (en pesos)</p>
-                  <p className="font-bold text-green-600">
+                  <p className="font-bold text-green-700">
                     {formatCurrency(vuelto)}
                   </p>
                 </>
@@ -1035,7 +1035,7 @@ function FilaVenta({
           <div className="flex items-center justify-center gap-2">
             <button
               onClick={() => setExpandido(!expandido)}
-              className="p-1 text-gray-400 hover:text-gray-600"
+              className="p-1 text-gray-500 hover:text-gray-600"
             >
               {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
@@ -1163,7 +1163,7 @@ function CardVentaMobile({
           <p>{venta.fecha ? formatDateTime(venta.fecha) : "-"}</p>
           <div className="flex items-center gap-2 flex-wrap">
             <BadgePago metodoPago={venta.metodo_pago} />
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-gray-500">
               {venta.sucursal === "sucursal_1" ? "Sucursal 1" : "Sucursal 2"}
             </span>
           </div>
@@ -1175,7 +1175,7 @@ function CardVentaMobile({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setExpandido(!expandido)}
-              className="p-1 text-gray-400 hover:text-gray-600"
+              className="p-1 text-gray-500 hover:text-gray-600"
             >
               {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
@@ -1526,7 +1526,7 @@ export default function Ventas() {
           <div className="relative flex-1">
             <Search
               size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
             />
             <input
               type="text"

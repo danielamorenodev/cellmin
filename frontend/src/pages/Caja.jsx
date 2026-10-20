@@ -410,7 +410,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Total ventas</span>
-              <span className="font-medium text-green-600">
+              <span className="font-medium text-green-700">
                 + {formatCurrency(caja.total_ventas_hoy || 0)}
               </span>
             </div>
@@ -419,7 +419,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
                 <span className="text-gray-600">
                   Dólares cobrados de más (vuelto)
                 </span>
-                <span className="font-medium text-green-600">
+                <span className="font-medium text-green-700">
                   + {formatCurrency(excedenteVentas)}
                 </span>
               </div>
@@ -430,7 +430,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
                 <div key={g} className="flex justify-between text-sm">
                   <span className="text-gray-600">{CONCEPTOS_MOV[g]}</span>
                   <span
-                    className={`font-medium ${v >= 0 ? "text-green-600" : "text-red-600"}`}
+                    className={`font-medium ${v >= 0 ? "text-green-700" : "text-red-600"}`}
                   >
                     {v >= 0 ? "+" : ""}
                     {formatCurrency(v)}
@@ -473,7 +473,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
                 <div key={m.key} className="flex items-center gap-3">
                   <div className="w-28 shrink-0">
                     <p className="text-sm text-gray-600">{m.label}</p>
-                    <p className="text-xs text-gray-400">Esp: {fmt(esp)}</p>
+                    <p className="text-xs text-gray-500">Esp: {fmt(esp)}</p>
                   </div>
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">
@@ -492,7 +492,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
                     <div
                       className={`text-xs font-medium w-20 text-right ${
                         Math.abs(dif) < 0.01
-                          ? "text-green-600"
+                          ? "text-green-700"
                           : dif > 0
                             ? "text-blue-600"
                             : "text-red-600"
@@ -511,7 +511,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
               );
             })}
             {tasaUSD > 0 && (esperadoUSD > 0 || montos.find((m) => m.metodo === "usd")?.monto > 0) && (
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-500">
                 Los dólares se valúan a {formatCurrency(tasaUSD)} cada uno
                 {esperadoUSD > 0
                   ? " (promedio con el que se cobraron)."
@@ -826,7 +826,7 @@ function ResumenCierre({ resultado, onClose }) {
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Total ventas del día</span>
-              <span className="font-semibold text-green-600">
+              <span className="font-semibold text-green-700">
                 {formatCurrency(resultado.total_ventas)}
               </span>
             </div>
@@ -874,7 +874,7 @@ function ResumenCierre({ resultado, onClose }) {
                   {formatCurrency(resultado.monto_retirado || 0)}
                 </span>
               </div>
-              <p className="text-xs text-gray-400">
+              <p className="text-xs text-gray-500">
                 Lo dejado será el monto inicial esperado de la próxima apertura.
               </p>
             </div>
@@ -941,7 +941,7 @@ function ResumenCierre({ resultado, onClose }) {
                           <p
                             className={`text-xs font-bold ${
                               diff === 0
-                                ? "text-green-600"
+                                ? "text-green-700"
                                 : diff > 0
                                   ? "text-blue-600"
                                   : "text-red-600"
@@ -986,7 +986,7 @@ function ListadoCajas({ abiertas, esAdmin, miCajaAbierta, onAbrir, onVer }) {
       <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
         <Lock size={48} className="mx-auto text-gray-300 mb-3" />
         <p className="text-gray-500 font-medium">No hay cajas abiertas</p>
-        <p className="text-gray-400 text-sm mt-1">
+        <p className="text-gray-500 text-sm mt-1">
           Abrí la caja para comenzar a registrar ventas
         </p>
         {!miCajaAbierta && (
@@ -1063,7 +1063,7 @@ function ListadoCajas({ abiertas, esAdmin, miCajaAbierta, onAbrir, onVer }) {
                 <td className="col-num px-6 py-4 text-sm text-gray-700">
                   {formatCurrency(c.monto_inicial)}
                 </td>
-                <td className="col-num px-6 py-4 text-sm font-medium text-green-600">
+                <td className="col-num px-6 py-4 text-sm font-medium text-green-700">
                   {formatCurrency(c.total_ventas_hoy || 0)}
                 </td>
                 <td className="col-num px-6 py-4 text-sm font-semibold text-gray-800">
@@ -1074,7 +1074,7 @@ function ListadoCajas({ abiertas, esAdmin, miCajaAbierta, onAbrir, onVer }) {
                     <button
                       onClick={() => onVer(c)}
                       title="Ver detalle"
-                      className="p-1 text-gray-400 hover:text-gray-600"
+                      className="p-1 text-gray-500 hover:text-gray-600"
                     >
                       <ChevronRight size={16} />
                     </button>
@@ -1113,7 +1113,7 @@ function ListadoCajas({ abiertas, esAdmin, miCajaAbierta, onAbrir, onVer }) {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-500">
-                Ventas: <b className="text-green-600">{formatCurrency(c.total_ventas_hoy || 0)}</b>
+                Ventas: <b className="text-green-700">{formatCurrency(c.total_ventas_hoy || 0)}</b>
               </span>
               <span className="text-gray-500">
                 Saldo: <b className="text-gray-800">{formatCurrency(saldo(c))}</b>
@@ -1354,14 +1354,14 @@ export default function Caja() {
                         {formatCurrency(Math.abs(caja.diferencia_apertura))}
                       </p>
                     ) : (
-                      <p className="text-xs mt-1 text-green-600 flex items-center gap-1">
+                      <p className="text-xs mt-1 text-green-700 flex items-center gap-1">
                         <Check size={14} /> Coincide con lo dejado en el cierre anterior
                       </p>
                     ))}
                 </div>
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                   <p className="text-sm text-gray-500">Ventas del día</p>
-                  <p className="text-2xl font-bold text-green-600 mt-1">
+                  <p className="text-2xl font-bold text-green-700 mt-1">
                     {formatCurrency(totalVentasHoy)}
                   </p>
                 </div>
@@ -1387,7 +1387,7 @@ export default function Caja() {
                 </div>
                 {!caja.movimientos_completos ||
                 caja.movimientos_completos.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400 text-sm">
+                  <div className="text-center py-8 text-gray-500 text-sm">
                     No hay movimientos registrados
                   </div>
                 ) : (
@@ -1433,14 +1433,14 @@ export default function Caja() {
                               <td
                                 className={`col-num px-6 py-3 text-sm font-semibold ${
                                   m.tipo === "ingreso"
-                                    ? "text-green-600"
+                                    ? "text-green-700"
                                     : "text-red-600"
                                 }`}
                               >
                                 {m.tipo === "ingreso" ? "+" : "-"}
                                 {formatCurrency(m.monto)}
                                 {m.monto_usd > 0 && (
-                                  <span className="block text-xs font-normal text-gray-400">
+                                  <span className="block text-xs font-normal text-gray-500">
                                     {formatUSD(m.monto_usd)}{" "}
                                     {m.tipo === "ingreso" ? "recibidos" : "devueltos"}
                                   </span>
@@ -1481,14 +1481,14 @@ export default function Caja() {
                             <p className="text-sm text-gray-700">
                               {m.descripcion}
                             </p>
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-gray-500">
                               {m.fecha ? formatDateTime(m.fecha) : "-"}
                             </p>
                           </div>
                           <span
                             className={`text-sm font-bold ${
                               m.tipo === "ingreso"
-                                ? "text-green-600"
+                                ? "text-green-700"
                                 : "text-red-600"
                             }`}
                           >
@@ -1518,7 +1518,7 @@ export default function Caja() {
           <div className="relative">
             <Search
               size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
             />
             <input
               type="text"
@@ -1529,7 +1529,7 @@ export default function Caja() {
             />
           </div>
           {historial.filter((c) => c.estado === "cerrada").length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
+            <div className="text-center py-12 text-gray-500">
               No hay cajas cerradas en el historial
             </div>
           ) : (
@@ -1560,7 +1560,7 @@ export default function Caja() {
                   <div className="flex items-center gap-6">
                     <div className="text-right hidden sm:block">
                       <p className="text-xs text-gray-500">Ventas</p>
-                      <p className="font-semibold text-green-600">
+                      <p className="font-semibold text-green-700">
                         {formatCurrency(c.total_ventas || 0)}
                       </p>
                     </div>
@@ -1580,9 +1580,9 @@ export default function Caja() {
                       </p>
                     </div>
                     {expandedCaja === i ? (
-                      <ChevronUp size={16} className="text-gray-400" />
+                      <ChevronUp size={16} className="text-gray-500" />
                     ) : (
-                      <ChevronDown size={16} className="text-gray-400" />
+                      <ChevronDown size={16} className="text-gray-500" />
                     )}
                   </div>
                 </div>
@@ -1598,7 +1598,7 @@ export default function Caja() {
                       </div>
                       <div className="bg-gray-50 rounded-xl p-3">
                         <p className="text-xs text-gray-500">Total ventas</p>
-                        <p className="font-semibold text-green-600">
+                        <p className="font-semibold text-green-700">
                           {formatCurrency(c.total_ventas || 0)}
                         </p>
                       </div>
@@ -1635,7 +1635,7 @@ export default function Caja() {
                           <p
                             className={`font-semibold ${
                               Math.abs(c.usd_diferencia || 0) < 0.01
-                                ? "text-green-600"
+                                ? "text-green-700"
                                 : c.usd_diferencia > 0
                                   ? "text-blue-600"
                                   : "text-red-600"
@@ -1670,7 +1670,7 @@ export default function Caja() {
                             <p
                               className={`font-semibold ${
                                 Math.abs(c.diferencia_apertura || 0) < 0.01
-                                  ? "text-green-600"
+                                  ? "text-green-700"
                                   : c.diferencia_apertura > 0
                                     ? "text-blue-600"
                                     : "text-red-600"
@@ -1729,7 +1729,7 @@ export default function Caja() {
                               <tr key={j}>
                                 <td className="col-centro px-3 py-2">
                                   <span
-                                    className={`text-xs font-medium ${m.tipo === "ingreso" ? "text-green-600" : "text-red-600"}`}
+                                    className={`text-xs font-medium ${m.tipo === "ingreso" ? "text-green-700" : "text-red-600"}`}
                                   >
                                     {m.tipo === "ingreso"
                                       ? "Ingreso"
@@ -1745,7 +1745,7 @@ export default function Caja() {
                                   {m.motivo}
                                 </td>
                                 <td
-                                  className={`col-num px-3 py-2 font-medium ${m.tipo === "ingreso" ? "text-green-600" : "text-red-600"}`}
+                                  className={`col-num px-3 py-2 font-medium ${m.tipo === "ingreso" ? "text-green-700" : "text-red-600"}`}
                                 >
                                   {m.tipo === "ingreso" ? "+" : "-"}
                                   {formatCurrency(m.monto)}

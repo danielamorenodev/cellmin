@@ -46,7 +46,7 @@ export default function InputPrecio({
   return (
     <div>
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium pointer-events-none">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-medium pointer-events-none">
           {esUSD ? "US$" : "$"}
         </span>
         <InputNumero
@@ -57,7 +57,7 @@ export default function InputPrecio({
         />
       </div>
       {equivalente && (
-        <p className="text-[11px] text-gray-400 mt-0.5">{equivalente}</p>
+        <p className="text-[11px] text-gray-500 mt-0.5">{equivalente}</p>
       )}
     </div>
   );
@@ -91,7 +91,7 @@ export function SelectorMoneda({ moneda, onChange }) {
         ))}
       </div>
       {disponible ? (
-        <span className="text-gray-400">
+        <span className="text-gray-500">
           Dólar $ {new Intl.NumberFormat("es-AR").format(venta)}
         </span>
       ) : (

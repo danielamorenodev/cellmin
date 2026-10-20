@@ -107,7 +107,7 @@ export default function Dolar() {
               Nuevo valor (1 USD en pesos)
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">
                 $
               </span>
               <InputNumero
@@ -138,11 +138,11 @@ export default function Dolar() {
       {/* Historial */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-          <CircleDollarSign size={18} className="text-gray-400" />
+          <CircleDollarSign size={18} className="text-gray-500" />
           <h2 className="font-semibold text-gray-800">Historial de cambios</h2>
         </div>
         {historial.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm py-10">
+          <p className="text-center text-gray-500 text-sm py-10">
             Todavía no hay cambios registrados
           </p>
         ) : (

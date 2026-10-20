@@ -8,7 +8,7 @@ export default function PrecioUSD({ pesos, className = "", prefijo = "≈" }) {
   const usd = aUSD(Number(pesos) || 0);
   if (usd === null) return null;
   return (
-    <span className={`text-xs font-normal text-gray-400 ${className}`}>
+    <span className={`text-xs font-normal text-gray-500 ${className}`}>
       {prefijo} {formatUSD(usd)}
     </span>
   );

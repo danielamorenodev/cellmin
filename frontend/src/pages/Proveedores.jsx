@@ -245,7 +245,7 @@ export default function Proveedores() {
       <div className="relative">
         <Search
           size={18}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
         />
         <input
           type="text"
@@ -288,7 +288,7 @@ export default function Proveedores() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
-                          <Truck size={16} className="text-orange-600" />
+                          <Truck size={16} className="text-orange-700" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -302,7 +302,7 @@ export default function Proveedores() {
                             )}
                           </div>
                           {proveedor.email && (
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-gray-500">
                               {proveedor.email}
                             </p>
                           )}
@@ -336,7 +336,7 @@ export default function Proveedores() {
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
-                    <Truck size={18} className="text-orange-600" />
+                    <Truck size={18} className="text-orange-700" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
