@@ -83,12 +83,12 @@ Copiá esa línea en GitHub → repositorio → Settings → **Deploy keys** →
 
 ```bash
 sudo -u cellmin git config --global core.sshCommand "ssh -i /opt/cellmin/.ssh_deploy_key -o StrictHostKeyChecking=accept-new"
-sudo -u cellmin git clone git@github.com:luciaddanielamoreno-hash/cellmin.git /opt/cellmin/app_tmp
+sudo -u cellmin git clone git@github.com:danielamorenodev/cellmin.git /opt/cellmin/app_tmp
 ```
 
 ### 3.2 Si el repo es público
 ```bash
-sudo -u cellmin git clone https://github.com/luciaddanielamoreno-hash/cellmin.git /opt/cellmin/app_tmp
+sudo -u cellmin git clone https://github.com/danielamorenodev/cellmin.git /opt/cellmin/app_tmp
 ```
 
 Dejar el código directo en `/opt/cellmin`:
