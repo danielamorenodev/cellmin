@@ -293,7 +293,7 @@ export default function Categorias() {
                         </p>
                       )}
                       {categoria.categoria_padre_id && (
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-gray-500">
                           Subcategoría de:{" "}
                           {getNombrePadre(categoria.categoria_padre_id)}
                         </p>

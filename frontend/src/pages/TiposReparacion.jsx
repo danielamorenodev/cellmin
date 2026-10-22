@@ -224,7 +224,7 @@ export default function TiposReparacion() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
-                          <Wrench size={14} className="text-orange-600" />
+                          <Wrench size={14} className="text-orange-700" />
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-gray-800">
@@ -264,7 +264,7 @@ export default function TiposReparacion() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-orange-100 rounded-xl flex items-center justify-center shrink-0">
-                      <Wrench size={16} className="text-orange-600" />
+                      <Wrench size={16} className="text-orange-700" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">

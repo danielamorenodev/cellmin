@@ -359,7 +359,7 @@ function NuevaCompraModal({ onClose, onSave }) {
             </div>
 
             {form.items.length === 0 && (
-              <p className="text-sm text-gray-400 text-center py-4 border-2 border-dashed border-gray-200 rounded-xl">
+              <p className="text-sm text-gray-500 text-center py-4 border-2 border-dashed border-gray-200 rounded-xl">
                 No hay productos. Hacé click en "Agregar producto".
               </p>
             )}
@@ -620,7 +620,7 @@ function FilaCompra({ compra, proveedores, onCancel, onVerDetalle }) {
           {compra.items?.length || 0}
         </td>
         <td
-          className={`col-num px-6 py-4 text-sm font-semibold ${cancelada ? "text-gray-400 line-through" : "text-gray-800"}`}
+          className={`col-num px-6 py-4 text-sm font-semibold ${cancelada ? "text-gray-500 line-through" : "text-gray-800"}`}
         >
           {formatCurrency(compra.total)}
         </td>
@@ -642,7 +642,7 @@ function FilaCompra({ compra, proveedores, onCancel, onVerDetalle }) {
           <div className="flex items-center justify-center gap-2">
             <button
               onClick={() => setExpandido(!expandido)}
-              className="p-1 text-gray-400 hover:text-gray-600"
+              className="p-1 text-gray-500 hover:text-gray-600"
             >
               {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
@@ -724,7 +724,7 @@ function CardCompraMobile({ compra, proveedor, onCancel, onVerDetalle }) {
             {compra.numero_compra}
           </button>
           <span
-            className={`text-sm font-bold ${cancelada ? "text-gray-400 line-through" : "text-gray-800"}`}
+            className={`text-sm font-bold ${cancelada ? "text-gray-500 line-through" : "text-gray-800"}`}
           >
             {formatCurrency(compra.total)}
           </span>
@@ -741,14 +741,14 @@ function CardCompraMobile({ compra, proveedor, onCancel, onVerDetalle }) {
           <p className="text-xs text-gray-500">
             {nombreSucursal(compra.sucursal || "sucursal_1")}
           </p>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500">
             {compra.fecha ? formatDateTime(compra.fecha) : "-"}
           </p>
           <p className="text-xs text-gray-500">
             {compra.items?.length || 0} productos
           </p>
           {compra.numero_remito && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-500">
               Remito: {compra.numero_remito}
             </p>
           )}
@@ -774,12 +774,12 @@ function CardCompraMobile({ compra, proveedor, onCancel, onVerDetalle }) {
               <div>
                 <span className="font-medium">{item.nombre_producto}</span>
                 {item.variante_nombre && (
-                  <span className="text-gray-400">
+                  <span className="text-gray-500">
                     {" "}
                     — {item.variante_nombre}
                   </span>
                 )}
-                <span className="text-gray-400"> x{item.cantidad}</span>
+                <span className="text-gray-500"> x{item.cantidad}</span>
               </div>
               <span className="font-medium">
                 {formatCurrency(item.subtotal)}
@@ -895,7 +895,7 @@ function GestionProveedores() {
         <div className="relative flex-1 min-w-48">
           <Search
             size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
           />
           <input
             type="text"
@@ -948,7 +948,7 @@ function GestionProveedores() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
-                          <Truck size={16} className="text-orange-600" />
+                          <Truck size={16} className="text-orange-700" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -962,7 +962,7 @@ function GestionProveedores() {
                             )}
                           </div>
                           {proveedor.email && (
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-gray-500">
                               {proveedor.email}
                             </p>
                           )}
@@ -999,7 +999,7 @@ function GestionProveedores() {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center shrink-0">
-                      <Truck size={18} className="text-orange-600" />
+                      <Truck size={18} className="text-orange-700" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -1183,7 +1183,7 @@ export default function Compras() {
           <div className="relative">
             <Search
               size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
             />
             <input
               type="text"

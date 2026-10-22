@@ -59,7 +59,7 @@ export const ESTADOS_REP = {
     color: "bg-yellow-100 text-yellow-700",
   },
   lista: { label: "Lista para entregar", color: "bg-green-100 text-green-700" },
-  entregada: { label: "Entregada", color: "bg-gray-100 text-gray-500" },
+  entregada: { label: "Entregada", color: "bg-gray-100 text-gray-700" },
   cancelada: { label: "Cancelada", color: "bg-red-100 text-red-700" },
 };
 

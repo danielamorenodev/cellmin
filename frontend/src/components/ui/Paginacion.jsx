@@ -52,7 +52,7 @@ export default function Paginacion({
         </button>
         {paginasFiltradas.map((p, i) =>
           p === "..." ? (
-            <span key={i} className="px-2 text-gray-400">
+            <span key={i} className="px-2 text-gray-500">
               ...
             </span>
           ) : (

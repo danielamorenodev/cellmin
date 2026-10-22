@@ -267,7 +267,7 @@ export default function Clientes() {
         <div className="relative flex-1">
           <Search
             size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
           />
           <input
             type="text"

@@ -41,7 +41,7 @@ export default function DetalleReparacion({ reparacion, cliente }) {
         <Dato titulo="Cliente">
           {cliente ? `${cliente.nombre} ${cliente.apellido || ""}` : "-"}
           {cliente?.telefono && (
-            <p className="text-xs text-gray-400">{cliente.telefono}</p>
+            <p className="text-xs text-gray-500">{cliente.telefono}</p>
           )}
         </Dato>
         <Dato titulo="Sucursal">{sucursal}</Dato>
@@ -79,18 +79,27 @@ export default function DetalleReparacion({ reparacion, cliente }) {
           <strong>Bloqueo de pantalla:</strong>{" "}
           {(!reparacion.equipo?.bloqueo_tipo ||
             reparacion.equipo.bloqueo_tipo === "ninguno") && "Sin bloqueo"}
-          {reparacion.equipo?.bloqueo_tipo === "pin" && (
+          {reparacion.equipo?.bloqueo_tipo &&
+            reparacion.equipo.bloqueo_tipo !== "ninguno" &&
+            !reparacion.equipo.bloqueo_valor && (
+              <span className="text-gray-500">
+                {reparacion.equipo.bloqueo_eliminado
+                  ? "Se eliminó al entregar el equipo"
+                  : "Oculto: solo lo ven el técnico y el administrador"}
+              </span>
+            )}
+          {reparacion.equipo?.bloqueo_tipo === "pin" && reparacion.equipo.bloqueo_valor && (
             <span>
               PIN <span className="font-mono">{reparacion.equipo.bloqueo_valor}</span>
             </span>
           )}
-          {reparacion.equipo?.bloqueo_tipo === "password" && (
+          {reparacion.equipo?.bloqueo_tipo === "password" && reparacion.equipo.bloqueo_valor && (
             <span>
               Contraseña{" "}
               <span className="font-mono">{reparacion.equipo.bloqueo_valor}</span>
             </span>
           )}
-          {reparacion.equipo?.bloqueo_tipo === "patron" && (
+          {reparacion.equipo?.bloqueo_tipo === "patron" && reparacion.equipo.bloqueo_valor && (
             <div className="mt-2">
               <PatronBloqueo value={reparacion.equipo.bloqueo_valor} readOnly />
             </div>
@@ -104,7 +113,7 @@ export default function DetalleReparacion({ reparacion, cliente }) {
             Reparaciones
           </p>
           {tipos.length === 0 ? (
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-gray-500">
               Todavía en diagnóstico, sin reparaciones definidas
             </p>
           ) : (
@@ -129,7 +138,7 @@ export default function DetalleReparacion({ reparacion, cliente }) {
         <div className="bg-gray-50 rounded-xl p-4">
           <p className="text-sm font-semibold text-gray-700 mb-2">Pagos</p>
           {pagos.length === 0 ? (
-            <p className="text-sm text-gray-400">Sin pagos registrados</p>
+            <p className="text-sm text-gray-500">Sin pagos registrados</p>
           ) : (
             pagos.map((p, i) => (
               <div
@@ -143,7 +152,7 @@ export default function DetalleReparacion({ reparacion, cliente }) {
               </div>
             ))
           )}
-          <div className="flex justify-between text-sm font-bold text-green-600 mt-2">
+          <div className="flex justify-between text-sm font-bold text-green-700 mt-2">
             <span>Total pagado</span>
             <span>{formatCurrency(reparacion.total_pagado || 0)}</span>
           </div>
@@ -173,7 +182,7 @@ export default function DetalleReparacion({ reparacion, cliente }) {
             </p>
           )}
           {reparacion.fecha_vencimiento_garantia && (
-            <p className="text-green-600">
+            <p className="text-green-700">
               <strong>Garantía hasta:</strong>{" "}
               {formatDateTime(reparacion.fecha_vencimiento_garantia)}
             </p>

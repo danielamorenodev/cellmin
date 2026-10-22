@@ -14,7 +14,8 @@ async def export_backup(current_user: dict = Depends(get_current_user)):
     colecciones = [
         "usuarios", "categorias", "productos", "clientes",
         "proveedores", "ventas", "compras", "cajas",
-        "reparaciones", "stock_movimientos"
+        "reparaciones", "stock_movimientos", "tipos_reparacion",
+        "contadores", "configuracion", "cotizacion_historial"
     ]
     backup = {}
     for col in colecciones:

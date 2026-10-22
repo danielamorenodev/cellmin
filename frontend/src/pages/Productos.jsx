@@ -165,7 +165,7 @@ function StockPorSucursal({
         ))}
       </div>
       {stockSoloLectura && (
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-gray-500">
           El stock se modifica desde el módulo Stock
         </p>
       )}
@@ -499,7 +499,7 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
                   Generar
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 Podés escanear el código del empaque directamente en este campo
               </p>
             </div>
@@ -680,7 +680,7 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
                 />
               ))}
               {form.variantes.length === 0 && (
-                <p className="text-sm text-gray-400 text-center py-4">
+                <p className="text-sm text-gray-500 text-center py-4">
                   No hay variantes. Hacé click en "Agregar variante".
                 </p>
               )}
@@ -806,7 +806,7 @@ function FilaProducto({ producto, categorias, onEdit, onDelete }) {
           <div className="flex items-center justify-center gap-1">
             <button
               onClick={toggle}
-              className="p-1 text-gray-400 hover:text-blue-600 transition"
+              className="p-1 text-gray-500 hover:text-blue-600 transition"
               title={expandido ? "Contraer" : "Expandir"}
             >
               {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -1127,7 +1127,7 @@ function GestionCategorias({ onCambio }) {
         <div className="relative flex-1 min-w-48">
           <Search
             size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
           />
           <input
             type="text"
@@ -1239,7 +1239,7 @@ function GestionCategorias({ onCambio }) {
                         </p>
                       )}
                       {categoria.categoria_padre_id && (
-                        <p className="text-xs text-gray-400">
+                        <p className="text-xs text-gray-500">
                           Subcategoría de:{" "}
                           {getNombrePadre(categoria.categoria_padre_id)}
                         </p>
@@ -1480,7 +1480,7 @@ export default function Productos() {
               <div className="relative flex-1">
                 <Search
                   size={18}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
                 />
                 <input
                   type="text"
@@ -1677,7 +1677,7 @@ export default function Productos() {
                             )?.nombre || "-"}
                           </p>
                           {producto.fecha_creacion && (
-                            <p className="text-xs text-gray-400">
+                            <p className="text-xs text-gray-500">
                               Creado: {formatDate(producto.fecha_creacion)}
                             </p>
                           )}

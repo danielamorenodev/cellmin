@@ -6,6 +6,7 @@ import {
   Wrench,
   AlertTriangle,
   DollarSign,
+  Download,
 } from "lucide-react";
 import { reportesService } from "../services/reportes.service";
 import { formatCurrency, nombreSucursal } from "../utils/helpers";
@@ -58,12 +59,34 @@ function StatCard({ title, value, subtitle, icon: Icon, color }) {
       </div>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
       <p className="text-sm font-medium text-gray-600 mt-1">{title}</p>
-      {subtitle && <p className="text-xs text-gray-400 mt-1">{subtitle}</p>}
+      {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
     </div>
   );
 }
 
 export default function Reportes() {
+  const [descargando, setDescargando] = useState(false);
+
+  // Descarga una copia completa de los datos en un archivo JSON
+  const descargarRespaldo = async () => {
+    setDescargando(true);
+    try {
+      const datos = await reportesService.descargarRespaldo();
+      const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `respaldo-cellmin-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Respaldo descargado. Guardalo en un lugar seguro: tiene datos de clientes.");
+    } catch {
+      toast.error("No se pudo descargar el respaldo");
+    } finally {
+      setDescargando(false);
+    }
+  };
+
   const [periodo, setPeriodo] = useState("mes");
   const [tab, setTab] = useState("ventas");
   const [ventasData, setVentasData] = useState(null);
@@ -120,6 +143,15 @@ export default function Reportes() {
             <p className="text-gray-500 text-sm mt-1">
               Estadísticas y métricas del negocio
             </p>
+            <button
+              type="button"
+              onClick={descargarRespaldo}
+              disabled={descargando}
+              className="mt-3 inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-60 transition"
+            >
+              <Download size={16} aria-hidden="true" />
+              {descargando ? "Descargando…" : "Descargar respaldo"}
+            </button>
           </div>
           <div className="flex flex-wrap gap-2 items-center">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -418,7 +450,7 @@ export default function Reportes() {
                   </h3>
                 </div>
                 {productosData.length === 0 ? (
-                  <div className="text-center py-12 text-gray-400">
+                  <div className="text-center py-12 text-gray-500">
                     No hay datos de ventas
                   </div>
                 ) : (

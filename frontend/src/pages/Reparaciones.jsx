@@ -189,7 +189,7 @@ function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle }) {
       <div className="relative">
         <Search
           size={16}
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
         />
         <input
           type="text"
@@ -204,7 +204,7 @@ function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle }) {
       </div>
       <div className="space-y-1">
         {tiposFiltrados.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">
+          <p className="text-sm text-gray-500 text-center py-4">
             No se encontraron tipos
           </p>
         ) : (
@@ -654,7 +654,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                   />
                 )}
                 {form.equipo.bloqueo_tipo !== "ninguno" && (
-                  <p className="text-xs text-gray-400 sm:col-span-2">
+                  <p className="text-xs text-gray-500 sm:col-span-2">
                     Se imprime solo en la copia del técnico.
                   </p>
                 )}
@@ -668,12 +668,12 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">
                 Tipos de reparación
-                <span className="text-xs text-gray-400 ml-2">
+                <span className="text-xs text-gray-500 ml-2">
                   (opcional si no se conoce el problema)
                 </span>
               </p>
               {tiposDisponibles.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4 border-2 border-dashed border-gray-200 rounded-xl">
+                <p className="text-sm text-gray-500 text-center py-4 border-2 border-dashed border-gray-200 rounded-xl">
                   No hay tipos cargados. Cargalos desde "Tipos de Reparación".
                 </p>
               ) : (
@@ -709,19 +709,19 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                     className="w-4 h-4"
                   />
                   <span
-                    className={`text-sm font-medium ${senaDisponible ? "text-gray-700" : "text-gray-400"}`}
+                    className={`text-sm font-medium ${senaDisponible ? "text-gray-700" : "text-gray-500"}`}
                   >
                     Cobrar seña ahora
                   </span>
                 </label>
                 {tiposSeleccionados.length === 0 && (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-500">
                     Disponible cuando elegís las reparaciones. En diagnóstico no
                     se cobra seña.
                   </p>
                 )}
                 {tiposSeleccionados.length > 0 && !cajaAbierta && (
-                  <p className="text-xs text-orange-600">
+                  <p className="text-xs text-orange-700">
                     Abrí la caja para poder cobrar una seña.
                   </p>
                 )}
@@ -800,7 +800,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                         <span>Total de la reparación</span>
                         <span>{formatCurrency(precioTotal)}</span>
                       </div>
-                      <div className="flex justify-between text-green-600">
+                      <div className="flex justify-between text-green-700">
                         <span>Seña</span>
                         <span>- {formatCurrency(montoSena)}</span>
                       </div>
@@ -809,7 +809,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                           saldoRestante < 0
                             ? "text-red-600"
                             : saldoRestante === 0
-                              ? "text-green-600"
+                              ? "text-green-700"
                               : "text-gray-800"
                         }`}
                       >
@@ -1089,7 +1089,7 @@ function PagoModal({ reparacion, onClose, onSave }) {
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Total pagado</span>
-              <span className="font-medium text-green-600">
+              <span className="font-medium text-green-700">
                 {formatCurrency(reparacion.total_pagado || 0)}
               </span>
             </div>
@@ -1376,14 +1376,14 @@ function FilaReparacion({
           {reparacion.tipos_reparacion?.length > 0 ? (
             formatCurrency(reparacion.precio_total || 0)
           ) : (
-            <span className="text-gray-400 text-xs font-normal">
+            <span className="text-gray-500 text-xs font-normal">
               En diagnóstico
             </span>
           )}
         </td>
         <td className="col-num px-6 py-4 text-sm ">
           {reparacion.estado === "cancelada" ? (
-            <span className="text-gray-400 text-xs">
+            <span className="text-gray-500 text-xs">
               {reparacion.total_devuelto > 0
                 ? `Devuelto ${formatCurrency(reparacion.total_devuelto)}`
                 : "-"}
@@ -1393,7 +1393,7 @@ function FilaReparacion({
               {formatCurrency(reparacion.saldo_pendiente)}
             </span>
           ) : reparacion.precio_total > 0 ? (
-            <span className="inline-flex items-center gap-1 text-green-600 text-xs font-medium">
+            <span className="inline-flex items-center gap-1 text-green-700 text-xs font-medium">
               <Check size={14} /> Pagado
             </span>
           ) : (
@@ -1404,7 +1404,7 @@ function FilaReparacion({
           <div className="flex items-center gap-1">
             <button
               onClick={() => setExpandido(!expandido)}
-              className="p-1 text-gray-400 hover:text-gray-600"
+              className="p-1 text-gray-500 hover:text-gray-600"
             >
               {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
@@ -1464,7 +1464,7 @@ function FilaReparacion({
                   </p>
                 )}
                 {reparacion.fecha_vencimiento_garantia && (
-                  <p className="text-xs text-green-600">
+                  <p className="text-xs text-green-700">
                     Garantía hasta:{" "}
                     {formatDateTime(reparacion.fecha_vencimiento_garantia)}
                   </p>
@@ -1515,7 +1515,7 @@ function FilaReparacion({
                     ))}
                     <div className="flex justify-between text-xs font-bold border-t border-gray-100 pt-1 mt-1">
                       <span>Total pagado</span>
-                      <span className="text-green-600">
+                      <span className="text-green-700">
                         {formatCurrency(reparacion.total_pagado)}
                       </span>
                     </div>
@@ -1595,13 +1595,13 @@ function CardReparacionMobile({
             {cliente ? `${cliente.nombre} ${cliente.apellido || ""}` : "-"}
           </p>
           {cliente?.telefono && (
-            <p className="text-xs text-gray-400">{cliente.telefono}</p>
+            <p className="text-xs text-gray-500">{cliente.telefono}</p>
           )}
           <p className="text-gray-700">
             {reparacion.equipo?.marca} {reparacion.equipo?.modelo}
           </p>
           {reparacion.equipo?.imei && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-500">
               IMEI: {reparacion.equipo.imei}
             </p>
           )}
@@ -1632,7 +1632,7 @@ function CardReparacionMobile({
         <div className="flex items-center justify-end gap-1">
           <button
             onClick={() => setExpandido(!expandido)}
-            className="p-1 text-gray-400 hover:text-gray-600"
+            className="p-1 text-gray-500 hover:text-gray-600"
           >
             {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
@@ -1677,7 +1677,7 @@ function CardReparacionMobile({
               </p>
             )}
             {reparacion.fecha_vencimiento_garantia && (
-              <p className="text-green-600">
+              <p className="text-green-700">
                 <strong>Garantía hasta:</strong>{" "}
                 {formatDateTime(reparacion.fecha_vencimiento_garantia)}
               </p>
@@ -1700,7 +1700,7 @@ function CardReparacionMobile({
               ))}
               <div className="flex justify-between text-xs font-bold border-t border-gray-200 pt-1 mt-1">
                 <span>Total pagado</span>
-                <span className="text-green-600">
+                <span className="text-green-700">
                   {formatCurrency(reparacion.total_pagado)}
                 </span>
               </div>
@@ -1904,7 +1904,7 @@ function GestionTiposReparacion() {
         <div className="relative flex-1 min-w-48">
           <Search
             size={18}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
           />
           <input
             type="text"
@@ -1953,7 +1953,7 @@ function GestionTiposReparacion() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center shrink-0">
-                          <Wrench size={14} className="text-orange-600" />
+                          <Wrench size={14} className="text-orange-700" />
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-gray-800">
@@ -1993,7 +1993,7 @@ function GestionTiposReparacion() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-orange-100 rounded-xl flex items-center justify-center shrink-0">
-                      <Wrench size={16} className="text-orange-600" />
+                      <Wrench size={16} className="text-orange-700" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -2218,7 +2218,7 @@ export default function Reparaciones() {
               <div className="relative flex-1">
                 <Search
                   size={18}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
                 />
                 <input
                   type="text"
