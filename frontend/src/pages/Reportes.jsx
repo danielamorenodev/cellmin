@@ -662,7 +662,9 @@ export default function Reportes() {
                             {p.stock_minimo}
                           </td>
                           <td className="col-num px-6 py-3 text-sm font-semibold text-red-600">
-                            -{p.stock_minimo - p.stock_actual}
+                            {p.stock_minimo - p.stock_actual > 0
+                              ? `-${p.stock_minimo - p.stock_actual}`
+                              : "En el mínimo"}
                           </td>
                         </tr>
                       ))}

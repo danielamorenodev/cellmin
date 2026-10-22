@@ -92,6 +92,13 @@ export const minimoEn = (item, sucursal) => {
   return item.stock_minimo_sucursal?.[sucursal] ?? 0;
 };
 
+// Alerta de reposición: el stock llegó al mínimo o está por debajo.
+// Un mínimo de 0 significa "sin mínimo configurado" y no genera alerta.
+export const bajoMinimo = (item, sucursal) => {
+  const minimo = minimoEn(item, sucursal);
+  return minimo > 0 && stockEn(item, sucursal) <= minimo;
+};
+
 export const formatInputMoneda = (valor) => {
   // Permitir solo números, punto y coma
   const limpio = valor.replace(/[^\d.,]/g, "");
