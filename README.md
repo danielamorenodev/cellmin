@@ -3,7 +3,7 @@
 Sistema web para **Cellmin**, un comercio con dos sucursales que vende y repara celulares, accesorios y productos tecnológicos. Reúne en un solo lugar el stock de cada sucursal, las ventas, la caja, las órdenes de reparación, las compras a proveedores y los reportes.
 
 **Sitio publicado:** https://cellmin.jybora.com
-**Tablero del proyecto:** https://github.com/users/luciaddanielamoreno-hash/projects/1
+**Tablero del proyecto:** https://github.com/users/danielamorenodev/projects/1
 
 **Tecnologías:** React · Vite · Tailwind CSS · Python · FastAPI · MongoDB (Motor, asíncrono) · Nginx
 
@@ -70,7 +70,7 @@ DESPLIEGUE.md       guía de despliegue en el servidor, paso a paso
 ### 1. Descargar el código
 
 ```bash
-git clone https://github.com/luciaddanielamoreno-hash/cellmin.git
+git clone https://github.com/danielamorenodev/cellmin.git
 cd cellmin
 ```
 
