@@ -1,4 +1,4 @@
-from app.utils.stock import SUCURSALES, stock_en, minimo_en
+from app.utils.stock import SUCURSALES, stock_en, minimo_en, bajo_minimo
 from fastapi import APIRouter, Depends
 from app.database import get_db
 from app.utils.auth import get_current_user
@@ -296,14 +296,14 @@ async def get_reparaciones_report(current_user: dict = Depends(get_current_user)
     }
 
 def _faltantes(productos):
-    """Filas (producto, variante, sucursal) que están por debajo del mínimo de esa sucursal."""
+    """Filas (producto, variante, sucursal) que llegaron al mínimo de esa sucursal o están por debajo."""
     filas = []
     for p in productos:
         unidades = p.get("variantes", []) if p.get("tiene_variantes") else [p]
         for u in unidades:
             for suc in SUCURSALES:
                 actual, minimo = stock_en(u, suc), minimo_en(u, suc)
-                if actual < minimo:
+                if bajo_minimo(actual, minimo):
                     filas.append({
                         "nombre": p["nombre"],
                         "variante": u["nombre"] if p.get("tiene_variantes") else None,

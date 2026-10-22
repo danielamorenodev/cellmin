@@ -32,6 +32,7 @@ import {
   nombreSucursal,
   stockEn,
   minimoEn,
+  bajoMinimo,
 } from "../utils/helpers";
 import { exportarListaPrecios } from "../utils/exportExcel";
 import Paginacion from "../components/ui/Paginacion";
@@ -55,9 +56,9 @@ const aEntero = (v) => {
 const mapaAEnteros = (m) =>
   Object.fromEntries(SUCURSALES.map((s) => [s.value, aEntero(m?.[s.value])]));
 
-// Sucursales cuyo stock está por debajo de su mínimo
+// Sucursales cuyo stock llegó a su mínimo o está por debajo
 const sucursalesBajas = (item) =>
-  SUCURSALES.filter((s) => stockEn(item, s.value) < minimoEn(item, s.value));
+  SUCURSALES.filter((s) => bajoMinimo(item, s.value));
 
 const tieneStockBajo = (item) => sucursalesBajas(item).length > 0;
 
@@ -70,15 +71,15 @@ const stockDeSucursal = (p, suc) =>
     : stockEn(p, suc);
 const bajoEnSucursal = (p, suc) =>
   p.tiene_variantes
-    ? (p.variantes || []).some((v) => stockEn(v, suc) < minimoEn(v, suc))
-    : stockEn(p, suc) < minimoEn(p, suc);
+    ? (p.variantes || []).some((v) => bajoMinimo(v, suc))
+    : bajoMinimo(p, suc);
 
-// Celda de stock de una sucursal: un solo número, en rojo si está bajo el mínimo
+// Celda de stock de una sucursal: un solo número, en rojo si llegó al mínimo
 function CeldaStock({ producto, sucursal }) {
   const bajo = bajoEnSucursal(producto, sucursal);
   return (
     <span
-      title={bajo ? "Stock bajo el mínimo" : undefined}
+      title={bajo ? "Stock en el mínimo o por debajo: hay que reponer" : undefined}
       className={`inline-flex items-center gap-1 text-sm ${
         bajo ? "font-semibold text-red-600" : "text-gray-700"
       }`}

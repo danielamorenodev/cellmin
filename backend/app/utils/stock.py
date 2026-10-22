@@ -47,6 +47,12 @@ def minimo_en(item, sucursal):
     return _entero(por.get(sucursal))
 
 
+def bajo_minimo(actual, minimo) -> bool:
+    """Alerta de reposición: el stock llegó al mínimo o está por debajo.
+    Un mínimo de 0 significa "sin mínimo configurado" y no genera alerta."""
+    return minimo > 0 and actual <= minimo
+
+
 def completar(item):
     """Deja stock_sucursal / stock_minimo_sucursal completos y los totales al día."""
     item["stock_sucursal"] = mapa(

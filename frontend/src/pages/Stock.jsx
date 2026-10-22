@@ -23,6 +23,7 @@ import {
   SUCURSALES,
   formatDateTime,
   minimoEn,
+  bajoMinimo,
   nombreSucursal,
   stockEn,
 } from "../utils/helpers";
@@ -333,11 +334,11 @@ export default function Stock() {
   // Stock / mínimo según la sucursal elegida (vacía = total)
   const stockDe = (item) => stockEn(item, sucursal);
   const minimoDe = (item) => minimoEn(item, sucursal);
-  // Con una sucursal elegida se mira esa; en "todas", si alguna está por debajo de su mínimo
+  // Con una sucursal elegida se mira esa; en "todas", si alguna llegó a su mínimo
   const esBajo = (item) =>
     sucursal
-      ? stockDe(item) < minimoDe(item)
-      : SUCURSALES.some((o) => stockEn(item, o.value) < minimoEn(item, o.value));
+      ? bajoMinimo(item, sucursal)
+      : SUCURSALES.some((o) => bajoMinimo(item, o.value));
 
   // Un artículo es un producto simple o cada variante de un producto
   const articulosBajos = (p) =>
@@ -369,8 +370,8 @@ export default function Stock() {
       : minimoEn(it, suc);
   const bajoEnSuc = (it, suc) =>
     it.tiene_variantes
-      ? (it.variantes || []).some((v) => stockEn(v, suc) < minimoEn(v, suc))
-      : stockEn(it, suc) < minimoEn(it, suc);
+      ? (it.variantes || []).some((v) => bajoMinimo(v, suc))
+      : bajoMinimo(it, suc);
 
   // Con una sucursal elegida: stock y mínimo de esa sucursal.
   // En "todas": una columna de stock por sucursal (rojo si está bajo su mínimo).
@@ -392,7 +393,7 @@ export default function Stock() {
         return (
           <td
             key={o.value}
-            title={bajo ? "Stock bajo el mínimo" : undefined}
+            title={bajo ? "Stock en el mínimo o por debajo: hay que reponer" : undefined}
             className={`col-num px-6 py-4 text-sm ${bajo ? "font-semibold text-red-600" : "text-gray-800"}`}
           >
             {valorEn(item, o.value)}

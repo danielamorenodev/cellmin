@@ -5,7 +5,7 @@ from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
-from app.utils.stock import completar, stock_en, minimo_en, validar_sucursal, aplicar_delta, descontar_stock, SUCURSALES
+from app.utils.stock import completar, stock_en, minimo_en, validar_sucursal, aplicar_delta, descontar_stock, bajo_minimo, SUCURSALES
 
 router = APIRouter()
 
@@ -28,9 +28,9 @@ async def get_stock_productos(current_user: dict = Depends(get_current_user)):
         tiene = p.get("tiene_variantes", False)
         alerta_por = {
             s: (
-                any(v["stock_sucursal"][s] < v["stock_minimo_sucursal"][s] for v in variantes)
+                any(bajo_minimo(v["stock_sucursal"][s], v["stock_minimo_sucursal"][s]) for v in variantes)
                 if tiene
-                else p["stock_sucursal"][s] < p["stock_minimo_sucursal"][s]
+                else bajo_minimo(p["stock_sucursal"][s], p["stock_minimo_sucursal"][s])
             )
             for s in SUCURSALES
         }
