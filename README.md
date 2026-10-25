@@ -20,7 +20,8 @@ Sistema web para **Cellmin**, un comercio con dos sucursales que vende y repara 
 - **Dólar:** el administrador carga el valor del día y queda un historial de cambios. Se puede cobrar en dólares y dar el vuelto en pesos.
 - **Compras y proveedores:** cada compra registrada suma el stock de la sucursal que la recibe.
 - **Reportes** con gráficos y **exportación a Excel**.
-- **Respaldo:** el administrador descarga una copia completa de los datos desde Reportes.
+- **Respaldo:** copia automática diaria en el servidor (se guardan 14 días) y descarga completa desde Reportes. `restaurar_respaldo.py` permite comprobar o recuperar un respaldo.
+- **Registro de actividad:** quién vendió, cobró, ajustó stock o cambió un precio, en archivos que rotan solos.
 - **Funciona en computadora, tablet y celular**, desde el navegador y sin instalar nada.
 
 ## Roles y permisos
@@ -55,11 +56,13 @@ backend/            API REST con FastAPI
   app/models/       modelos de datos
   app/utils/        sesión, permisos, stock, caja, dólar, idempotencia, tickets PDF
   crear_admin.py    crea el primer usuario administrador
+  respaldo.py       respaldo completo de la base (lo ejecuta el servidor todos los días)
+  restaurar_respaldo.py  restaura un respaldo en una base aparte para comprobarlo
 frontend/           React + Vite + Tailwind
   src/pages/        pantallas del sistema
   src/components/   componentes reutilizables
   src/services/     comunicación con la API
-deploy/             configuración de Nginx, servicio systemd y script de actualización
+deploy/             configuración de Nginx, servicios systemd (API y respaldo diario) y script de actualización
 DESPLIEGUE.md       guía de despliegue en el servidor, paso a paso
 ```
 

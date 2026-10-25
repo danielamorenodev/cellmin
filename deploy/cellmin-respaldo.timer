@@ -1,0 +1,13 @@
+# Ejecuta el respaldo todos los días a las 3:30 (hora del servidor).
+# Si el servidor estaba apagado a esa hora, lo hace apenas vuelve a encender.
+# Se copia a /etc/systemd/system/cellmin-respaldo.timer
+[Unit]
+Description=Cellmin - respaldo diario
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

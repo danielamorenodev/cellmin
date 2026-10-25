@@ -5,6 +5,7 @@ from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
+from app.utils.logger import registrar_auditoria
 from app.utils.stock import completar, stock_en, minimo_en, validar_sucursal, aplicar_delta, descontar_stock, bajo_minimo, SUCURSALES
 
 router = APIRouter()
@@ -119,5 +120,20 @@ async def create_movement(movement: StockMovement, current_user: dict = Depends(
         "usuario_id": current_user["user_id"],
         "fecha": datetime.utcnow(),
     })
+
+    nombre = producto.get("nombre", "")
+    if movement.variante_nombre:
+        nombre += f" ({movement.variante_nombre})"
+    await registrar_auditoria(
+        usuario_id=current_user["user_id"],
+        rol=current_user["role"],
+        accion=movement.tipo,
+        modulo="stock",
+        descripcion=(
+            f"{movement.tipo.capitalize()} de stock: {nombre} en {movement.sucursal}: "
+            f"{stock_actual} -> {nuevo_stock}. Motivo: {movement.motivo}"
+            + (f". Notas: {movement.notas}" if movement.notas else "")
+        ),
+    )
 
     return {"message": "Movimiento registrado correctamente"}

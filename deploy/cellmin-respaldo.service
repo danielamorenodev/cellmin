@@ -1,0 +1,20 @@
+# Respaldo diario de la base. Lo dispara cellmin-respaldo.timer.
+# Se copia a /etc/systemd/system/cellmin-respaldo.service
+[Unit]
+Description=Cellmin - respaldo de la base de datos
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=cellmin
+Group=cellmin
+WorkingDirectory=/opt/cellmin/backend
+Environment=RESPALDO_DIR=/var/backups/cellmin
+Environment=RESPALDO_DIAS=14
+ExecStart=/opt/cellmin/backend/venv/bin/python respaldo.py
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/var/backups/cellmin

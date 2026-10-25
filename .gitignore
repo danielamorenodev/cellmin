@@ -13,3 +13,5 @@ frontend/dist/
 *.pyc
 # Logs del sistema
 backend/logs/
+# Respaldos locales (tienen datos personales)
+respaldos/

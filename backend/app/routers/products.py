@@ -6,6 +6,7 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
 from app.utils.stock import completar, mapa, SUCURSALES
+from app.utils.logger import registrar_auditoria
 
 router = APIRouter()
 
@@ -125,7 +126,31 @@ async def update_product(product_id: str, product: ProductUpdate, current_user: 
         update_data["variantes"] = nuevas
     await db.productos.update_one({"_id": ObjectId(product_id)}, {"$set": update_data})
     updated = await db.productos.find_one({"_id": ObjectId(product_id)})
+    await _registrar_cambios_de_precio(actual, updated, current_user)
     return format_product(updated)
+
+
+def _precios(p):
+    """{"" o nombre de variante: (costo, venta)} para comparar antes y después."""
+    if p.get("tiene_variantes"):
+        return {v["nombre"]: (v.get("precio_costo"), v.get("precio_venta")) for v in p.get("variantes", [])}
+    return {"": (p.get("precio_costo"), p.get("precio_venta"))}
+
+
+async def _registrar_cambios_de_precio(antes, despues, user):
+    previos, nuevos = _precios(antes), _precios(despues)
+    for clave, (costo, venta) in nuevos.items():
+        if clave not in previos or previos[clave] == (costo, venta):
+            continue
+        c0, v0 = previos[clave]
+        nombre = despues.get("nombre", "") + (f" ({clave})" if clave else "")
+        await registrar_auditoria(
+            usuario_id=user["user_id"],
+            rol=user["role"],
+            accion="cambio_precio",
+            modulo="productos",
+            descripcion=f"Cambio de precio: {nombre}. Costo {c0} -> {costo}. Venta {v0} -> {venta}",
+        )
 
 @router.delete("/{product_id}")
 async def delete_product(product_id: str, current_user: dict = Depends(get_current_user)):
