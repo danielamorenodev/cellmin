@@ -17,7 +17,7 @@ import gzip
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from bson import json_util
 from pymongo import MongoClient
@@ -32,7 +32,7 @@ PREFIJO = "cellmin_"
 def respaldar() -> str:
     os.makedirs(CARPETA, mode=0o700, exist_ok=True)
     db = MongoClient(settings.mongodb_url, serverSelectionTimeoutMS=15000)[settings.database_name]
-    datos = {"_respaldo": {"base": settings.database_name, "fecha": datetime.utcnow().isoformat() + "Z"}}
+    datos = {"_respaldo": {"base": settings.database_name, "fecha": datetime.now(timezone.utc).isoformat()}}
     totales = {}
     for col in sorted(db.list_collection_names()):
         if col.startswith("system."):
