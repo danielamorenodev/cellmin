@@ -28,6 +28,7 @@ class ProductCreate(BaseModel):
     stock_minimo: Optional[int] = 0
     stock_sucursal: Optional[Dict[str, int]] = None
     stock_minimo_sucursal: Optional[Dict[str, int]] = None
+    pide_imei: bool = False  # celulares: al venderlo hay que cargar el IMEI de cada unidad
     activo: bool = True
 
 class ProductUpdate(BaseModel):
@@ -37,6 +38,7 @@ class ProductUpdate(BaseModel):
     codigo_barras: Optional[str] = None
     unidad_medida: Optional[str] = None
     tiene_variantes: Optional[bool] = None
+    pide_imei: Optional[bool] = None
     variantes: Optional[List[Variante]] = None
     precio_costo: Optional[float] = None
     precio_venta: Optional[float] = None

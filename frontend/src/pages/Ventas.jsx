@@ -27,8 +27,10 @@ import MenuAcciones from "../components/ui/MenuAcciones";
 import {
   formatCurrency,
   formatDateTime,
+  imeiValido,
   METODOS_PAGO,
   minimoEn,
+  normalizarImei,
   nombreSucursal,
   parsearMetodoPago,
   stockEn,
@@ -262,6 +264,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                 ...item,
                 cantidad: item.cantidad + 1,
                 subtotal: (item.cantidad + 1) * item.precio_unitario,
+                imeis: ajustarImeis(item, item.cantidad + 1),
               }
             : item,
         ),
@@ -281,10 +284,42 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
           precio_unitario: precio,
           subtotal: precio,
           stock_disponible: stockDisponible,
+          pide_imei: !!producto.pide_imei,
+          imeis: producto.pide_imei ? [""] : undefined,
         },
       ]);
     }
   };
+
+  // Celulares: un campo de IMEI por unidad; al cambiar la cantidad se conservan los ya cargados
+  const ajustarImeis = (item, cantidad) =>
+    item.pide_imei
+      ? Array.from({ length: cantidad }, (_, i) => item.imeis?.[i] ?? "")
+      : undefined;
+
+  const cambiarImei = (key, indice, texto) =>
+    setCarrito((actual) =>
+      actual.map((i) =>
+        i.key === key
+          ? { ...i, imeis: i.imeis.map((x, n) => (n === indice ? normalizarImei(texto).slice(0, 15) : x)) }
+          : i,
+      ),
+    );
+
+  // Problemas con los IMEI del carrito (vacío, inválido o repetido)
+  const todosLosImeis = carrito.flatMap((i) => (i.pide_imei ? i.imeis : []));
+  const imeiRepetido = (imei) =>
+    imei && todosLosImeis.filter((x) => x === imei).length > 1;
+  const problemaImei = carrito
+    .filter((i) => i.pide_imei)
+    .map((i) => {
+      if (i.imeis.some((x) => !x)) return `Falta el IMEI de ${i.nombre_producto}`;
+      if (i.imeis.some((x) => !imeiValido(x)))
+        return `Hay un IMEI inválido en ${i.nombre_producto}`;
+      if (i.imeis.some(imeiRepetido)) return "Hay un IMEI cargado dos veces";
+      return null;
+    })
+    .find(Boolean);
 
   const actualizarCantidad = (key, cantidad) => {
     if (cantidad <= 0) {
@@ -299,7 +334,12 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
     setCarrito(
       carrito.map((i) =>
         i.key === key
-          ? { ...i, cantidad, subtotal: cantidad * i.precio_unitario }
+          ? {
+              ...i,
+              cantidad,
+              subtotal: cantidad * i.precio_unitario,
+              imeis: ajustarImeis(i, cantidad),
+            }
           : i,
       ),
     );
@@ -373,7 +413,8 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
     !loading &&
     faltaCobrar === null &&
     !mixtoExcede &&
-    !sinCotizacion;
+    !sinCotizacion &&
+    !problemaImei;
 
   const handlePagoChange = (index, field, value) => {
     if (!pagoMixto) {
@@ -420,6 +461,10 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
       toast.error("Agregá al menos un producto");
       return;
     }
+    if (problemaImei) {
+      toast.error(problemaImei);
+      return;
+    }
     if (!puedeConfirmar) {
       toast.error("Revisá el pago: no coincide con el total a cobrar");
       return;
@@ -457,6 +502,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
           cantidad: item.cantidad,
           precio_unitario: item.precio_unitario,
           subtotal: item.subtotal,
+          ...(item.pide_imei ? { imeis: item.imeis } : {}),
         })),
       };
       const result = await ventasService.create(data);
@@ -666,6 +712,50 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                     >
                       <Trash2 size={16} />
                     </button>
+                    {item.pide_imei && (
+                      <div className="basis-full space-y-1">
+                        {item.imeis.map((imei, n) => {
+                          const error =
+                            imei.length === 15 && !imeiValido(imei)
+                              ? "IMEI inválido: revisá los números"
+                              : imeiRepetido(imei)
+                                ? "Este IMEI ya está cargado"
+                                : null;
+                          return (
+                            <div key={n}>
+                              <label className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-gray-600 shrink-0 w-20">
+                                  IMEI{item.cantidad > 1 ? ` ${n + 1}` : ""}
+                                </span>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  value={imei}
+                                  placeholder="15 números (escanealo de la caja)"
+                                  onChange={(e) => cambiarImei(item.key, n, e.target.value)}
+                                  // El lector termina con Enter: no debe confirmar la venta
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") e.preventDefault();
+                                  }}
+                                  aria-invalid={!!error}
+                                  className={`flex-1 min-w-0 px-2 py-1 text-sm font-mono border rounded-lg focus:outline-none focus:ring-2 ${
+                                    error
+                                      ? "border-red-400 focus:ring-red-400"
+                                      : imeiValido(imei)
+                                        ? "border-green-500 focus:ring-green-500"
+                                        : "border-gray-300 focus:ring-blue-500"
+                                  }`}
+                                />
+                              </label>
+                              {error && (
+                                <p className="text-xs text-red-600 ml-22 pl-0.5">{error}</p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1079,6 +1169,11 @@ function FilaVenta({
                     <tr key={i} className="bg-white">
                       <td className="px-4 py-2  font-medium text-gray-700">
                         {item.nombre_producto}
+                        {item.imeis?.length > 0 && (
+                          <p className="text-xs font-normal font-mono text-gray-500">
+                            IMEI: {item.imeis.join(", ")}
+                          </p>
+                        )}
                       </td>
                       <td className="col-num px-4 py-2 text-gray-600">
                         {item.cantidad}
@@ -1198,6 +1293,11 @@ function CardVentaMobile({
             <div key={i} className="flex justify-between text-xs text-gray-600">
               <span>
                 {item.nombre_producto} x{item.cantidad}
+                {item.imeis?.length > 0 && (
+                  <span className="block font-mono text-gray-500">
+                    IMEI: {item.imeis.join(", ")}
+                  </span>
+                )}
               </span>
               <span className="font-medium">
                 {formatCurrency(item.subtotal)}
@@ -1413,7 +1513,10 @@ export default function Ventas() {
       filtros.busqueda &&
       !venta.numero_venta
         ?.toLowerCase()
-        .includes(filtros.busqueda.toLowerCase())
+        .includes(filtros.busqueda.toLowerCase()) &&
+      !venta.items?.some((i) =>
+        i.imeis?.some((x) => normalizarImei(filtros.busqueda).length >= 4 && x.includes(normalizarImei(filtros.busqueda))),
+      )
     )
       return false;
     if (
@@ -1530,7 +1633,7 @@ export default function Ventas() {
             />
             <input
               type="text"
-              placeholder="Buscar por número de venta..."
+              placeholder="Buscar por número de venta o IMEI..."
               value={filtros.busqueda}
               onChange={(e) =>
                 setFiltros({ ...filtros, busqueda: e.target.value })

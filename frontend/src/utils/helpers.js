@@ -99,6 +99,33 @@ export const bajoMinimo = (item, sucursal) => {
   return minimo > 0 && stockEn(item, sucursal) <= minimo;
 };
 
+// IMEI de un celular: 15 números, el último es un dígito verificador (Luhn).
+// El lector o la caja pueden traer espacios o guiones: se dejan solo los números.
+export const normalizarImei = (texto) => String(texto ?? "").replace(/\D/g, "");
+export const imeiValido = (imei) => {
+  if (!/^\d{15}$/.test(imei || "")) return false;
+  let suma = 0;
+  [...imei].reverse().forEach((c, i) => {
+    let d = Number(c);
+    if (i % 2 === 1) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    suma += d;
+  });
+  return suma % 10 === 0;
+};
+
+// ¿La categoría (o alguna categoría padre) es de celulares?
+export const esCategoriaCelulares = (categorias, id) => {
+  let actual = categorias.find((c) => c.id === id);
+  for (let n = 0; actual && n < 10; n++) {
+    if (/celular/i.test(actual.nombre || "")) return true;
+    actual = categorias.find((c) => c.id === actual.categoria_padre_id);
+  }
+  return false;
+};
+
 export const formatInputMoneda = (valor) => {
   // Permitir solo números, punto y coma
   const limpio = valor.replace(/[^\d.,]/g, "");

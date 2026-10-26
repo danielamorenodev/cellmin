@@ -6,6 +6,7 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
 from app.utils.logger import registrar_auditoria
+from app.utils import imei as imei_util
 from app.utils.stock import stock_en, aplicar_delta, descontar_varios
 from app.utils.cajas import caja_para_vender, exigir_dueno_o_admin
 from app.utils.idempotencia import resultado_previo, reclamar_clave, guardar_resultado, liberar_clave
@@ -92,6 +93,7 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
     pedidos = {}  # (producto_id, variante) -> cantidad total pedida
     stock_por_clave = {}
     nombre_por_clave = {}
+    imeis_de_la_venta = set()
 
     for item in sale.items:
         if item.cantidad < 1:
@@ -127,14 +129,35 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
         stock_por_clave[clave] = stock
         nombre_por_clave[clave] = nombre
 
-        items_finales.append({
+        final = {
             "producto_id": item.producto_id,
             "variante_nombre": item.variante_nombre,
             "nombre_producto": nombre,
             "cantidad": item.cantidad,
             "precio_unitario": precio,
             "subtotal": redondear(precio * item.cantidad),
-        })
+        }
+
+        # Celulares: un IMEI válido y distinto por cada unidad vendida
+        if producto.get("pide_imei"):
+            imeis = [imei_util.normalizar(x) for x in (item.imeis or []) if imei_util.normalizar(x)]
+            if len(imeis) != item.cantidad:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Falta el IMEI de '{nombre}': hay que cargar uno por cada unidad ({item.cantidad}).",
+                )
+            for x in imeis:
+                if not imei_util.es_valido(x):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"El IMEI {x} de '{nombre}' no es válido. Revisá los 15 números.",
+                    )
+                if x in imeis_de_la_venta:
+                    raise HTTPException(status_code=400, detail=f"El IMEI {x} está cargado dos veces.")
+                imeis_de_la_venta.add(x)
+            final["imeis"] = imeis
+
+        items_finales.append(final)
 
     for clave, cantidad in pedidos.items():
         if cantidad > stock_por_clave[clave]:
@@ -331,7 +354,10 @@ async def _guardar_venta(db, sale, current_user, items_finales, subtotal, porcen
         rol=current_user["role"],
         accion="crear",
         modulo="ventas",
-        descripcion=f"Venta registrada: {numero}",
+        descripcion=f"Venta registrada: {numero}" + (
+            f". IMEI vendidos: {', '.join(sorted(imeis))}"
+            if (imeis := [x for i in items_finales for x in i.get("imeis", [])]) else ""
+        ),
     )
 
     respuesta = {"message": "Venta registrada", "numero_venta": numero, "id": str(result.inserted_id), "total": total, "vuelto": vuelto}
