@@ -13,7 +13,8 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "logs")
+# La carpeta se puede cambiar con la variable LOG_DIR (la demo usa una propia)
+LOG_DIR = os.environ.get("LOG_DIR") or os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 _CAMPOS_SENSIBLES = (

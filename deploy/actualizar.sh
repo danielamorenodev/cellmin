@@ -15,9 +15,19 @@ cd /opt/cellmin/frontend
 sudo -u cellmin npm ci --no-audit --no-fund
 sudo -u cellmin npm run build
 sudo rsync -a --delete dist/ /var/www/cellmin/
+# La demostración usa el mismo sitio compilado (si está instalada)
+if [ -d /var/www/cellmin-demo ]; then
+  sudo rsync -a --delete dist/ /var/www/cellmin-demo/
+fi
 
 echo "==> Reiniciando el backend"
 sudo systemctl restart cellmin-backend
 sleep 2
 sudo systemctl is-active cellmin-backend
+if systemctl is-enabled --quiet cellmin-demo-backend 2>/dev/null; then
+  echo "==> Reiniciando la API de la demostración"
+  sudo systemctl restart cellmin-demo-backend
+  sleep 2
+  sudo systemctl is-active cellmin-demo-backend
+fi
 echo "Listo."

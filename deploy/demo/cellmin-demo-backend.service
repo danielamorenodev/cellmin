@@ -1,0 +1,26 @@
+# API de la DEMOSTRACIÓN (demo.cellmin.jybora.com). Usa el mismo código que el
+# sistema del local, pero con su propia base (cellmin_demo), su propia clave y
+# sus propios registros. Se copia a /etc/systemd/system/cellmin-demo-backend.service
+[Unit]
+Description=Cellmin - API de demostración
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=cellmin
+Group=cellmin
+WorkingDirectory=/opt/cellmin/backend
+# Las variables de este archivo tienen prioridad sobre el .env del sistema del local
+EnvironmentFile=/opt/cellmin/demo.env
+Environment=LOG_DIR=/opt/cellmin/logs-demo
+ExecStart=/opt/cellmin/backend/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8003 --proxy-headers --forwarded-allow-ips=127.0.0.1
+Restart=always
+RestartSec=3
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/cellmin/logs-demo
+
+[Install]
+WantedBy=multi-user.target

@@ -58,17 +58,19 @@ backend/            API REST con FastAPI
   crear_admin.py    crea el primer usuario administrador
   respaldo.py       respaldo completo de la base (lo ejecuta el servidor todos los días)
   restaurar_respaldo.py  restaura un respaldo en una base aparte para comprobarlo
+  cargar_datos_demo.py   carga datos de prueba en la base de demostración (ver DEMO.md)
 frontend/           React + Vite + Tailwind
   src/pages/        pantallas del sistema
   src/components/   componentes reutilizables
   src/services/     comunicación con la API
 deploy/             configuración de Nginx, servicios systemd (API y respaldo diario) y script de actualización
 DESPLIEGUE.md       guía de despliegue en el servidor, paso a paso
+DEMO.md             demostración con datos de prueba: publicada y en la computadora
 ```
 
 ## Cómo ejecutarlo en una computadora
 
-**Requisitos:** Python 3.10 o superior, Node.js 20 o superior, Git y una base MongoDB (local o una cuenta gratuita de MongoDB Atlas).
+**Requisitos:** Python 3.10, 3.11 o 3.12 (en 3.13 algunas dependencias fijadas no se instalan), Node.js 20 o superior, Git y una base MongoDB (local o una cuenta gratuita de MongoDB Atlas).
 
 ### 1. Descargar el código
 
