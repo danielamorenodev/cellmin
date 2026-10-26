@@ -19,7 +19,7 @@ async def export_backup(current_user: dict = Depends(get_current_user)):
     ]
     backup = {}
     for col in colecciones:
-        docs = await db[col].find().to_list(10000)
+        docs = await db[col].find().to_list(None)  # sin límite: antes cortaba en 10.000
         backup[col] = [{**d, "_id": str(d["_id"])} for d in docs]
     backup["fecha_backup"] = datetime.utcnow().isoformat()
     return backup

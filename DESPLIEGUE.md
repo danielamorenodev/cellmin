@@ -198,9 +198,58 @@ Baja el código, instala dependencias, recompila el sitio y reinicia el backend.
 
 ## 10. Copias de seguridad
 
-- El plan gratuito de Atlas (M0) **no incluye copias automáticas**. Con un plan pago (M10 o superior) se activan en *Atlas → Backup*.
-- Mientras tanto, el administrador puede exportar todo desde el sistema: `GET /api/backup/exportar` (con sesión de administrador). Hacelo con regularidad y guardá el archivo fuera del servidor.
-- Los registros del sistema están en `/opt/cellmin/backend/logs` (actividad, accesos y errores; rotan solos).
+El plan gratuito de Atlas (M0) **no incluye copias automáticas**, así que el servidor hace las suyas: todos los días a las 3:30 guarda la base completa en `/var/backups/cellmin` y conserva los últimos 14 días. Los archivos tienen datos personales y solo los puede leer el usuario `cellmin`.
+
+### 10.1 Activar el respaldo diario (una sola vez)
+
+```bash
+sudo install -d -o cellmin -g cellmin -m 700 /var/backups/cellmin
+sudo cp /opt/cellmin/deploy/cellmin-respaldo.service /opt/cellmin/deploy/cellmin-respaldo.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now cellmin-respaldo.timer
+```
+
+Probarlo en el momento, sin esperar a la noche:
+
+```bash
+sudo systemctl start cellmin-respaldo.service
+sudo journalctl -u cellmin-respaldo -n 5 --no-pager
+sudo ls -lh /var/backups/cellmin
+```
+
+Tiene que aparecer `Respaldo creado: ...` y un archivo `cellmin_AAAA-MM-DD_HHMM.json.gz`. Para ver cuándo es el próximo: `systemctl list-timers cellmin-respaldo.timer`.
+
+### 10.2 Comprobar que un respaldo sirve (una vez por mes)
+
+Un respaldo que nunca se probó no es un respaldo. Esto lo restaura en una base aparte (`cellmin_restaurado`), sin tocar la base en uso:
+
+```bash
+cd /opt/cellmin/backend
+sudo -u cellmin venv/bin/python restaurar_respaldo.py /var/backups/cellmin/ARCHIVO.json.gz
+```
+
+Muestra cuántos documentos restauró por colección. Después, borrá la base `cellmin_restaurado` desde Atlas (*Browse Collections*).
+
+Para recuperar de verdad la base en uso (solo ante una pérdida de datos): detené el backend (`sudo systemctl stop cellmin-backend`), corré el mismo comando con `--base cellmin_prod --reemplazar` (pide escribir el nombre de la base para confirmar) y volvé a iniciarlo.
+
+### 10.3 Copia fuera del servidor
+
+Si se pierde el VPS, se pierden también sus respaldos. Por eso:
+
+- En el panel de Hostinger, verificá que estén activas las **copias semanales del VPS** (*VPS → Backups*).
+- Una vez por semana, el administrador descarga la copia completa desde **Reportes → Descargar respaldo** y la guarda en una carpeta privada (por ejemplo, Google Drive del dueño).
+
+## 10 bis. Registros del sistema
+
+En `/opt/cellmin/backend/logs` (rotan solos a los 5 MB y guardan 10 copias; nunca guardan contraseñas, tokens ni códigos de bloqueo):
+
+| Archivo | Qué registra |
+|---|---|
+| `actividad.log` | Quién hizo qué: inicios de sesión, ventas, cancelaciones, cajas, compras, reparaciones, usuarios, valor del dólar, movimientos y ajustes de stock, y cambios de precio |
+| `accesos.log` | Cada pedido a la API, con su resultado y cuánto tardó |
+| `errores.log` | Errores no previstos, con el detalle para corregirlos |
+
+Ejemplo: ver los últimos ajustes de stock con `grep "modulo=stock" /opt/cellmin/backend/logs/actividad.log | tail -n 20`.
 
 ## 11. Si algo falla
 
@@ -212,6 +261,7 @@ Baja el código, instala dependencias, recompila el sitio y reinicia el backend.
 | El backend dice que `SECRET_KEY` es corta | Usá una de 32 caracteres o más (paso 4) |
 | `certbot` falla | El DNS todavía no apunta al VPS (`nslookup cellmin.jybora.com`) o el puerto 80 está cerrado |
 | Error 500 en alguna pantalla | `sudo tail -n 50 /opt/cellmin/backend/logs/errores.log` |
+| No se generó el respaldo de la noche | `sudo journalctl -u cellmin-respaldo -n 20 --no-pager` |
 
 ## Resumen de seguridad ya aplicado en el código
 
