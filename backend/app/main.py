@@ -14,6 +14,19 @@ from app.routers import cotizacion
 import traceback
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from datetime import datetime, timezone
+from fastapi.encoders import ENCODERS_BY_TYPE
+
+
+# Las fechas se guardan en UTC sin zona horaria (datetime.utcnow()). Si se
+# envían así, el navegador las toma como hora local y las muestra 3 horas
+# adelantadas. Se envían marcadas como UTC y el navegador las pasa a la hora
+# de Argentina.
+def _fecha_utc(d: datetime) -> str:
+    return (d.replace(tzinfo=timezone.utc) if d.tzinfo is None else d).isoformat()
+
+
+ENCODERS_BY_TYPE[datetime] = _fecha_utc
 from app.utils.logger import log_accesos, log_errores
 
 @asynccontextmanager
