@@ -58,6 +58,7 @@ export default function TicketVenta({ venta, cliente }) {
           ?.map(
             (item) => `
           <p class="bold">${item.nombre_producto}</p>
+          ${(item.imeis || []).map((imei) => `<p>IMEI: ${imei}</p>`).join("")}
           <div class="row">
             <span>${item.cantidad} x ${formatCurrency(item.precio_unitario)}</span>
             <span>${formatCurrency(item.subtotal)}</span>
@@ -132,6 +133,11 @@ export default function TicketVenta({ venta, cliente }) {
           <div key={i} className="flex justify-between text-sm">
             <span className="text-gray-700">
               {item.nombre_producto} x{item.cantidad}
+              {item.imeis?.length > 0 && (
+                <span className="block text-xs font-mono text-gray-500">
+                  IMEI: {item.imeis.join(", ")}
+                </span>
+              )}
             </span>
             <span className="font-medium">{formatCurrency(item.subtotal)}</span>
           </div>

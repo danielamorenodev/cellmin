@@ -36,6 +36,7 @@ def format_product(p):
         "codigo_barras": p.get("codigo_barras"),
         "unidad_medida": p.get("unidad_medida"),
         "tiene_variantes": p.get("tiene_variantes", False),
+        "pide_imei": p.get("pide_imei", False),
         "variantes": p.get("variantes", []),
         "precio_costo": p.get("precio_costo"),
         "precio_venta": p.get("precio_venta"),

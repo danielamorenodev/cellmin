@@ -33,6 +33,7 @@ import {
   stockEn,
   minimoEn,
   bajoMinimo,
+  esCategoriaCelulares,
 } from "../utils/helpers";
 import { exportarListaPrecios } from "../utils/exportExcel";
 import Paginacion from "../components/ui/Paginacion";
@@ -303,6 +304,7 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
     codigo_barras: producto?.codigo_barras || generarCodigoBarras(),
     unidad_medida: "unidad",
     tiene_variantes: producto?.tiene_variantes || false,
+    pide_imei: producto?.pide_imei || false,
     variantes: (producto?.variantes || []).map((v) => ({
       ...v,
       stock_sucursal: mapaDe(v, "stock"),
@@ -472,7 +474,16 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
               <SelectorCategoria
                 categorias={categorias}
                 value={form.categoria_id}
-                onChange={(id) => setForm({ ...form, categoria_id: id })}
+                onChange={(id) =>
+                  setForm({
+                    ...form,
+                    categoria_id: id,
+                    // En un producto nuevo, una categoría de celulares marca la casilla del IMEI
+                    pide_imei: producto
+                      ? form.pide_imei
+                      : form.pide_imei || esCategoriaCelulares(categorias, id),
+                  })
+                }
               />
             </div>
             <div>
@@ -538,6 +549,23 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
               className="text-sm font-medium text-gray-700"
             >
               Este producto tiene variantes (color, tamaño, etc.)
+            </label>
+          </div>
+
+          <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl">
+            <input
+              type="checkbox"
+              id="pide_imei"
+              checked={form.pide_imei}
+              onChange={(e) => setForm({ ...form, pide_imei: e.target.checked })}
+              className="w-4 h-4 mt-0.5 text-blue-600"
+            />
+            <label htmlFor="pide_imei" className="text-sm text-gray-700">
+              <span className="font-medium">Pedir el IMEI al venderlo</span>
+              <span className="block text-xs text-gray-500">
+                Para celulares: en cada venta se carga el IMEI de cada unidad y
+                queda en el ticket.
+              </span>
             </label>
           </div>
 

@@ -9,6 +9,8 @@ class SaleItem(BaseModel):
     cantidad: int
     precio_unitario: float
     subtotal: float
+    # Celulares: un IMEI por unidad vendida (lo exige el producto con pide_imei)
+    imeis: Optional[List[str]] = None
 
 class PagoVenta(BaseModel):
     metodo: str  # efectivo, transferencia, debito, credito

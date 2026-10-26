@@ -85,6 +85,11 @@ export default function DetalleVenta({ venta, cliente }) {
               <tr key={i} className="bg-white">
                 <td className="px-4 py-2 font-medium text-gray-700">
                   {item.nombre_producto}
+                  {item.imeis?.length > 0 && (
+                    <p className="text-xs font-normal font-mono text-gray-500">
+                      IMEI: {item.imeis.join(", ")}
+                    </p>
+                  )}
                 </td>
                 <td className="col-num px-4 py-2 text-gray-600">{item.cantidad}</td>
                 <td className="col-num px-4 py-2 text-gray-600">
