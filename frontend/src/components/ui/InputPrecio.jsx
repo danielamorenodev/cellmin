@@ -53,12 +53,14 @@ export default function InputPrecio({
           {...resto}
           value={esUSD ? usd : pesos}
           onChange={esUSD ? cambiarUSD : onChange}
-          className={`${className} pl-9`}
+          className={`${className} ${esUSD ? "pl-11" : "pl-7"}`}
         />
       </div>
-      {equivalente && (
-        <p className="text-[11px] text-gray-500 mt-0.5">{equivalente}</p>
-      )}
+      {/* La línea del equivalente siempre ocupa su lugar, así los campos
+          vecinos quedan alineados aunque uno todavía esté vacío */}
+      <p className="text-[11px] leading-4 h-4 mt-0.5 text-gray-500" aria-live="polite">
+        {equivalente ?? ""}
+      </p>
     </div>
   );
 }

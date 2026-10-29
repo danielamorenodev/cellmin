@@ -501,14 +501,17 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl max-h-[92vh] flex flex-col">
+      <div className="bg-white rounded-2xl w-full max-w-2xl lg:max-w-6xl shadow-xl max-h-[92vh] flex flex-col">
         <div className="px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="text-lg font-semibold text-gray-800">
             {producto ? "Editar producto" : "Nuevo producto"}
           </h2>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
-          <div className="overflow-y-auto px-6 py-5 space-y-6">
+          {/* En pantallas anchas, dos columnas: a la izquierda los datos del
+              producto y a la derecha precios e inventario (cada una con su desplazamiento) */}
+          <div className="overflow-y-auto min-h-0 flex-1 lg:overflow-hidden lg:grid lg:grid-cols-2 lg:divide-x lg:divide-gray-100">
+          <div className="px-6 py-5 space-y-6 lg:overflow-y-auto">
             {/* 1. Información del producto */}
             <Seccion titulo="Información del producto">
               <div>
@@ -594,6 +597,9 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
               </div>
             </Seccion>
 
+          </div>
+
+          <div className="px-6 pb-5 pt-0 lg:pt-5 space-y-6 lg:overflow-y-auto">
             {/* 3. Precios */}
             <Seccion
               titulo="Precios"
@@ -640,7 +646,7 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
                     </span>
                   </label>
                   {precioGlobal ? (
-                    <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                    <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-start">
                       <div>
                         <label className={ETIQUETA}>Costo ({simbolo})</label>
                         <InputPrecio
@@ -661,13 +667,16 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
                           className={CAMPO}
                         />
                       </div>
-                      <button
-                        type="button"
-                        onClick={aplicarPrecioGlobal}
-                        className="mb-[18px] px-3 py-2 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 transition whitespace-nowrap"
-                      >
-                        Aplicar
-                      </button>
+                      <div>
+                        <span className={ETIQUETA} aria-hidden="true">&nbsp;</span>
+                        <button
+                          type="button"
+                          onClick={aplicarPrecioGlobal}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition whitespace-nowrap"
+                        >
+                          Aplicar
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <p className="text-xs text-gray-500">
@@ -732,20 +741,21 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
               )}
             </Seccion>
           </div>
+          </div>
 
           {/* Pie fijo: siempre visible aunque el formulario tenga desplazamiento */}
-          <div className="flex gap-3 px-6 py-3 border-t border-gray-100 bg-white rounded-b-2xl shrink-0">
+          <div className="flex gap-3 lg:justify-end px-6 py-3 border-t border-gray-100 bg-white rounded-b-2xl shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
+              className="flex-1 lg:flex-none lg:w-44 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:bg-blue-400 transition"
+              className="flex-1 lg:flex-none lg:w-44 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:bg-blue-400 transition"
             >
               {loading ? "Guardando..." : "Guardar"}
             </button>
