@@ -126,6 +126,23 @@ export const esCategoriaCelulares = (categorias, id) => {
   return false;
 };
 
+// Ids de una categoría y de todas sus subcategorías (a cualquier nivel).
+// Así, filtrar por "Celulares" muestra también los productos de "Samsung", etc.
+export const idsConSubcategorias = (categorias, id) => {
+  const ids = new Set([id]);
+  let agregado = true;
+  while (agregado) {
+    agregado = false;
+    for (const c of categorias) {
+      if (c.categoria_padre_id && ids.has(c.categoria_padre_id) && !ids.has(c.id)) {
+        ids.add(c.id);
+        agregado = true;
+      }
+    }
+  }
+  return ids;
+};
+
 export const formatInputMoneda = (valor) => {
   // Permitir solo números, punto y coma
   const limpio = valor.replace(/[^\d.,]/g, "");

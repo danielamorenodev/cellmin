@@ -1412,7 +1412,8 @@ export default function Ventas() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showFiltros, setShowFiltros] = useState(false);
-  const [cajaAbierta, setCajaAbierta] = useState(false);
+  // null = todavía se está consultando la caja (no se muestra como cerrada)
+  const [cajaAbierta, setCajaAbierta] = useState(null);
   const [cajaActual, setCajaActual] = useState(null);
   const [showTicket, setShowTicket] = useState(false);
   const [ventaImprimir, setVentaImprimir] = useState(null);
@@ -1451,6 +1452,9 @@ export default function Ventas() {
 
   const fetchData = async () => {
     try {
+      // La caja se consulta en paralelo y por separado: es una consulta
+      // liviana y habilita el botón sin esperar el listado de ventas
+      const caja = cargarCaja();
       const [vs, cs, ps] = await Promise.all([
         ventasService.getAll(),
         clientesService.getAll(),
@@ -1459,7 +1463,7 @@ export default function Ventas() {
       setVentas(vs);
       setClientes(cs);
       setProductos(ps);
-      await cargarCaja();
+      await caja;
     } catch (error) {
       toast.error("Error al cargar ventas");
     } finally {
@@ -1599,6 +1603,7 @@ export default function Ventas() {
           </select>
         )}
         <button
+          disabled={cajaAbierta === null}
           onClick={() => {
             if (!cajaAbierta) {
               toast.error(
@@ -1609,14 +1614,14 @@ export default function Ventas() {
             setShowModal(true);
           }}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl hover:opacity-90 transition text-sm font-medium text-white ${
-            cajaAbierta
-              ? "bg-blue-600 hover:bg-blue-700"
+            cajaAbierta !== false
+              ? "bg-blue-600 hover:bg-blue-700 disabled:opacity-70 disabled:cursor-wait"
               : "bg-gray-400 cursor-not-allowed"
           }`}
         >
           <Plus size={18} />
           Nueva Venta
-          {!cajaAbierta && (
+          {cajaAbierta === false && (
             <span className="text-xs opacity-75">(caja cerrada)</span>
           )}
         </button>

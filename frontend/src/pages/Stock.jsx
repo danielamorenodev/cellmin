@@ -26,6 +26,7 @@ import {
   bajoMinimo,
   nombreSucursal,
   stockEn,
+  idsConSubcategorias,
 } from "../utils/helpers";
 import { useSucursales } from "../hooks/useSucursales";
 import Paginacion from "../components/ui/Paginacion";
@@ -322,9 +323,13 @@ export default function Stock() {
       ? (p.variantes || []).reduce((a, v) => a + (stockEn(v, sucursal) || 0), 0)
       : stockEn(p, sucursal) || 0;
 
+  // La categoría elegida incluye sus subcategorías
+  const categoriasFiltro = filtros.categoria_id
+    ? idsConSubcategorias(categorias, filtros.categoria_id)
+    : null;
   const filteredProductos = productos.filter((p) => {
     if (!p.nombre.toLowerCase().includes(search.toLowerCase())) return false;
-    if (filtros.categoria_id && p.categoria_id !== filtros.categoria_id)
+    if (categoriasFiltro && !categoriasFiltro.has(p.categoria_id))
       return false;
     if (filtros.stock === "con_stock" && stockDelProducto(p) <= 0) return false;
     if (filtros.stock === "sin_stock" && stockDelProducto(p) > 0) return false;
