@@ -10,7 +10,6 @@ import {
   Package,
   Search,
   PlusCircle,
-  MinusCircle,
   ChevronDown,
   ChevronUp,
   Download,
@@ -18,6 +17,9 @@ import {
   ToggleLeft,
   Eye,
   AlertTriangle,
+  ScanBarcode,
+  RefreshCw,
+  Info,
 } from "lucide-react";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import { productosService } from "../services/productos.service";
@@ -127,50 +129,107 @@ function StockDesglose({ item }) {
   );
 }
 
-// Bloque de inputs "Stock por sucursal" (stock inicial + mínimo)
-function StockPorSucursal({
-  stock,
-  minimo,
-  onStock,
-  onMinimo,
-  stockSoloLectura,
-  rounded = "rounded-lg",
-}) {
-  const clase = `w-full px-3 py-2 border border-gray-300 ${rounded} text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500`;
+// Estilos comunes del formulario de producto
+const CAMPO =
+  "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500";
+const ETIQUETA = "block text-xs font-medium text-gray-600 mb-1";
+
+// Sección del formulario con un subtítulo discreto
+function Seccion({ titulo, accion, children }) {
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-medium text-gray-600">Stock por sucursal</p>
-      <div className="grid grid-cols-[1fr_1fr_1fr] gap-2 items-end">
-        <span />
-        <span className="text-xs text-gray-500">
-          {stockSoloLectura ? "Stock actual" : "Stock inicial *"}
-        </span>
-        <span className="text-xs text-gray-500">Stock mínimo</span>
-        {SUCURSALES.map((s) => (
-          <div key={s.value} className="contents">
-            <span className="text-sm text-gray-700 self-center">{s.label}</span>
-            <InputNumero
-              value={stock?.[s.value] ?? ""}
-              onChange={(v) => onStock(s.value, v)}
-              decimales={0}
-              disabled={stockSoloLectura}
-              required={!stockSoloLectura}
-              className={clase}
-            />
-            <InputNumero
-              value={minimo?.[s.value] ?? 0}
-              onChange={(v) => onMinimo(s.value, v)}
-              decimales={0}
-              className={clase}
-            />
-          </div>
-        ))}
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {titulo}
+        </h3>
+        {accion}
       </div>
-      {stockSoloLectura && (
-        <p className="text-xs text-gray-500">
-          El stock se modifica desde el módulo Stock
-        </p>
-      )}
+      {children}
+    </section>
+  );
+}
+
+// Stock por sucursal como una tabla chica: cada fila es una sucursal
+function StockPorSucursal({ stock, minimo, onStock, onMinimo, stockSoloLectura }) {
+  return (
+    <div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-xs text-gray-500">
+            <th className="text-left font-medium pb-1 w-1/3">Sucursal</th>
+            <th className="text-left font-medium pb-1 px-2">
+              {stockSoloLectura ? "Stock actual" : "Stock inicial *"}
+            </th>
+            <th className="text-left font-medium pb-1 pl-2">Stock mínimo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {SUCURSALES.map((s) => (
+            <tr key={s.value}>
+              <td className="py-1 pr-2 text-gray-700">{s.label}</td>
+              <td className="py-1 px-2">
+                <InputNumero
+                  value={stock?.[s.value] ?? ""}
+                  onChange={(v) => onStock(s.value, v)}
+                  decimales={0}
+                  disabled={stockSoloLectura}
+                  required={!stockSoloLectura}
+                  placeholder="Cantidad"
+                  aria-label={`${stockSoloLectura ? "Stock actual" : "Stock inicial"} en ${s.label}`}
+                  className={CAMPO}
+                />
+              </td>
+              <td className="py-1 pl-2">
+                <InputNumero
+                  value={minimo?.[s.value] ?? 0}
+                  onChange={(v) => onMinimo(s.value, v)}
+                  decimales={0}
+                  aria-label={`Stock mínimo en ${s.label}`}
+                  className={CAMPO}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="text-xs text-gray-500 mt-1">
+        {stockSoloLectura
+          ? "El stock se modifica desde el módulo Stock. "
+          : "Stock inicial: cantidad con la que empieza el inventario. "}
+        Stock mínimo: al llegar a ese número el sistema avisa que hay que
+        reponer (0 = sin aviso).
+      </p>
+    </div>
+  );
+}
+
+// Código de barras: se escanea o se escribe; si el producto no tiene, se
+// genera uno interno (con el botón o, si queda vacío, al guardar).
+function CampoCodigo({ value, onChange, id }) {
+  return (
+    <div className="flex gap-2">
+      <div className="relative flex-1">
+        <ScanBarcode
+          size={16}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+        />
+        <input
+          id={id}
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Escanear o escribir"
+          className={`${CAMPO} pl-9`}
+        />
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange(generarCodigoBarras())}
+        title="Generar un código interno para productos sin código de barras"
+        className="inline-flex items-center gap-1 px-3 py-2 border border-gray-300 text-gray-600 rounded-lg text-xs hover:bg-gray-50 transition whitespace-nowrap"
+      >
+        <RefreshCw size={13} /> Generar interno
+      </button>
     </div>
   );
 }
@@ -189,109 +248,100 @@ function VarianteForm({
   precioGlobal,
   moneda,
 }) {
+  const simbolo = moneda === "usd" ? "US$" : "$";
   return (
-    <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700">
-          Variante {index + 1}
-        </span>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="text-red-500 hover:text-red-700"
-        >
-          <MinusCircle size={18} />
-        </button>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Nombre *
-          </label>
+    <div className="border border-gray-200 rounded-lg p-3 space-y-3">
+      <div className="flex gap-2 items-end">
+        <div className="flex-1">
+          <label className={ETIQUETA}>Variante {index + 1} *</label>
           <input
             type="text"
             required
             value={variante.nombre}
             onChange={(e) => onChange(index, "nombre", e.target.value)}
-            placeholder="ej: Rojo 500ml"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="ej.: Negro 128 GB"
+            className={CAMPO}
           />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-gray-600 mb-1">
-            Código de barras
-          </label>
-          <div className="flex gap-1">
-            <input
-              type="text"
-              value={variante.codigo_barras}
-              onChange={(e) => onChange(index, "codigo_barras", e.target.value)}
-              placeholder="Escaneá o escribí el código..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <button
+          type="button"
+          onClick={onRemove}
+          title="Quitar variante"
+          aria-label={`Quitar variante ${index + 1}`}
+          className="p-2 mb-0.5 text-gray-400 hover:text-red-600"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+      <div>
+        <label className={ETIQUETA}>Código de barras</label>
+        <CampoCodigo
+          value={variante.codigo_barras || ""}
+          onChange={(v) => onChange(index, "codigo_barras", v)}
+        />
+      </div>
+      {!precioGlobal && (
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className={ETIQUETA}>Precio de costo ({simbolo}) *</label>
+            <InputPrecio
+              pesos={variante.precio_costo}
+              onChange={(v) => onChange(index, "precio_costo", v)}
+              required
+              moneda={moneda}
+              key={moneda}
+              className={CAMPO}
             />
-            <button
-              type="button"
-              onClick={() =>
-                onChange(index, "codigo_barras", generarCodigoBarras())
-              }
-              className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded-lg text-xs text-gray-600 transition whitespace-nowrap"
-            >
-              Auto
-            </button>
+          </div>
+          <div>
+            <label className={ETIQUETA}>Precio de venta ({simbolo}) *</label>
+            <InputPrecio
+              pesos={variante.precio_venta}
+              onChange={(v) => onChange(index, "precio_venta", v)}
+              required
+              moneda={moneda}
+              key={moneda}
+              className={CAMPO}
+            />
           </div>
         </div>
-        {!precioGlobal && (
-          <>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Precio costo *
-              </label>
-              <InputPrecio
-                pesos={variante.precio_costo}
-                onChange={(v) =>
-                  onChange(index, "precio_costo", v)}
-                required
-                              moneda={moneda}
-                key={moneda}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Precio venta *
-              </label>
-              <InputPrecio
-                pesos={variante.precio_venta}
-                onChange={(v) =>
-                  onChange(index, "precio_venta", v)}
-                required
-                              moneda={moneda}
-                key={moneda}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </>
-        )}
-        <div className="col-span-2">
-          <StockPorSucursal
-            stock={variante.stock_sucursal}
-            minimo={variante.stock_minimo_sucursal}
-            onStock={(suc, v) =>
-              onChange(index, "stock_sucursal", {
-                ...variante.stock_sucursal,
-                [suc]: v,
-              })
-            }
-            onMinimo={(suc, v) =>
-              onChange(index, "stock_minimo_sucursal", {
-                ...variante.stock_minimo_sucursal,
-                [suc]: v,
-              })
-            }
-            stockSoloLectura={!!variante.id}
-          />
-        </div>
-      </div>
+      )}
+      <StockPorSucursal
+        stock={variante.stock_sucursal}
+        minimo={variante.stock_minimo_sucursal}
+        onStock={(suc, v) =>
+          onChange(index, "stock_sucursal", { ...variante.stock_sucursal, [suc]: v })
+        }
+        onMinimo={(suc, v) =>
+          onChange(index, "stock_minimo_sucursal", {
+            ...variante.stock_minimo_sucursal,
+            [suc]: v,
+          })
+        }
+        stockSoloLectura={!!variante.id}
+      />
+    </div>
+  );
+}
+
+// Opción del bloque "Características": casilla con su explicación
+function Opcion({ id, checked, onChange, titulo, ayuda, children }) {
+  return (
+    <div className="px-3 py-2.5">
+      <label htmlFor={id} className="flex items-start gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          id={id}
+          checked={checked}
+          onChange={onChange}
+          className="w-4 h-4 mt-0.5 text-blue-600"
+        />
+        <span className="text-sm">
+          <span className="font-medium text-gray-800">{titulo}</span>
+          <span className="block text-xs text-gray-500">{ayuda}</span>
+        </span>
+      </label>
+      {checked && children}
     </div>
   );
 }
@@ -301,7 +351,7 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
     nombre: producto?.nombre || "",
     descripcion: producto?.descripcion || "",
     categoria_id: producto?.categoria_id || "",
-    codigo_barras: producto?.codigo_barras || generarCodigoBarras(),
+    codigo_barras: producto?.codigo_barras || "",
     unidad_medida: "unidad",
     tiene_variantes: producto?.tiene_variantes || false,
     pide_imei: producto?.pide_imei || false,
@@ -334,7 +384,7 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
         ...form.variantes,
         {
           nombre: "",
-          codigo_barras: generarCodigoBarras(),
+          codigo_barras: "",
           precio_costo: precioGlobal ? parseFloat(precioCostoGlobal) || 0 : 0,
           precio_venta: precioGlobal ? parseFloat(precioVentaGlobal) || 0 : 0,
           stock_sucursal: mapaVacio(""),
@@ -397,6 +447,8 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
         const { stock_actual, stock_minimo, stock_sucursal, ...resto } = v;
         const base = {
           ...resto,
+          // sin código de barras propio: se le genera uno interno
+          codigo_barras: v.codigo_barras || generarCodigoBarras(),
           stock_minimo_sucursal: mapaAEnteros(v.stock_minimo_sucursal),
         };
         // El stock de variantes existentes no se envía: solo cambia por movimientos
@@ -418,7 +470,7 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
         stock_minimo_sucursal: form.tiene_variantes
           ? mapaVacio(0)
           : mapaAEnteros(stock_minimo_sucursal),
-        codigo_barras: form.codigo_barras || null,
+        codigo_barras: form.codigo_barras || generarCodigoBarras(),
       };
       // En la creación el stock inicial va en el producto o en cada variante;
       // en la edición el backend ignora el stock existente.
@@ -445,289 +497,255 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
     }
   };
 
+  const simbolo = moneda === "usd" ? "US$" : "$";
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-100 sticky top-0 bg-white">
+      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl max-h-[92vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="text-lg font-semibold text-gray-800">
-            {producto ? "Editar Producto" : "Nuevo Producto"}
+            {producto ? "Editar producto" : "Nuevo producto"}
           </h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre *
-              </label>
-              <input
-                type="text"
-                required
-                value={form.nombre}
-                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Categoría *
-              </label>
-              <SelectorCategoria
-                categorias={categorias}
-                value={form.categoria_id}
-                onChange={(id) =>
-                  setForm({
-                    ...form,
-                    categoria_id: id,
-                    // En un producto nuevo, una categoría de celulares marca la casilla del IMEI
-                    pide_imei: producto
-                      ? form.pide_imei
-                      : form.pide_imei || esCategoriaCelulares(categorias, id),
-                  })
-                }
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Código de barras
-              </label>
-              <div className="flex gap-2">
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+          <div className="overflow-y-auto px-6 py-5 space-y-6">
+            {/* 1. Información del producto */}
+            <Seccion titulo="Información del producto">
+              <div>
+                <label htmlFor="prod-nombre" className={ETIQUETA}>Nombre *</label>
                 <input
+                  id="prod-nombre"
                   type="text"
-                  value={form.codigo_barras}
-                  onChange={(e) =>
-                    setForm({ ...form, codigo_barras: e.target.value })
-                  }
-                  placeholder="Escaneá o escribí el código..."
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  autoFocus={false}
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setForm({ ...form, codigo_barras: Date.now().toString() })
-                  }
-                  className="px-3 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition"
-                >
-                  Generar
-                </button>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Podés escanear el código del empaque directamente en este campo
-              </p>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descripción
-              </label>
-              <textarea
-                value={form.descripcion}
-                onChange={(e) =>
-                  setForm({ ...form, descripcion: e.target.value })
-                }
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-            <input
-              type="checkbox"
-              id="tiene_variantes"
-              checked={form.tiene_variantes}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  tiene_variantes: e.target.checked,
-                  variantes: [],
-                })
-              }
-              className="w-4 h-4 text-blue-600"
-            />
-            <label
-              htmlFor="tiene_variantes"
-              className="text-sm font-medium text-gray-700"
-            >
-              Este producto tiene variantes (color, tamaño, etc.)
-            </label>
-          </div>
-
-          <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl">
-            <input
-              type="checkbox"
-              id="pide_imei"
-              checked={form.pide_imei}
-              onChange={(e) => setForm({ ...form, pide_imei: e.target.checked })}
-              className="w-4 h-4 mt-0.5 text-blue-600"
-            />
-            <label htmlFor="pide_imei" className="text-sm text-gray-700">
-              <span className="font-medium">Pedir el IMEI al venderlo</span>
-              <span className="block text-xs text-gray-500">
-                Para celulares: en cada venta se carga el IMEI de cada unidad y
-                queda en el ticket.
-              </span>
-            </label>
-          </div>
-
-          <SelectorMoneda moneda={moneda} onChange={setMoneda} />
-
-          {!form.tiene_variantes && (
-            <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Precio costo *
-                </label>
-                <InputPrecio
-                  pesos={form.precio_costo}
-                  onChange={(v) =>
-                    setForm({ ...form, precio_costo: v })}
                   required
-                                  moneda={moneda}
-                  key={moneda}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={form.nombre}
+                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                  placeholder="ej.: Samsung Galaxy A15 128 GB"
+                  className={CAMPO}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Precio venta *
-                </label>
-                <InputPrecio
-                  pesos={form.precio_venta}
-                  onChange={(v) =>
-                    setForm({ ...form, precio_venta: v })}
-                  required
-                                  moneda={moneda}
-                  key={moneda}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <label className={ETIQUETA}>Categoría *</label>
+                <SelectorCategoria
+                  categorias={categorias}
+                  value={form.categoria_id}
+                  onChange={(id) =>
+                    setForm({
+                      ...form,
+                      categoria_id: id,
+                      // En un producto nuevo, una categoría de celulares marca la casilla del IMEI
+                      pide_imei: producto
+                        ? form.pide_imei
+                        : form.pide_imei || esCategoriaCelulares(categorias, id),
+                    })
+                  }
                 />
               </div>
-            </div>
-            <StockPorSucursal
-              stock={form.stock_sucursal}
-              minimo={form.stock_minimo_sucursal}
-              onStock={(suc, v) =>
-                setForm({
-                  ...form,
-                  stock_sucursal: { ...form.stock_sucursal, [suc]: v },
-                })
-              }
-              onMinimo={(suc, v) =>
-                setForm({
-                  ...form,
-                  stock_minimo_sucursal: {
-                    ...form.stock_minimo_sucursal,
-                    [suc]: v,
-                  },
-                })
-              }
-              stockSoloLectura={!!producto}
-              rounded="rounded-xl"
-            />
-            </div>
-          )}
-
-          {form.tiene_variantes && (
-            <div className="space-y-3">
-              <div className="p-4 bg-blue-50 rounded-xl space-y-3">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="precio_global"
-                    checked={precioGlobal}
-                    onChange={(e) => setPrecioGlobal(e.target.checked)}
-                    className="w-4 h-4 text-blue-600"
+              {!form.tiene_variantes && (
+                <div>
+                  <label htmlFor="prod-codigo" className={ETIQUETA}>Código de barras</label>
+                  <CampoCodigo
+                    id="prod-codigo"
+                    value={form.codigo_barras}
+                    onChange={(v) => setForm({ ...form, codigo_barras: v })}
                   />
-                  <label
-                    htmlFor="precio_global"
-                    className="text-sm font-medium text-blue-800"
-                  >
-                    Usar el mismo precio para todas las variantes
-                  </label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Escaneá el código del empaque o escribilo. Si el producto no
+                    tiene, generá uno interno (si lo dejás vacío, se genera al guardar).
+                  </p>
                 </div>
-                {precioGlobal && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-blue-700 mb-1">
-                        Precio costo global
-                      </label>
-                      <InputPrecio
-                        pesos={precioCostoGlobal}
-                        onChange={(v) => setPrecioCostoGlobal(v)}
-                                              moneda={moneda}
-                        key={moneda}
-                        className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-blue-700 mb-1">
-                        Precio venta global
-                      </label>
-                      <InputPrecio
-                        pesos={precioVentaGlobal}
-                        onChange={(v) => setPrecioVentaGlobal(v)}
-                                              moneda={moneda}
-                        key={moneda}
-                        className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="col-span-2">
+              )}
+              <div>
+                <label htmlFor="prod-desc" className={ETIQUETA}>Descripción</label>
+                <textarea
+                  id="prod-desc"
+                  value={form.descripcion}
+                  onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
+                  rows={2}
+                  className={`${CAMPO} resize-none`}
+                />
+              </div>
+            </Seccion>
+
+            {/* 2. Características */}
+            <Seccion titulo="Características">
+              <div className="border border-gray-200 rounded-lg divide-y divide-gray-100">
+                <Opcion
+                  id="tiene_variantes"
+                  checked={form.tiene_variantes}
+                  onChange={(e) =>
+                    setForm({ ...form, tiene_variantes: e.target.checked, variantes: [] })
+                  }
+                  titulo="Tiene variantes"
+                  ayuda="Colores, capacidades o modelos. Cada variante tiene su código, precio y stock."
+                />
+                <Opcion
+                  id="pide_imei"
+                  checked={form.pide_imei}
+                  onChange={(e) => setForm({ ...form, pide_imei: e.target.checked })}
+                  titulo="Pedir el IMEI al venderlo"
+                  ayuda="Para celulares: cada unidad se identifica por su IMEI."
+                >
+                  <p className="mt-2 ml-7 flex items-start gap-1.5 text-xs text-blue-800 bg-blue-50 rounded-md px-2 py-1.5">
+                    <Info size={13} className="mt-0.5 shrink-0" />
+                    En cada venta, el sistema pide un IMEI por unidad (si se venden
+                    2, pide 2), lo valida y lo imprime en el ticket.
+                  </p>
+                </Opcion>
+              </div>
+            </Seccion>
+
+            {/* 3. Precios */}
+            <Seccion
+              titulo="Precios"
+              accion={<SelectorMoneda moneda={moneda} onChange={setMoneda} />}
+            >
+              {!form.tiene_variantes && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={ETIQUETA}>Precio de costo ({simbolo}) *</label>
+                    <InputPrecio
+                      pesos={form.precio_costo}
+                      onChange={(v) => setForm({ ...form, precio_costo: v })}
+                      required
+                      moneda={moneda}
+                      key={moneda}
+                      className={CAMPO}
+                    />
+                  </div>
+                  <div>
+                    <label className={ETIQUETA}>Precio de venta ({simbolo}) *</label>
+                    <InputPrecio
+                      pesos={form.precio_venta}
+                      onChange={(v) => setForm({ ...form, precio_venta: v })}
+                      required
+                      moneda={moneda}
+                      key={moneda}
+                      className={CAMPO}
+                    />
+                  </div>
+                </div>
+              )}
+              {form.tiene_variantes && (
+                <div className="rounded-lg border border-gray-200 px-3 py-2.5 space-y-3">
+                  <label htmlFor="precio_global" className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="precio_global"
+                      checked={precioGlobal}
+                      onChange={(e) => setPrecioGlobal(e.target.checked)}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                    <span className="text-sm font-medium text-gray-800">
+                      Mismo precio para todas las variantes
+                    </span>
+                  </label>
+                  {precioGlobal ? (
+                    <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                      <div>
+                        <label className={ETIQUETA}>Costo ({simbolo})</label>
+                        <InputPrecio
+                          pesos={precioCostoGlobal}
+                          onChange={(v) => setPrecioCostoGlobal(v)}
+                          moneda={moneda}
+                          key={moneda}
+                          className={CAMPO}
+                        />
+                      </div>
+                      <div>
+                        <label className={ETIQUETA}>Venta ({simbolo})</label>
+                        <InputPrecio
+                          pesos={precioVentaGlobal}
+                          onChange={(v) => setPrecioVentaGlobal(v)}
+                          moneda={moneda}
+                          key={moneda}
+                          className={CAMPO}
+                        />
+                      </div>
                       <button
                         type="button"
                         onClick={aplicarPrecioGlobal}
-                        className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition"
+                        className="mb-[18px] px-3 py-2 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 transition whitespace-nowrap"
                       >
-                        Aplicar a todas las variantes
+                        Aplicar
                       </button>
                     </div>
-                  </div>
-                )}
-              </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      Si no, el precio se carga en cada variante.
+                    </p>
+                  )}
+                </div>
+              )}
+            </Seccion>
 
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">
-                  Variantes
-                </span>
+            {/* 4. Inventario */}
+            <Seccion
+              titulo={form.tiene_variantes ? "Variantes e inventario" : "Inventario"}
+              accion={
+                form.tiene_variantes && (
+                  <button
+                    type="button"
+                    onClick={addVariante}
+                    className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                  >
+                    <PlusCircle size={16} /> Agregar variante
+                  </button>
+                )
+              }
+            >
+              {!form.tiene_variantes && (
+                <StockPorSucursal
+                  stock={form.stock_sucursal}
+                  minimo={form.stock_minimo_sucursal}
+                  onStock={(suc, v) =>
+                    setForm({ ...form, stock_sucursal: { ...form.stock_sucursal, [suc]: v } })
+                  }
+                  onMinimo={(suc, v) =>
+                    setForm({
+                      ...form,
+                      stock_minimo_sucursal: { ...form.stock_minimo_sucursal, [suc]: v },
+                    })
+                  }
+                  stockSoloLectura={!!producto}
+                />
+              )}
+              {form.tiene_variantes &&
+                form.variantes.map((v, i) => (
+                  <VarianteForm
+                    key={i}
+                    variante={v}
+                    index={i}
+                    onChange={handleVarianteChange}
+                    onRemove={() => removeVariante(i)}
+                    precioGlobal={precioGlobal}
+                    moneda={moneda}
+                  />
+                ))}
+              {form.tiene_variantes && form.variantes.length === 0 && (
                 <button
                   type="button"
                   onClick={addVariante}
-                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                  className="w-full py-4 border border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:bg-gray-50 transition"
                 >
-                  <PlusCircle size={16} />
-                  Agregar variante
+                  Todavía no hay variantes. Agregá la primera.
                 </button>
-              </div>
-              {form.variantes.map((v, i) => (
-                <VarianteForm
-                  key={i}
-                  variante={v}
-                  index={i}
-                  onChange={handleVarianteChange}
-                  onRemove={() => removeVariante(i)}
-                  precioGlobal={precioGlobal}
-                  moneda={moneda}
-                />
-              ))}
-              {form.variantes.length === 0 && (
-                <p className="text-sm text-gray-500 text-center py-4">
-                  No hay variantes. Hacé click en "Agregar variante".
-                </p>
               )}
-            </div>
-          )}
+            </Seccion>
+          </div>
 
-          <div className="flex gap-3 pt-2">
+          {/* Pie fijo: siempre visible aunque el formulario tenga desplazamiento */}
+          <div className="flex gap-3 px-6 py-3 border-t border-gray-100 bg-white rounded-b-2xl shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
+              className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 disabled:bg-blue-400 transition"
+              className="flex-1 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:bg-blue-400 transition"
             >
               {loading ? "Guardando..." : "Guardar"}
             </button>

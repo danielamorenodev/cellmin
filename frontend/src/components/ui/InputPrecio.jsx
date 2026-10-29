@@ -63,7 +63,8 @@ export default function InputPrecio({
   );
 }
 
-// Selector de la moneda en la que se cargan los precios
+// Selector de la moneda en la que se cargan los precios, con la cotización
+// que se usa para convertir entre pesos y dólares
 export function SelectorMoneda({ moneda, onChange }) {
   const { disponible, venta } = useCotizacion();
   const opciones = [
@@ -71,32 +72,35 @@ export function SelectorMoneda({ moneda, onChange }) {
     { v: "usd", t: "Dólares (US$)" },
   ];
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="font-medium text-gray-600">Cargar precios en:</span>
-      <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden">
-        {opciones.map((o) => (
-          <button
-            key={o.v}
-            type="button"
-            disabled={o.v === "usd" && !disponible}
-            onClick={() => onChange(o.v)}
-            className={`px-3 py-1 transition disabled:opacity-40 disabled:cursor-not-allowed ${
-              moneda === o.v
-                ? "bg-blue-600 text-white"
-                : "bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            {o.t}
-          </button>
-        ))}
+    <div className="flex flex-col items-end gap-0.5 text-xs">
+      <div className="flex items-center gap-2">
+        <span className="text-gray-500">Cargar en</span>
+        <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden" role="group" aria-label="Moneda de los precios">
+          {opciones.map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              aria-pressed={moneda === o.v}
+              disabled={o.v === "usd" && !disponible}
+              onClick={() => onChange(o.v)}
+              className={`px-2.5 py-1 transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                moneda === o.v
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {o.t}
+            </button>
+          ))}
+        </div>
       </div>
       {disponible ? (
         <span className="text-gray-500">
-          Dólar $ {new Intl.NumberFormat("es-AR").format(venta)}
+          Cotización utilizada: $ {new Intl.NumberFormat("es-AR").format(venta)} por USD
         </span>
       ) : (
-        <span className="text-red-500">
-          Sin cotización: solo se puede cargar en pesos
+        <span className="text-red-600">
+          Sin cotización cargada: solo se puede cargar en pesos
         </span>
       )}
     </div>
