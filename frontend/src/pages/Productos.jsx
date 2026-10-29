@@ -36,6 +36,7 @@ import {
   minimoEn,
   bajoMinimo,
   esCategoriaCelulares,
+  idsConSubcategorias,
 } from "../utils/helpers";
 import { exportarListaPrecios } from "../utils/exportExcel";
 import Paginacion from "../components/ui/Paginacion";
@@ -1406,13 +1407,17 @@ export default function Productos() {
     return producto.precio_venta || 0;
   };
 
+  // La categoría elegida incluye sus subcategorías
+  const categoriasFiltro = filtros.categoria_id
+    ? idsConSubcategorias(categorias, filtros.categoria_id)
+    : null;
   const filtered = productos.filter((p) => {
     if (
       filtros.nombre &&
       !p.nombre.toLowerCase().includes(filtros.nombre.toLowerCase())
     )
       return false;
-    if (filtros.categoria_id && p.categoria_id !== filtros.categoria_id)
+    if (categoriasFiltro && !categoriasFiltro.has(p.categoria_id))
       return false;
     const precio = getPrecioVenta(p);
     if (filtros.precio_min && precio < parseFloat(filtros.precio_min))
