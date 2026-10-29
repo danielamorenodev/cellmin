@@ -390,269 +390,251 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
     }
   };
 
+  const difTotal = totalReal - montoEsperadoTotal;
+  const colorDif = (d) =>
+    Math.abs(d) < 0.01 ? "text-green-700" : d > 0 ? "text-blue-600" : "text-red-600";
+  const SUBTITULO = "text-xs font-semibold uppercase tracking-wide text-gray-500";
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-800">Cerrar Caja</h2>
+      <div className="bg-white rounded-2xl w-full max-w-lg lg:max-w-5xl shadow-xl max-h-[92vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-100 shrink-0">
+          <h2 className="text-lg font-semibold text-gray-800">Cerrar caja</h2>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Resumen del día */}
-          <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-            <p className="text-sm font-medium text-gray-700 mb-2">
-              Resumen del día
-            </p>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Monto inicial</span>
-              <span className="font-medium">
-                {formatCurrency(caja.monto_inicial)}
-              </span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Total ventas</span>
-              <span className="font-medium text-green-700">
-                + {formatCurrency(caja.total_ventas_hoy || 0)}
-              </span>
-            </div>
-            {excedenteVentas > 0.001 && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">
-                  Dólares cobrados de más (vuelto)
-                </span>
-                <span className="font-medium text-green-700">
-                  + {formatCurrency(excedenteVentas)}
-                </span>
-              </div>
-            )}
-            {Object.entries(totalesMovimientos(caja.movimientos))
-              .filter(([, v]) => Math.abs(v) > 0.001)
-              .map(([g, v]) => (
-                <div key={g} className="flex justify-between text-sm">
-                  <span className="text-gray-600">{CONCEPTOS_MOV[g]}</span>
-                  <span
-                    className={`font-medium ${v >= 0 ? "text-green-700" : "text-red-600"}`}
-                  >
-                    {v >= 0 ? "+" : ""}
-                    {formatCurrency(v)}
-                  </span>
-                </div>
-              ))}
-            <div className="flex justify-between text-sm font-semibold border-t border-gray-200 pt-2">
-              <span className="text-gray-700">Total esperado</span>
-              <span>{formatCurrency(montoEsperadoTotal)}</span>
-            </div>
-            {caja.monto_esperado_apertura != null &&
-              Math.abs(caja.diferencia_apertura || 0) > 0.01 && (
-                <p
-                  className={`text-xs pt-1 ${
-                    caja.diferencia_apertura > 0 ? "text-blue-600" : "text-red-600"
-                  }`}
-                >
-                  Al abrir esta caja se esperaban{" "}
-                  {formatCurrency(caja.monto_esperado_apertura)} y se contaron{" "}
-                  {formatCurrency(caja.monto_inicial)} (
-                  {caja.diferencia_apertura > 0 ? "sobraban " : "faltaban "}
-                  {formatCurrency(Math.abs(caja.diferencia_apertura))}).
-                </p>
-              )}
-          </div>
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+          {/* En pantallas anchas, dos columnas: a la izquierda el conteo y a
+              la derecha el resumen, así se ve todo sin desplazarse */}
+          <div className="overflow-y-auto min-h-0 flex-1 lg:grid lg:grid-cols-[1.25fr_1fr] lg:divide-x lg:divide-gray-100">
+            <div className="px-6 py-5 space-y-5 lg:overflow-y-auto">
+              {/* Conteo por método: esperado, contado y diferencia en una tabla */}
+              <section className="space-y-2">
+                <h3 className={SUBTITULO}>Monto contado por método</h3>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-500">
+                      <th className="text-left font-medium pb-1">Método</th>
+                      <th className="text-right font-medium pb-1 px-2">Esperado</th>
+                      <th className="text-left font-medium pb-1 px-2">Contado</th>
+                      <th className="text-right font-medium pb-1 w-24">Diferencia</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {METODOS.map((m, index) => {
+                      const esUSD = m.key === "usd";
+                      // esperado en la unidad en que se cuenta (US$ para dólares)
+                      const esp = esUSD ? esperadoUSD : esperado[m.key] || 0;
+                      const contado = montos[index].monto || 0;
+                      const fmt = esUSD ? formatUSD : formatCurrency;
+                      const dif = Math.round((contado - esp) * 100) / 100;
+                      return (
+                        <tr key={m.key}>
+                          <td className="py-1 pr-2 text-gray-700 whitespace-nowrap">{m.label}</td>
+                          <td className="py-1 px-2 text-right text-gray-500 whitespace-nowrap">{fmt(esp)}</td>
+                          <td className="py-1 px-2">
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-medium pointer-events-none">
+                                {esUSD ? "US$" : "$"}
+                              </span>
+                              <input
+                                type="text"
+                                inputMode={esUSD ? "decimal" : "numeric"}
+                                value={montos[index].display}
+                                onChange={(e) => handleMontoChange(index, e.target.value)}
+                                placeholder="0"
+                                aria-label={`Contado en ${m.label}`}
+                                className={`w-full ${esUSD ? "pl-11" : "pl-7"} pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                              />
+                            </div>
+                          </td>
+                          <td className={`py-1 text-right text-xs font-medium whitespace-nowrap ${colorDif(dif)}`}>
+                            {montos[index].display === "" && esp === 0 ? (
+                              <span className="text-gray-300">—</span>
+                            ) : Math.abs(dif) < 0.01 ? (
+                              <span className="inline-flex items-center gap-1">
+                                <Check size={14} /> OK
+                              </span>
+                            ) : (
+                              <>
+                                {dif > 0 ? "Sobran " : "Faltan "}
+                                {fmt(Math.abs(dif))}
+                                {esUSD && (
+                                  <span className="block text-[11px] font-normal opacity-80">
+                                    ≈ {formatCurrency(Math.abs(dif) * tasaUSD)}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {tasaUSD > 0 && (esperadoUSD > 0 || montos.find((m) => m.metodo === "usd")?.monto > 0) && (
+                  <p className="text-xs text-gray-500">
+                    Los dólares se valúan a {formatCurrency(tasaUSD)} cada uno
+                    {esperadoUSD > 0
+                      ? " (promedio con el que se cobraron)."
+                      : " (dólar actual)."}
+                  </p>
+                )}
+              </section>
 
-          {/* Ingreso por método */}
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-gray-700">
-              Ingresá el monto contado por método
-            </p>
-            {METODOS.map((m, index) => {
-              const esUSD = m.key === "usd";
-              // esperado en la unidad en que se cuenta (US$ para dólares)
-              const esp = esUSD ? esperadoUSD : esperado[m.key] || 0;
-              const contado = montos[index].monto || 0;
-              const fmt = esUSD ? formatUSD : formatCurrency;
-              const dif = Math.round((contado - esp) * 100) / 100;
-              return (
-                <div key={m.key} className="flex items-center gap-3">
-                  <div className="w-28 shrink-0">
-                    <p className="text-sm text-gray-600">{m.label}</p>
-                    <p className="text-xs text-gray-500">Esp: {fmt(esp)}</p>
+              {/* Efectivo que queda en la caja para mañana */}
+              <section className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className={SUBTITULO}>Dejar en caja (efectivo)</h3>
+                  <button
+                    type="button"
+                    onClick={dejarTodo}
+                    disabled={efectivoContado <= 0}
+                    className="text-xs text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline"
+                  >
+                    Dejar todo el efectivo contado
+                  </button>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs font-medium pointer-events-none">
+                    $
+                  </span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={dejar.display}
+                    onChange={(e) => handleDejarChange(e.target.value)}
+                    placeholder="0"
+                    aria-label="Efectivo que queda en la caja"
+                    className={`w-full pl-7 pr-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                      excedeDejar
+                        ? "border-red-400 focus:ring-red-400"
+                        : "border-gray-300 focus:ring-blue-500"
+                    }`}
+                  />
+                </div>
+                {excedeDejar ? (
+                  <p className="text-xs text-red-600">
+                    Es más que el efectivo contado ({formatCurrency(efectivoContado)}).
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500">
+                    Se retira {formatCurrency(Math.max(0, efectivoContado - (dejar.monto || 0)))}.
+                    Lo que dejes será el monto inicial esperado de la próxima apertura.
+                  </p>
+                )}
+              </section>
+            </div>
+
+            <div className="px-6 pb-5 pt-0 lg:pt-5 space-y-5 lg:overflow-y-auto">
+              {/* Resumen del día */}
+              <section className="space-y-2">
+                <h3 className={SUBTITULO}>Resumen del día</h3>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Monto inicial</span>
+                    <span className="font-medium">{formatCurrency(caja.monto_inicial)}</span>
                   </div>
-                  <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">
-                      {esUSD ? "US$" : "$"}
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total ventas</span>
+                    <span className="font-medium text-green-700">
+                      + {formatCurrency(caja.total_ventas_hoy || 0)}
                     </span>
-                    <input
-                      type="text"
-                      inputMode={esUSD ? "decimal" : "numeric"}
-                      value={montos[index].display}
-                      onChange={(e) => handleMontoChange(index, e.target.value)}
-                      placeholder="0"
-                      className={`w-full ${esUSD ? "pl-10" : "pl-7"} pr-4 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                    />
                   </div>
-                  {contado > 0 && (
-                    <div
-                      className={`text-xs font-medium w-20 text-right ${
-                        Math.abs(dif) < 0.01
-                          ? "text-green-700"
-                          : dif > 0
-                            ? "text-blue-600"
-                            : "text-red-600"
-                      }`}
-                    >
-                      {Math.abs(dif) < 0.01 ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Check size={14} /> OK
-                        </span>
-                      ) : dif > 0
-                          ? `+${fmt(dif)}`
-                          : `-${fmt(-dif)}`}
+                  {excedenteVentas > 0.001 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Dólares cobrados de más (vuelto)</span>
+                      <span className="font-medium text-green-700">
+                        + {formatCurrency(excedenteVentas)}
+                      </span>
                     </div>
                   )}
-                </div>
-              );
-            })}
-            {tasaUSD > 0 && (esperadoUSD > 0 || montos.find((m) => m.metodo === "usd")?.monto > 0) && (
-              <p className="text-xs text-gray-500">
-                Los dólares se valúan a {formatCurrency(tasaUSD)} cada uno
-                {esperadoUSD > 0
-                  ? " (promedio con el que se cobraron)."
-                  : " (dólar actual)."}
-              </p>
-            )}
-          </div>
-
-          {/* Efectivo que queda en la caja para mañana */}
-          <div className="rounded-xl border border-gray-200 p-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-700">
-                Dejar en caja (efectivo)
-              </p>
-              <button
-                type="button"
-                onClick={dejarTodo}
-                disabled={efectivoContado <= 0}
-                className="text-xs text-blue-600 hover:underline disabled:text-gray-300 disabled:no-underline"
-              >
-                Dejar todo el efectivo contado
-              </button>
-            </div>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium">
-                $
-              </span>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={dejar.display}
-                onChange={(e) => handleDejarChange(e.target.value)}
-                placeholder="0"
-                className={`w-full pl-7 pr-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 ${
-                  excedeDejar
-                    ? "border-red-400 focus:ring-red-400"
-                    : "border-gray-300 focus:ring-blue-500"
-                }`}
-              />
-            </div>
-            {excedeDejar ? (
-              <p className="text-xs text-red-600">
-                Es más que el efectivo contado ({formatCurrency(efectivoContado)}).
-              </p>
-            ) : (
-              <p className="text-xs text-gray-500">
-                Se retira {formatCurrency(Math.max(0, efectivoContado - (dejar.monto || 0)))}.
-                Lo que dejes será el monto inicial esperado de la próxima apertura.
-              </p>
-            )}
-          </div>
-
-          {/* Resumen totales */}
-          <div className="bg-gray-50 rounded-xl p-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Total contado</span>
-              <span className="font-semibold">{formatCurrency(totalReal)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Total esperado</span>
-              <span className="font-semibold">
-                {formatCurrency(montoEsperadoTotal)}
-              </span>
-            </div>
-            <div
-              className={`flex justify-between text-sm font-bold border-t border-gray-200 pt-2 ${
-                Math.abs(totalReal - montoEsperadoTotal) < 0.01
-                  ? "text-green-700"
-                  : totalReal > montoEsperadoTotal
-                    ? "text-blue-700"
-                    : "text-red-700"
-              }`}
-            >
-              <span>Diferencia total</span>
-              <span>
-                {totalReal >= montoEsperadoTotal ? "+" : ""}
-                {formatCurrency(totalReal - montoEsperadoTotal)}
-              </span>
-            </div>
-          </div>
-
-          {/* Diferencias por método */}
-          {hayDiferencias && (
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-gray-700">
-                Diferencias por método
-              </p>
-              {diferenciaPorMetodo.map(
-                (d) =>
-                  Math.abs(d.diferencia) > 0.01 && (
-                    <div
-                      key={d.metodo}
-                      className={`flex items-center justify-between px-4 py-2 rounded-xl text-sm ${
-                        d.diferencia > 0
-                          ? "bg-blue-50 text-blue-700"
-                          : "bg-red-50 text-red-700"
-                      }`}
-                    >
-                      <span className="font-medium">{d.label}</span>
-                      <div className="text-right">
-                        <p className="text-xs opacity-75">
-                          Esp: {formatCurrency(d.esperado)} / Real:{" "}
-                          {formatCurrency(d.real)}
-                        </p>
-                        <p className="font-bold">
-                          {d.diferencia > 0 ? "Sobran" : "Faltan"}{" "}
-                          {formatCurrency(Math.abs(d.diferencia))}
-                        </p>
+                  {Object.entries(totalesMovimientos(caja.movimientos))
+                    .filter(([, v]) => Math.abs(v) > 0.001)
+                    .map(([g, v]) => (
+                      <div key={g} className="flex justify-between">
+                        <span className="text-gray-600">{CONCEPTOS_MOV[g]}</span>
+                        <span className={`font-medium ${v >= 0 ? "text-green-700" : "text-red-600"}`}>
+                          {v >= 0 ? "+" : ""}
+                          {formatCurrency(v)}
+                        </span>
                       </div>
-                    </div>
-                  ),
-              )}
-            </div>
-          )}
+                    ))}
+                  {caja.monto_esperado_apertura != null &&
+                    Math.abs(caja.diferencia_apertura || 0) > 0.01 && (
+                      <p
+                        className={`text-xs pt-1 ${
+                          caja.diferencia_apertura > 0 ? "text-blue-600" : "text-red-600"
+                        }`}
+                      >
+                        Al abrir esta caja se esperaban{" "}
+                        {formatCurrency(caja.monto_esperado_apertura)} y se contaron{" "}
+                        {formatCurrency(caja.monto_inicial)} (
+                        {caja.diferencia_apertura > 0 ? "sobraban " : "faltaban "}
+                        {formatCurrency(Math.abs(caja.diferencia_apertura))}).
+                      </p>
+                    )}
+                </div>
+              </section>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notas
-            </label>
-            <textarea
-              value={notas}
-              onChange={(e) => setNotas(e.target.value)}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
+              {/* Totales del cierre */}
+              <section className="space-y-2">
+                <h3 className={SUBTITULO}>Totales del cierre</h3>
+                <div className="rounded-lg border border-gray-200 p-3 space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total esperado</span>
+                    <span className="font-semibold">{formatCurrency(montoEsperadoTotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Total contado</span>
+                    <span className="font-semibold">{formatCurrency(totalReal)}</span>
+                  </div>
+                  <div
+                    className={`flex justify-between font-bold border-t border-gray-200 pt-1.5 ${colorDif(difTotal)}`}
+                  >
+                    <span>Diferencia total</span>
+                    <span>
+                      {difTotal >= 0 ? "+" : ""}
+                      {formatCurrency(difTotal)}
+                    </span>
+                  </div>
+                  {hayDiferencias && (
+                    <p className="text-xs text-gray-500">
+                      El detalle de lo que sobra o falta está en la columna Diferencia.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              <section className="space-y-2">
+                <label htmlFor="cierre-notas" className={SUBTITULO + " block"}>
+                  Notas
+                </label>
+                <textarea
+                  id="cierre-notas"
+                  value={notas}
+                  onChange={(e) => setNotas(e.target.value)}
+                  rows={2}
+                  placeholder="Opcional: por ejemplo, el motivo de una diferencia"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                />
+              </section>
+            </div>
           </div>
 
-          <div className="flex gap-3">
+          {/* Pie fijo: siempre visible */}
+          <div className="flex gap-3 lg:justify-end px-6 py-3 border-t border-gray-100 bg-white rounded-b-2xl shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
+              className="flex-1 lg:flex-none lg:w-44 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700 disabled:bg-red-400 transition"
+              className="flex-1 lg:flex-none lg:w-44 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 disabled:bg-red-400 transition"
             >
-              {loading ? "Cerrando..." : "Cerrar Caja"}
+              {loading ? "Cerrando..." : "Cerrar caja"}
             </button>
           </div>
         </form>
