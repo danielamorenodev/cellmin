@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from app.database import get_db
-from app.utils.auth import verify_password, create_access_token, get_current_user
+from app.utils.auth import verify_password, create_access_token, get_current_user, hash_password
+from pydantic import BaseModel
 from bson import ObjectId
 from app.utils.logger import registrar_auditoria, guardar_evento
 
@@ -70,3 +71,31 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         "rol": user["rol"],
         "sucursales": user.get("sucursales", [user.get("sucursal", "sucursal_1")]),
     }
+
+class CambioClave(BaseModel):
+    actual: str
+    nueva: str
+
+
+MINIMO_CLAVE = 8
+
+
+@router.put("/password")
+async def cambiar_mi_clave(datos: CambioClave, current_user: dict = Depends(get_current_user)):
+    """Cada usuario cambia su propia contraseña (tiene que saber la actual)."""
+    db = get_db()
+    user = await db.usuarios.find_one({"_id": ObjectId(current_user["user_id"])})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if not verify_password(datos.actual, user["password"]):
+        raise HTTPException(status_code=400, detail="La contraseña actual no es correcta")
+    if len(datos.nueva) < MINIMO_CLAVE:
+        raise HTTPException(status_code=400, detail=f"La contraseña nueva tiene que tener al menos {MINIMO_CLAVE} caracteres")
+    if datos.nueva == datos.actual:
+        raise HTTPException(status_code=400, detail="La contraseña nueva tiene que ser distinta de la actual")
+    await db.usuarios.update_one({"_id": user["_id"]}, {"$set": {"password": hash_password(datos.nueva)}})
+    await registrar_auditoria(
+        db=db, usuario_id=current_user["user_id"], usuario_nombre=user["nombre"], rol=current_user["role"],
+        accion="cambiar_clave", modulo="usuarios", descripcion=f"{user['nombre']} cambió su contraseña",
+    )
+    return {"message": "Contraseña actualizada"}

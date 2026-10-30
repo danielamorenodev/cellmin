@@ -69,7 +69,7 @@ def fila_reparacion(r, clientes):
 
 
 @router.get("/dashboard/detalle/{tipo}")
-async def detalle_dashboard(tipo: str, current_user: dict = Depends(get_current_user)):
+async def detalle_dashboard(tipo: str, filtro: str = None, current_user: dict = Depends(get_current_user)):
     """Lo que hay detrás de cada número del Inicio."""
     check_permission(current_user["role"], "dashboard:read")
     db = get_db()
@@ -77,6 +77,14 @@ async def detalle_dashboard(tipo: str, current_user: dict = Depends(get_current_
         reps = await db.reparaciones.find({"estado": {"$in": ESTADOS_ACTIVOS}}).to_list(2000)
         clientes = await _nombres_clientes(db, [r.get("cliente_id") for r in reps])
         filas = [fila_reparacion(r, clientes) for r in reps]
+        # Recortes de la misma lista: listas para entregar, atrasadas o las del técnico conectado
+        if filtro == "listas":
+            filas = [f for f in filas if f["estado"] == "lista"]
+        elif filtro == "atrasadas":
+            filas = [f for f in filas if f["dias_atraso"] > 0]
+        elif filtro == "mias":
+            ids = {str(r["_id"]) for r in reps if r.get("tecnico_id") == current_user["user_id"]}
+            filas = [f for f in filas if f["id"] in ids and f["estado"] in EN_CURSO]
         return sorted(filas, key=lambda f: (-f["dias_atraso"], -(f["dias_en_taller"] or 0)))
     if tipo == "ventas":
         check_permission(current_user["role"], "ventas:read")
@@ -121,10 +129,15 @@ async def get_dashboard(current_user: dict = Depends(get_current_user)):
     }).to_list(1000)
     total_hoy = sum(v["total"] for v in ventas_hoy)
     activas = await db.reparaciones.find(
-        {"estado": {"$in": ESTADOS_ACTIVOS}}, {"estado": 1, "fecha_estimada_entrega": 1}
+        {"estado": {"$in": ESTADOS_ACTIVOS}}, {"estado": 1, "fecha_estimada_entrega": 1, "tecnico_id": 1}
     ).to_list(2000)
     reparaciones_activas = len(activas)
     reparaciones_atrasadas = sum(1 for r in activas if dias_atraso(r) > 0)
+    reparaciones_listas = sum(1 for r in activas if r.get("estado") == "lista")
+    mias = sum(1 for r in activas if r.get("tecnico_id") == current_user["user_id"] and r.get("estado") in EN_CURSO)
+    semana = datetime.utcnow() - timedelta(days=7)
+    ingresos_semana = await db.compras.count_documents({"fecha": {"$gte": semana}, "estado": {"$ne": "cancelada"}})
+    remitos_semana = await db.remitos.count_documents({"fecha": {"$gte": semana}})
     productos_activos = await db.productos.find({"activo": True}).to_list(2000)
     stock_bajo = len(_faltantes(productos_activos))
     total_clientes = await db.clientes.count_documents({"activo": True})
@@ -133,6 +146,10 @@ async def get_dashboard(current_user: dict = Depends(get_current_user)):
         "total_ventas_hoy": total_hoy,
         "reparaciones_activas": reparaciones_activas,
         "reparaciones_atrasadas": reparaciones_atrasadas,
+        "reparaciones_listas": reparaciones_listas,
+        "reparaciones_mias": mias,
+        "ingresos_semana": ingresos_semana,
+        "remitos_semana": remitos_semana,
         "stock_bajo": stock_bajo,
         "total_clientes": total_clientes,
     }

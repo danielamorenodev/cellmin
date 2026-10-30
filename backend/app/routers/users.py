@@ -47,6 +47,8 @@ async def create_user(user: UserCreate, current_user: dict = Depends(get_current
     existing = await db.usuarios.find_one({"email": user.email})
     if existing:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
+    if len(user.password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña tiene que tener al menos 8 caracteres")
     new_user = {
         "nombre": user.nombre,
         "email": user.email,
@@ -75,7 +77,12 @@ async def update_user(user_id: str, user: UserUpdate, current_user: dict = Depen
     check_permission(current_user["role"], "*")
     db = get_db()
     update_data = {k: v for k, v in user.dict().items() if v is not None}
-    if "password" in update_data:
+    if not ObjectId.is_valid(user_id) or not await db.usuarios.find_one({"_id": ObjectId(user_id)}):
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    cambia_clave = "password" in update_data
+    if cambia_clave:
+        if len(update_data["password"]) < 8:
+            raise HTTPException(status_code=400, detail="La contraseña tiene que tener al menos 8 caracteres")
         update_data["password"] = hash_password(update_data["password"])
     await db.usuarios.update_one({"_id": ObjectId(user_id)}, {"$set": update_data})
     updated = await db.usuarios.find_one({"_id": ObjectId(user_id)})
@@ -87,7 +94,9 @@ async def update_user(user_id: str, user: UserUpdate, current_user: dict = Depen
     rol=current_user["role"],
     accion="actualizar",
     modulo="usuarios",
-    descripcion=f"Usuario actualizado: {user_id}"
+    descripcion=(f"Contraseña de {updated['nombre']} cambiada por el administrador"
+                 if cambia_clave and len(update_data) == 1
+                 else f"Usuario actualizado: {updated['nombre']}" + (" (incluye contraseña)" if cambia_clave else ""))
     )
 
     return format_user(updated)
