@@ -5,6 +5,8 @@ import {
   etiquetaPago,
   formatDateTime,
   SUCURSALES,
+  formatFechaISO,
+  diasAtraso,
 } from "../../utils/helpers";
 
 function Dato({ titulo, children }) {
@@ -44,13 +46,23 @@ export default function DetalleReparacion({ reparacion, cliente }) {
             <p className="text-xs text-gray-500">{cliente.telefono}</p>
           )}
         </Dato>
-        <Dato titulo="Sucursal">{sucursal}</Dato>
+        <Dato titulo="Sucursal de ingreso">{sucursal}</Dato>
         <Dato titulo="Estado">
           <span
             className={`px-2 py-1 rounded-lg text-xs font-medium ${estado.color}`}
           >
             {estado.label}
           </span>
+        </Dato>
+        <Dato titulo="Atendió">{reparacion.vendedor_nombre || "-"}</Dato>
+        <Dato titulo="Técnico">{reparacion.tecnico_nombre || "Sin asignar"}</Dato>
+        <Dato titulo="Entrega estimada">
+          {formatFechaISO(reparacion.fecha_estimada_entrega) || "-"}
+          {diasAtraso(reparacion) > 0 && (
+            <p className="text-xs font-medium text-red-600">
+              Atrasada {diasAtraso(reparacion)} {diasAtraso(reparacion) === 1 ? "día" : "días"}
+            </p>
+          )}
         </Dato>
       </div>
 

@@ -1,6 +1,12 @@
 import api from "./api";
 
 export const usuariosService = {
+  // Personal activo (sin datos privados) para elegir vendedor o técnico
+  personal: async () => {
+    const response = await api.get("/users/personal");
+    return response.data;
+  },
+
   getAll: async () => {
     const response = await api.get("/users/");
     return response.data;

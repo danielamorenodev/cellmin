@@ -3,6 +3,17 @@ import { authService } from "../services/auth.service";
 
 const AuthContext = createContext(null);
 
+// Id del usuario guardado en el token (para sesiones abiertas antes de que
+// el sistema guardara el id junto con el nombre)
+const idDelToken = (token) => {
+  try {
+    const datos = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(datos)).sub || null;
+  } catch {
+    return null;
+  }
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -12,7 +23,8 @@ export function AuthProvider({ children }) {
     const savedUser = localStorage.getItem("user");
     if (token && savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const guardado = JSON.parse(savedUser);
+        setUser(guardado.id ? guardado : { ...guardado, id: idDelToken(token) });
       } catch {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -25,6 +37,7 @@ export function AuthProvider({ children }) {
     const data = await authService.login(email, password);
     localStorage.setItem("token", data.access_token);
     const userData = {
+      id: data.id || idDelToken(data.access_token),
       nombre: data.nombre,
       rol: data.rol,
       sucursales: data.sucursales || ["sucursal_1"],

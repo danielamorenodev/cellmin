@@ -71,6 +71,28 @@ export const METODOS_PAGO = [
   { value: "usd", label: "Dólares (US$)" },
 ];
 
+// ---- Fecha estimada de entrega de reparaciones ("AAAA-MM-DD") ----
+const dosDigitos = (n) => String(n).padStart(2, "0");
+export const fechaLocalISO = (d = new Date()) =>
+  `${d.getFullYear()}-${dosDigitos(d.getMonth() + 1)}-${dosDigitos(d.getDate())}`;
+export const sumarDias = (dias, d = new Date()) => {
+  const r = new Date(d);
+  r.setDate(r.getDate() + dias);
+  return fechaLocalISO(r);
+};
+// "2026-11-03" -> "03/11/2026"
+export const formatFechaISO = (iso) => (iso ? iso.split("-").reverse().join("/") : "");
+const ESTADOS_EN_CURSO = ["en_diagnostico", "ingresada", "en_reparacion"];
+// Días de atraso de una orden que todavía no está lista (0 = en término)
+export const diasAtraso = (r) => {
+  if (!r?.fecha_estimada_entrega || !ESTADOS_EN_CURSO.includes(r.estado)) return 0;
+  const [a, m, d] = r.fecha_estimada_entrega.split("-").map(Number);
+  const estimada = new Date(a, m - 1, d);
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((hoy - estimada) / 86400000));
+};
+
 // Motivos de los movimientos de stock, como se muestran en pantalla
 export const MOTIVOS_STOCK = {
   ajuste_manual: "Ajuste manual",

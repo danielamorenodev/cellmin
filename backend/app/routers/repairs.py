@@ -9,6 +9,8 @@ from app.utils.logger import registrar_auditoria
 from app.utils.cajas import caja_propia, puede_sucursal
 from app.utils.stock import validar_sucursal
 from app.utils.tarjetas import datos_tarjeta, texto_tarjeta
+from app.utils.personal import persona, ROLES_VENDEDOR, ROLES_TECNICO
+from app.utils.marcas import registrar_marca_modelo
 from app.utils.pagos import (
     METODOS_VALIDOS,
     USD,
@@ -127,6 +129,17 @@ def movimientos_de_cobro(plan: dict, metodo: str, numero: str, repair_id: str, n
     return movimientos
 
 
+def validar_fecha_estimada(valor):
+    """Fecha estimada de entrega 'AAAA-MM-DD' (o None)."""
+    if not valor:
+        return None
+    try:
+        datetime.strptime(valor, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fecha estimada de entrega inválida")
+    return valor
+
+
 def validar_bloqueo(equipo: dict) -> dict:
     """Normaliza y valida el bloqueo de pantalla del equipo."""
     tipo = equipo.get("bloqueo_tipo") or "ninguno"
@@ -199,6 +212,14 @@ async def create_repair(repair: RepairCreate, current_user: dict = Depends(get_c
     data = repair.dict()
     sena = data.pop("sena", None)
     data["equipo"] = validar_bloqueo(data["equipo"])
+    data["equipo"]["marca"] = (data["equipo"].get("marca") or "").strip()
+    data["equipo"]["modelo"] = (data["equipo"].get("modelo") or "").strip()
+    data["fecha_estimada_entrega"] = validar_fecha_estimada(data.get("fecha_estimada_entrega"))
+    # Quién tomó la orden: el elegido o quien la registra
+    vendedor = await persona(db, data.pop("vendedor_id", None) or current_user["user_id"],
+                             ROLES_VENDEDOR + ("tecnico",), "vendedor")
+    data["vendedor_id"] = vendedor["id"]
+    data["vendedor_nombre"] = vendedor["nombre"]
     # La orden queda en la sucursal de la caja del usuario (si tiene una abierta)
     mi_caja = await caja_propia(db, current_user)
     if mi_caja:
@@ -259,6 +280,8 @@ async def create_repair(repair: RepairCreate, current_user: dict = Depends(get_c
     }
     result = await db.reparaciones.insert_one(new_repair)
     new_repair["_id"] = result.inserted_id
+    # La marca y el modelo quedan en el catálogo para las próximas órdenes
+    await registrar_marca_modelo(db, data["equipo"]["marca"], data["equipo"]["modelo"])
 
     if sena:
         await db.cajas.update_one(
@@ -306,9 +329,25 @@ async def update_repair(repair_id: str, repair: RepairUpdate, current_user: dict
         update_data["precio_total"] = precio_total
         update_data["saldo_pendiente"] = precio_total - total_pagado
 
+    if "fecha_estimada_entrega" in update_data:
+        update_data["fecha_estimada_entrega"] = validar_fecha_estimada(update_data["fecha_estimada_entrega"])
+    # El técnico solo se registra al pasar a "En reparación"
+    tecnico_elegido = update_data.pop("tecnico_id", None)
+
     nuevo_estado = update_data.get("estado")
     if nuevo_estado and nuevo_estado != repair_doc.get("estado"):
         validar_cambio_estado(repair_doc.get("estado", "en_diagnostico"), nuevo_estado)
+
+        # Al empezar la reparación se registra qué técnico la hace
+        if nuevo_estado == "en_reparacion":
+            if not tecnico_elegido and current_user["role"] == "tecnico":
+                tecnico_elegido = current_user["user_id"]
+            tecnico = await persona(db, tecnico_elegido, ROLES_TECNICO, "técnico")
+            update_data["tecnico_id"] = tecnico["id"]
+            update_data["tecnico_nombre"] = tecnico["nombre"]
+            update_data["fecha_inicio_reparacion"] = datetime.utcnow()
+        if nuevo_estado == "lista":
+            update_data["fecha_lista"] = datetime.utcnow()
 
         # Para pasar a ingresada hacen falta tipos de reparación (presupuesto)
         if nuevo_estado == "ingresada" and not (update_data.get("tipos_reparacion") or repair_doc.get("tipos_reparacion")):

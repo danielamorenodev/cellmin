@@ -32,6 +32,7 @@ class SaleCreate(BaseModel):
     pagos: Optional[List[PagoVenta]] = None
     sucursal: Optional[str] = None  # solo la usa el vendedor que pertenece a ambas sucursales
     notas: Optional[str] = None
+    vendedor_id: Optional[str] = None  # quién vendió (si no viene, el usuario conectado)
     clave_idempotencia: Optional[str] = None  # evita duplicar la venta por doble envio
 
 class SaleResponse(BaseModel):

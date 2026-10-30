@@ -11,6 +11,7 @@ from app.utils.stock import stock_en, aplicar_delta, descontar_varios
 from app.utils.cajas import caja_para_vender, exigir_dueno_o_admin
 from app.utils.idempotencia import resultado_previo, reclamar_clave, guardar_resultado, liberar_clave
 from app.utils.tarjetas import datos_tarjeta, texto_tarjeta
+from app.utils.personal import persona, ROLES_VENDEDOR
 from app.utils.pagos import (
     validar_medios_unicos,
     METODOS_VALIDOS,
@@ -278,6 +279,9 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
             elif pagos_venta[0].get("tarjeta"):
                 metodo_pago = f"{pagos_venta[0]['metodo']} ({texto_tarjeta(pagos_venta[0])})"
 
+    # 4c. Vendedor: el elegido o, si no se eligió, quien registra la venta
+    vendedor = await persona(db, sale.vendedor_id or current_user["user_id"], ROLES_VENDEDOR, "vendedor")
+
     # 5. Registrar la venta (una sola vez por clave: un doble click no duplica)
     previa = await reclamar_clave(db, sale.clave_idempotencia, "venta")
     if previa:
@@ -285,7 +289,7 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
     try:
         return await _registrar_venta(
             db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
-            interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal,
+            interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal, vendedor,
         )
     except Exception:
         await liberar_clave(db, sale.clave_idempotencia, "venta")
@@ -293,7 +297,7 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
 
 
 async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
-                           interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal):
+                           interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal, vendedor):
     # Reservar el stock ANTES de registrar nada. El descuento es atómico y
     # condicional: si otra venta se llevó mientras tanto las últimas unidades,
     # esta falla sin dejar el stock en negativo.
@@ -315,7 +319,7 @@ async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porc
     try:
         return await _guardar_venta(
             db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
-            interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal,
+            interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal, vendedor,
         )
     except Exception:
         # Si algo falla después de reservar, el stock vuelve a su lugar
@@ -325,7 +329,7 @@ async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porc
 
 
 async def _guardar_venta(db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
-                         interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal):
+                         interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal, vendedor):
     numero = await get_next_number(db, "ventas", "V-")
     new_sale = {
         "cliente_id": sale.cliente_id,
@@ -347,6 +351,8 @@ async def _guardar_venta(db, sale, current_user, items_finales, subtotal, porcen
         "numero_venta": numero,
         "estado": "completada",
         "usuario_id": current_user["user_id"],
+        "vendedor_id": vendedor["id"],
+        "vendedor_nombre": vendedor["nombre"],
         "fecha": datetime.utcnow(),
     }
     result = await db.ventas.insert_one(new_sale)

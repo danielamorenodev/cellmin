@@ -22,6 +22,7 @@ import {
   Trash2,
   Wrench,
   X,
+  AlertTriangle,
   PlusCircle,
 } from "lucide-react";
 import { reparacionesService } from "../services/reparaciones.service";
@@ -36,7 +37,16 @@ import {
   ESTADOS_REP,
   recargoTarjeta,
   MEDIOS_UNICOS,
+  nombreSucursal,
+  SUCURSALES,
+  sumarDias,
+  fechaLocalISO,
+  formatFechaISO,
+  diasAtraso,
 } from "../utils/helpers";
+import ComboCrear from "../components/ui/ComboCrear";
+import { marcasService } from "../services/marcas.service";
+import { usePersonal } from "../hooks/usePersonal";
 import CamposTarjeta from "../components/ui/CamposTarjeta";
 import { useTarjetas } from "../hooks/useTarjetas";
 import { cajaService } from "../services/caja.service";
@@ -296,6 +306,7 @@ function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle }) {
 }
 
 function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
+  const { user } = useAuth();
   // La orden queda en la sucursal de la caja del usuario (el servidor lo define);
   // si no tiene caja abierta, en su primera sucursal.
   const { porDefecto: sucursalUsuario } = useSucursales();
@@ -317,8 +328,13 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
     garantia_dias: 90,
     sucursal: sucursalUsuario,
     estado: "en_diagnostico",
+    // Quién toma la orden (por defecto, el usuario conectado) y cuándo se promete
+    vendedor_id: user?.id && user?.rol !== "deposito" ? user.id : "",
+    fecha_estimada_entrega: sumarDias(3),
   });
   const [loading, setLoading] = useState(false);
+  const [marcas, setMarcas] = useState([]);
+  const personal = usePersonal();
   const [cobrarSena, setCobrarSena] = useState(false);
   const [sena, setSena] = useState({ monto: "", metodo: "efectivo", tarjeta_id: "", cuotas: 1 });
   const cotizacion = useCotizacion();
@@ -332,7 +348,38 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
       setClientes(clients);
       setTiposDisponibles(tipos);
     });
+    marcasService.getAll().then(setMarcas).catch(() => {});
   }, []);
+
+  // Marca y modelo: se eligen del catálogo o se crean en el momento
+  const marcaElegida = marcas.find(
+    (m) => m.nombre.toLowerCase() === form.equipo.marca.toLowerCase(),
+  );
+  const cambiarEquipo = (datos) => setForm((f) => ({ ...f, equipo: { ...f.equipo, ...datos } }));
+  const crearMarca = async (nombre) => {
+    try {
+      const m = await marcasService.create(nombre);
+      setMarcas((l) => [...l, m]);
+      toast.success(`Marca «${m.nombre}» creada`);
+      return m.nombre;
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "No se pudo crear la marca");
+      return null;
+    }
+  };
+  const crearModelo = async (nombre) => {
+    if (!marcaElegida) return null;
+    try {
+      const m = await marcasService.agregarModelo(marcaElegida.id, nombre);
+      setMarcas((l) => l.map((x) => (x.id === m.id ? m : x)));
+      toast.success(`Modelo «${nombre}» agregado a ${m.nombre}`);
+      return nombre;
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "No se pudo crear el modelo");
+      return null;
+    }
+  };
+  const vendedores = personal.filter((p) => ["vendedor", "cajero", "administrador", "tecnico"].includes(p.rol));
 
   const toggleTipo = (tipo) => {
     const existe = tiposSeleccionados.find((t) => t.tipo_id === tipo.id);
@@ -474,6 +521,48 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
           >
             <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden lg:grid lg:grid-cols-2">
               <div className="min-h-0 p-6 space-y-5 lg:overflow-y-auto lg:border-r border-gray-100">
+            {/* Atención: quién toma la orden, dónde ingresa y para cuándo */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label htmlFor="rep-vendedor" className="block text-xs text-gray-600 mb-1">
+                  Atendió *
+                </label>
+                <select
+                  id="rep-vendedor"
+                  required
+                  value={form.vendedor_id}
+                  onChange={(e) => setForm({ ...form, vendedor_id: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Elegí quién atiende</option>
+                  {vendedores.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <span className="block text-xs text-gray-600 mb-1">Sucursal de ingreso</span>
+                <div className="px-3 py-2 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-700">
+                  {nombreSucursal(form.sucursal)}
+                </div>
+              </div>
+              <div>
+                <label htmlFor="rep-estimada" className="block text-xs text-gray-600 mb-1">
+                  Entrega estimada
+                </label>
+                <input
+                  id="rep-estimada"
+                  type="date"
+                  min={fechaLocalISO()}
+                  value={form.fecha_estimada_entrega}
+                  onChange={(e) => setForm({ ...form, fecha_estimada_entrega: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
             {/* Cliente */}
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -513,39 +602,32 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">
+                  <label htmlFor="rep-marca" className="block text-xs text-gray-600 mb-1">
                     Marca *
                   </label>
-                  <input
-                    type="text"
+                  <ComboCrear
+                    id="rep-marca"
                     required
                     value={form.equipo.marca}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        equipo: { ...form.equipo, marca: e.target.value },
-                      })
-                    }
-                    placeholder="Samsung, Apple..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    opciones={marcas.filter((m) => m.activo !== false).map((m) => m.nombre)}
+                    onChange={(v) => cambiarEquipo({ marca: v, modelo: "" })}
+                    onCrear={crearMarca}
+                    placeholder="Buscar marca..."
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1">
+                  <label htmlFor="rep-modelo" className="block text-xs text-gray-600 mb-1">
                     Modelo *
                   </label>
-                  <input
-                    type="text"
+                  <ComboCrear
+                    id="rep-modelo"
                     required
                     value={form.equipo.modelo}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        equipo: { ...form.equipo, modelo: e.target.value },
-                      })
-                    }
-                    placeholder="Galaxy A54..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    opciones={marcaElegida?.modelos || []}
+                    onChange={(v) => cambiarEquipo({ modelo: v })}
+                    onCrear={crearModelo}
+                    disabled={!marcaElegida}
+                    placeholder={marcaElegida ? "Buscar modelo..." : "Primero elegí la marca"}
                   />
                 </div>
                 <div>
@@ -1401,6 +1483,93 @@ function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir }) {
   );
 }
 
+// Al pasar una orden a "En reparación" se registra qué técnico la hace
+function AsignarTecnicoModal({ reparacion, onClose, onConfirmar }) {
+  const { user } = useAuth();
+  const personal = usePersonal();
+  const tecnicos = personal.filter((p) => p.rol === "tecnico" || p.rol === "administrador");
+  const [elegido, setElegido] = useState(user?.rol === "tecnico" ? user.id : "");
+  const [enviando, setEnviando] = useState(false);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <form
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!elegido) return;
+          setEnviando(true);
+          await onConfirmar(elegido);
+        }}
+        className="bg-white rounded-2xl w-full max-w-sm shadow-xl"
+      >
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-semibold text-gray-800">Pasar a En reparación</h2>
+          <p className="text-xs text-gray-500">
+            {reparacion.numero_orden} · {reparacion.equipo?.marca} {reparacion.equipo?.modelo}
+          </p>
+        </div>
+        <div className="p-6 space-y-2">
+          <label htmlFor="tecnico" className="block text-sm font-medium text-gray-700">
+            ¿Qué técnico la repara? *
+          </label>
+          <select
+            id="tecnico"
+            required
+            value={elegido}
+            onChange={(e) => setElegido(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Elegí el técnico</option>
+            {tecnicos.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.nombre}
+                {t.rol === "administrador" ? " (administración)" : ""}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500">
+            Queda registrado en la orden y en el historial de reparaciones del técnico.
+          </p>
+        </div>
+        <div className="flex gap-3 px-6 py-3 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={!elegido || enviando}
+            className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 disabled:bg-blue-300"
+          >
+            Confirmar
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+// Debajo del estado: para cuándo se prometió y, si se pasó, cuántos días de atraso
+function EntregaEstimada({ reparacion }) {
+  const atraso = diasAtraso(reparacion);
+  if (atraso > 0)
+    return (
+      <span className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-red-600 whitespace-nowrap">
+        <AlertTriangle size={12} /> Atrasada {atraso} {atraso === 1 ? "día" : "días"}
+      </span>
+    );
+  if (!reparacion.fecha_estimada_entrega || ["entregada", "cancelada"].includes(reparacion.estado))
+    return null;
+  return (
+    <span className="mt-1 block text-xs text-gray-500 whitespace-nowrap">
+      Entrega {formatFechaISO(reparacion.fecha_estimada_entrega).slice(0, 5)}
+    </span>
+  );
+}
+
 function FilaReparacion({
   reparacion,
   clientes,
@@ -1454,6 +1623,7 @@ function FilaReparacion({
           >
             {reparacion.numero_orden}
           </button>
+          <span className="block text-xs text-gray-500">{nombreSucursal(reparacion.sucursal)}</span>
         </td>
         <td className="col-centro px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
           {formatDateTime(reparacion.fecha_ingreso)}
@@ -1463,6 +1633,9 @@ function FilaReparacion({
         </td>
         <td className="px-6 py-4 text-sm text-gray-700">
           {reparacion.equipo?.marca} {reparacion.equipo?.modelo}
+          {reparacion.tecnico_nombre && (
+            <span className="block text-xs text-gray-500">Técnico: {reparacion.tecnico_nombre}</span>
+          )}
         </td>
         <td className="col-centro px-6 py-4">
           <span
@@ -1470,6 +1643,7 @@ function FilaReparacion({
           >
             {estadoInfo.label}
           </span>
+          <EntregaEstimada reparacion={reparacion} />
         </td>
         <td className="col-num px-6 py-4 text-sm font-semibold text-gray-800">
           {reparacion.tipos_reparacion?.length > 0 ? (
@@ -1544,6 +1718,19 @@ function FilaReparacion({
                   </span>
                   <span>
                     Garantía: <strong>{reparacion.garantia_dias} días</strong>
+                  </span>
+                  <span>
+                    Atendió: <strong>{reparacion.vendedor_nombre || "-"}</strong>
+                  </span>
+                  <span>
+                    Técnico: <strong>{reparacion.tecnico_nombre || "Sin asignar"}</strong>
+                  </span>
+                  <span>
+                    Ingresó en: <strong>{nombreSucursal(reparacion.sucursal)}</strong>
+                  </span>
+                  <span>
+                    Entrega estimada:{" "}
+                    <strong>{formatFechaISO(reparacion.fecha_estimada_entrega) || "-"}</strong>
                   </span>
                 </div>
                 {reparacion.equipo?.problema_descripcion && (
@@ -1699,6 +1886,11 @@ function CardReparacionMobile({
           <p className="text-gray-700">
             {reparacion.equipo?.marca} {reparacion.equipo?.modelo}
           </p>
+          <p className="text-xs text-gray-500">
+            {nombreSucursal(reparacion.sucursal)}
+            {reparacion.tecnico_nombre && ` · Técnico: ${reparacion.tecnico_nombre}`}
+          </p>
+          <EntregaEstimada reparacion={reparacion} />
           {reparacion.equipo?.imei && (
             <p className="text-xs text-gray-500">
               IMEI: {reparacion.equipo.imei}
@@ -2161,7 +2353,13 @@ export default function Reparaciones() {
     busqueda: "",
     estado: "",
     cliente_id: "",
+    sucursal: "",
+    vendedor: "",
+    tecnico: "",
+    atrasadas: "",
   });
+  // Orden que pasa a "En reparación": se pide qué técnico la hace
+  const [asignarTecnico, setAsignarTecnico] = useState(null);
   const [cajaAbierta, setCajaAbierta] = useState(false);
   const { user } = useAuth();
   const [showOrden, setShowOrden] = useState(null);
@@ -2199,6 +2397,10 @@ export default function Reparaciones() {
   }, []);
 
   const handleUpdate = async (id, data) => {
+    if (data.estado === "en_reparacion" && !data.tecnico_id) {
+      setAsignarTecnico(reparaciones.find((r) => r.id === id));
+      return;
+    }
     try {
       await reparacionesService.update(id, data);
       toast.success("Estado actualizado");
@@ -2219,6 +2421,10 @@ export default function Reparaciones() {
       return false;
     if (filtros.estado && r.estado !== filtros.estado) return false;
     if (filtros.cliente_id && r.cliente_id !== filtros.cliente_id) return false;
+    if (filtros.sucursal && r.sucursal !== filtros.sucursal) return false;
+    if (filtros.vendedor && r.vendedor_nombre !== filtros.vendedor) return false;
+    if (filtros.tecnico && r.tecnico_nombre !== filtros.tecnico) return false;
+    if (filtros.atrasadas && diasAtraso(r) === 0) return false;
     return true;
   });
 
@@ -2243,7 +2449,19 @@ export default function Reparaciones() {
   });
 
   const limpiarFiltros = () =>
-    setFiltros({ busqueda: "", estado: "", cliente_id: "" });
+    setFiltros({
+      busqueda: "",
+      estado: "",
+      cliente_id: "",
+      sucursal: "",
+      vendedor: "",
+      tecnico: "",
+      atrasadas: "",
+    });
+  // Opciones de los filtros de personal: los nombres que aparecen en las órdenes
+  const unicos = (campo) =>
+    [...new Set(reparaciones.map((r) => r[campo]).filter(Boolean))].sort();
+  const atrasadas = reparaciones.filter((r) => diasAtraso(r) > 0).length;
   const filtrosActivos = Object.values(filtros).some((v) => v !== "");
 
   const handleCancelar = async (id) => {
@@ -2331,7 +2549,7 @@ export default function Reparaciones() {
             </div>
 
             {showFiltros && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-white border border-gray-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
                     Estado
@@ -2370,7 +2588,53 @@ export default function Reparaciones() {
                     ))}
                   </select>
                 </div>
+                {[
+                  ["sucursal", "Sucursal de ingreso", SUCURSALES.map((o) => [o.value, o.label])],
+                  ["vendedor", "Atendió", unicos("vendedor_nombre").map((n) => [n, n])],
+                  ["tecnico", "Técnico", unicos("tecnico_nombre").map((n) => [n, n])],
+                ].map(([campo, titulo, opciones]) => (
+                  <div key={campo}>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">{titulo}</label>
+                    <select
+                      value={filtros[campo]}
+                      onChange={(e) => setFiltros({ ...filtros, [campo]: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Todos</option>
+                      {opciones.map(([v, t]) => (
+                        <option key={v} value={v}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer self-end pb-2">
+                  <input
+                    type="checkbox"
+                    checked={!!filtros.atrasadas}
+                    onChange={(e) => setFiltros({ ...filtros, atrasadas: e.target.checked ? "1" : "" })}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  Solo atrasadas
+                </label>
               </div>
+            )}
+
+            {atrasadas > 0 && !filtros.atrasadas && (
+              <button
+                type="button"
+                onClick={() => setFiltros({ ...filtros, atrasadas: "1" })}
+                className="w-full text-left bg-red-50 border border-red-200 rounded-2xl p-3 flex items-center gap-3 hover:bg-red-100/60 transition"
+              >
+                <AlertTriangle size={18} className="text-red-500 shrink-0" />
+                <span className="text-sm text-red-700">
+                  <span className="font-semibold">
+                    {atrasadas} {atrasadas === 1 ? "orden atrasada" : "órdenes atrasadas"}
+                  </span>{" "}
+                  (pasó la fecha estimada de entrega). <span className="underline">Ver solo esas</span>
+                </span>
+              </button>
             )}
           </div>
 
@@ -2486,6 +2750,18 @@ export default function Reparaciones() {
               }}
             />
           )}
+          {asignarTecnico && (
+            <AsignarTecnicoModal
+              reparacion={asignarTecnico}
+              onClose={() => setAsignarTecnico(null)}
+              onConfirmar={async (tecnico_id) => {
+                const r = asignarTecnico;
+                setAsignarTecnico(null);
+                await handleUpdate(r.id, { estado: "en_reparacion", tecnico_id });
+              }}
+            />
+          )}
+
           {showPago && (
             <PagoModal
               reparacion={showPago}

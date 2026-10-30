@@ -50,6 +50,7 @@ export default function TicketVenta({ venta, cliente }) {
       <div class="section">
         <p class="bold">Venta: ${venta.numero_venta}</p>
         <p>Fecha: ${formatDateTime(venta.fecha)}</p>
+        ${venta.vendedor_nombre ? `<p>Lo atendió: ${venta.vendedor_nombre}</p>` : ""}
         ${cliente ? `<p>Cliente: ${cliente.nombre} ${cliente.apellido || ""}</p>` : ""}
       </div>
       <div class="divider"></div>
@@ -121,6 +122,9 @@ export default function TicketVenta({ venta, cliente }) {
           Venta: {venta.numero_venta}
         </p>
         <p className="text-sm text-gray-600">{formatDateTime(venta.fecha)}</p>
+        {venta.vendedor_nombre && (
+          <p className="text-xs text-gray-500">Lo atendió: {venta.vendedor_nombre}</p>
+        )}
         {cliente && (
           <p className="text-sm text-gray-600">
             {cliente.nombre} {cliente.apellido || ""}

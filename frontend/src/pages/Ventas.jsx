@@ -40,6 +40,7 @@ import {
 } from "../utils/helpers";
 import CamposTarjeta from "../components/ui/CamposTarjeta";
 import { useTarjetas } from "../hooks/useTarjetas";
+import { usePersonal } from "../hooks/usePersonal";
 import { useAuth } from "../context/AuthContext";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
@@ -141,6 +142,17 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
   const [pagoMixto, setPagoMixto] = useState(false);
   const [pagos, setPagos] = useState([{ metodo: "efectivo", monto: 0 }]);
   const tarjetas = useTarjetas();
+  // Quién vendió: por defecto el usuario conectado; se puede elegir otro
+  // vendedor de la sucursal (por ejemplo, si cobra el cajero)
+  const personal = usePersonal();
+  const vendedores = personal.filter(
+    (p) =>
+      ["vendedor", "cajero", "administrador"].includes(p.rol) &&
+      (!sucursal || p.rol === "administrador" || p.sucursales?.includes(sucursal)),
+  );
+  const [vendedorId, setVendedorId] = useState(
+    ["vendedor", "cajero", "administrador"].includes(user?.rol) ? user?.id || "" : "",
+  );
   const [loading, setLoading] = useState(false);
   // Una clave por formulario abierto + bloqueo inmediato: un doble click no duplica la venta
   const claveVenta = useRef(
@@ -434,6 +446,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
     !mixtoExcede &&
     !sinCotizacion &&
     !faltaTarjeta &&
+    !!vendedorId &&
     !problemaImei;
 
   const handlePagoChange = (index, field, value) => {
@@ -526,6 +539,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
         ...form,
         cliente_id: form.cliente_id || null,
         clave_idempotencia: claveVenta.current,
+        vendedor_id: vendedorId || null,
         descuento: tipoAjuste === "descuento" ? montoAjuste : 0,
         total,
         tipo_ajuste: tipoAjuste,
@@ -808,15 +822,36 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
 
           {/* Derecha: cliente, ajuste, cobro */}
           <div className="min-h-0 p-6 space-y-4 lg:overflow-y-auto">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Cliente
-              </label>
-              <SelectorCliente
-                clientes={clientes}
-                value={form.cliente_id}
-                onChange={(id) => setForm({ ...form, cliente_id: id })}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_14rem] gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cliente
+                </label>
+                <SelectorCliente
+                  clientes={clientes}
+                  value={form.cliente_id}
+                  onChange={(id) => setForm({ ...form, cliente_id: id })}
+                />
+              </div>
+              <div>
+                <label htmlFor="venta-vendedor" className="block text-sm font-medium text-gray-700 mb-1">
+                  Vendió *
+                </label>
+                <select
+                  id="venta-vendedor"
+                  required
+                  value={vendedorId}
+                  onChange={(e) => setVendedorId(e.target.value)}
+                  className={inputBase}
+                >
+                  <option value="">Elegí quién vendió</option>
+                  {vendedores.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Ajuste */}
@@ -1183,6 +1218,9 @@ function FilaVenta({
         </td>
         <td className="px-6 py-4 text-sm  text-gray-600">
           {venta.sucursal === "sucursal_1" ? "Sucursal 1" : "Sucursal 2"}
+          {venta.vendedor_nombre && (
+            <span className="block text-xs text-gray-500">Vendió: {venta.vendedor_nombre}</span>
+          )}
         </td>
         <td className="col-num px-6 py-4 text-sm text-gray-600">
           {venta.items?.length || 0}
@@ -1343,6 +1381,7 @@ function CardVentaMobile({
             <BadgePago metodoPago={venta.metodo_pago} />
             <span className="text-xs text-gray-500">
               {venta.sucursal === "sucursal_1" ? "Sucursal 1" : "Sucursal 2"}
+              {venta.vendedor_nombre && ` · ${venta.vendedor_nombre}`}
             </span>
           </div>
         </div>
@@ -1512,6 +1551,7 @@ export default function Ventas() {
     fecha_hasta: "",
     producto: "",
     cliente_id: "",
+    vendedor: "",
     sucursal: "",
     estado: "",
   });
@@ -1589,6 +1629,7 @@ export default function Ventas() {
       fecha_hasta: "",
       producto: "",
       cliente_id: "",
+      vendedor: "",
       sucursal: "",
       estado: "",
     });
@@ -1611,6 +1652,7 @@ export default function Ventas() {
       !venta.metodo_pago?.includes(filtros.metodo_pago)
     )
       return false;
+    if (filtros.vendedor && venta.vendedor_nombre !== filtros.vendedor) return false;
     if (filtros.cliente_id && venta.cliente_id !== filtros.cliente_id)
       return false;
     if (filtros.fecha_desde) {
@@ -1789,6 +1831,23 @@ export default function Ventas() {
                 {clientes.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nombre} {c.apellido || ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Vendedor
+              </label>
+              <select
+                value={filtros.vendedor}
+                onChange={(e) => setFiltros({ ...filtros, vendedor: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Todos</option>
+                {[...new Set(ventas.map((v) => v.vendedor_nombre).filter(Boolean))].sort().map((n) => (
+                  <option key={n} value={n}>
+                    {n}
                   </option>
                 ))}
               </select>
