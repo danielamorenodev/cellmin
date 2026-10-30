@@ -380,7 +380,12 @@ async def update_repair(repair_id: str, repair: RepairUpdate, current_user: dict
     rol=current_user["role"],
     accion="actualizar",
     modulo="reparaciones",
-    descripcion=f"Reparación actualizada: {repair_id}"
+    descripcion=(
+        f"Orden {repair_doc.get('numero_orden', '')}: "
+        + (f"pasó a {NOMBRE_ESTADO.get(update_data['estado'], update_data['estado'])}"
+           + (f" (técnico: {update_data['tecnico_nombre']})" if update_data.get("tecnico_nombre") else "")
+           if update_data.get("estado") else "datos actualizados")
+    )
     )
 
     return format_repair(updated, current_user)

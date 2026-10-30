@@ -27,6 +27,14 @@ def dia_local(momento=None):
     return momento.astimezone(ZONA_AR).strftime("%Y-%m-%d")
 
 
+def inicio_dia_local(momento=None):
+    """Medianoche de hoy en Argentina, expresada en UTC sin zona (como se
+    guardan las fechas en la base)."""
+    momento = momento or datetime.now(timezone.utc)
+    local = momento.astimezone(ZONA_AR).replace(hour=0, minute=0, second=0, microsecond=0)
+    return local.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def es_admin(user):
     return user.get("role") == "administrador"
 

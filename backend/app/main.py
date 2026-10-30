@@ -14,6 +14,7 @@ from app.routers import cotizacion
 from app.routers import tarjetas
 from app.routers import remitos
 from app.routers import marcas
+from app.routers import actividad
 import traceback
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -30,7 +31,7 @@ def _fecha_utc(d: datetime) -> str:
 
 
 ENCODERS_BY_TYPE[datetime] = _fecha_utc
-from app.utils.logger import log_accesos, log_errores
+from app.utils.logger import log_accesos, log_errores, guardar_evento
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -79,6 +80,7 @@ app.include_router(cotizacion.router, prefix="/api/cotizacion", tags=["Cotizaci√
 app.include_router(tarjetas.router,      prefix="/api/tarjetas",    tags=["Tarjetas"])
 app.include_router(remitos.router,       prefix="/api/remitos",     tags=["Remitos"])
 app.include_router(marcas.router,        prefix="/api/marcas",      tags=["Marcas y modelos"])
+app.include_router(actividad.router,     prefix="/api/actividad",   tags=["Registro de actividad"])
 
 
 @app.middleware("http")
@@ -86,9 +88,14 @@ async def registrar_pedidos(request: Request, call_next):
     inicio = time.perf_counter()
     try:
         response = await call_next(request)
-    except Exception:
+    except Exception as error:
         log_errores.error(
             f"{request.method} {request.url.path}\n{traceback.format_exc()}"
+        )
+        await guardar_evento(
+            None, "error", "sistema", request.method,
+            f"{request.method} {request.url.path}: {type(error).__name__}: {str(error)[:200]}",
+            ip=request.client.host if request.client else None,
         )
         return JSONResponse(status_code=500, content={"detail": "Error interno del servidor"})
     ms = (time.perf_counter() - inicio) * 1000

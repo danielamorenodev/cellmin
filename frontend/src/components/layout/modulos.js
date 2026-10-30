@@ -91,6 +91,7 @@ export const MODULOS = [
       { label: "Usuarios", path: "/usuarios", roles: ["administrador"] },
       { label: "Medios de pago", path: "/medios-pago", roles: ["administrador"] },
       { label: "Dólar", path: "/dolar", roles: ["administrador"] },
+      { label: "Registro de actividad", path: "/actividad", roles: ["administrador"] },
     ],
   },
 ];

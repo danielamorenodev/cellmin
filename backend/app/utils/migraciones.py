@@ -11,7 +11,16 @@ async def aplanar_categorias(db):
     )
 
 
+async def indices_actividad(db):
+    """El registro de actividad se borra solo después de un año."""
+    try:
+        await db.actividad.create_index("fecha", expireAfterSeconds=365 * 24 * 3600)
+    except Exception:
+        pass
+
+
 async def aplicar_migraciones(db):
+    await indices_actividad(db)
     from app.utils.tarjetas import crear_tarjetas_iniciales
     await aplanar_categorias(db)
     await crear_tarjetas_iniciales(db)
