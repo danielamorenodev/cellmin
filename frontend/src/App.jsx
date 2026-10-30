@@ -20,6 +20,7 @@ import Usuarios from "./pages/Usuarios";
 import Reportes from "./pages/Reportes";
 import Dolar from "./pages/Dolar";
 import MediosPago from "./pages/MediosPago";
+import MarcasModelos from "./pages/MarcasModelos";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -176,6 +177,14 @@ export default function App() {
         element={
           <PrivateLayout>
             <MediosPago />
+          </PrivateLayout>
+        }
+      />
+      <Route
+        path="/marcas"
+        element={
+          <PrivateLayout>
+            <MarcasModelos />
           </PrivateLayout>
         }
       />

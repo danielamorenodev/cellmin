@@ -77,6 +77,8 @@ function generarHTML(reparacion, cliente, tipo) {
       <div style="margin-bottom:6px;">
         <p style="font-weight:bold;">Orden: ${reparacion.numero_orden}</p>
         <p>Ingreso: ${formatDateTime(reparacion.fecha_ingreso)}</p>
+        ${reparacion.fecha_estimada_entrega ? `<p>Entrega estimada: ${reparacion.fecha_estimada_entrega.split("-").reverse().join("/")}</p>` : ""}
+        ${reparacion.vendedor_nombre ? `<p>Atendió: ${reparacion.vendedor_nombre}</p>` : ""}
       </div>
 
       <div style="border-top:1px dashed #000; margin:6px 0;"></div>

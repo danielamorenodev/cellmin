@@ -32,6 +32,8 @@ class Pago(BaseModel):
 class RepairCreate(BaseModel):
     cliente_id: str
     equipo: Equipo
+    vendedor_id: Optional[str] = None             # quién tomó la orden (si no viene, el usuario conectado)
+    fecha_estimada_entrega: Optional[str] = None  # "AAAA-MM-DD"
     tipos_reparacion: List[TipoReparacionItem] = []
     sucursal: str = "sucursal_1"
     notas_internas: Optional[str] = None
@@ -45,6 +47,7 @@ class RepairUpdate(BaseModel):
     notas_internas: Optional[str] = None
     tecnico_id: Optional[str] = None
     garantia_dias: Optional[int] = None
+    fecha_estimada_entrega: Optional[str] = None  # "AAAA-MM-DD"
 
 class RepairResponse(BaseModel):
     id: str

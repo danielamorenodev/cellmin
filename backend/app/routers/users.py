@@ -20,6 +20,19 @@ def format_user(user):
         "fecha_creacion": user.get("fecha_creacion")
     }
 
+@router.get("/personal")
+async def personal(current_user: dict = Depends(get_current_user)):
+    """Personal activo (nombre, rol y sucursales, sin email) para elegir el
+    vendedor de una venta u orden y el técnico que repara."""
+    db = get_db()
+    users = await db.usuarios.find({"activo": True}, {"nombre": 1, "rol": 1, "sucursales": 1, "sucursal": 1}).to_list(200)
+    return [
+        {"id": str(u["_id"]), "nombre": u["nombre"], "rol": u["rol"],
+         "sucursales": u.get("sucursales", [u.get("sucursal", "sucursal_1")])}
+        for u in users
+    ]
+
+
 @router.get("/")
 async def get_users(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")

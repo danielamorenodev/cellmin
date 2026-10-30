@@ -13,6 +13,7 @@ import time
 from app.routers import cotizacion
 from app.routers import tarjetas
 from app.routers import remitos
+from app.routers import marcas
 import traceback
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -77,6 +78,7 @@ app.include_router(repair_types.router, prefix="/api/repair-types", tags=["Tipos
 app.include_router(cotizacion.router, prefix="/api/cotizacion", tags=["Cotización"])
 app.include_router(tarjetas.router,      prefix="/api/tarjetas",    tags=["Tarjetas"])
 app.include_router(remitos.router,       prefix="/api/remitos",     tags=["Remitos"])
+app.include_router(marcas.router,        prefix="/api/marcas",      tags=["Marcas y modelos"])
 
 
 @app.middleware("http")

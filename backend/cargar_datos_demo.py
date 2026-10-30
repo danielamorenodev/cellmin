@@ -226,8 +226,12 @@ class Demo:
         efectivo = sum(m["monto"] for m in montos if m["metodo"] == "efectivo")
         await self.api("POST", "/api/cash/cerrar", quien, {"montos_por_metodo": montos, "dejar_en_caja": min(dejar, efectivo)})
 
-    async def orden(self, quien, cliente, marca, modelo, tipo, problema, bloqueo=("ninguno", None), sena=None, sucursal="sucursal_1"):
-        datos = {"cliente_id": cliente, "sucursal": sucursal, "tipos_reparacion": [tipo],
+    async def orden(self, quien, cliente, marca, modelo, tipo, problema, bloqueo=("ninguno", None), sena=None,
+                    sucursal="sucursal_1", estimada=3):
+        # estimada: días desde HOY (real) para la fecha de entrega prometida;
+        # negativo = la orden ya está atrasada
+        fecha = (datetime.now().date() + timedelta(days=estimada)).isoformat()
+        datos = {"cliente_id": cliente, "sucursal": sucursal, "tipos_reparacion": [tipo], "fecha_estimada_entrega": fecha,
                  "equipo": {"marca": marca, "modelo": modelo, "imei": imei_valido(self.rnd), "problema_descripcion": problema,
                             "bloqueo_tipo": bloqueo[0], "bloqueo_valor": bloqueo[1]}}
         if sena:
@@ -333,14 +337,14 @@ class Demo:
                 await self.venta(C2, [("Motorola Moto G24 128 GB", None, 1), ("Funda silicona Samsung A15", "Negro", 1)], pago="credito", cliente=cl[1])
             if atras == 5:  # reparación completa: ingreso con seña, taller, cobro y entrega
                 o = await self.orden(C2, cl[0], "Samsung", "Galaxy A15", self.tipos[0], "Pantalla rota, no responde al tacto",
-                                     ("patron", "1-5-9-6"), sena=30000, sucursal="sucursal_2")
+                                     ("patron", "1-5-9-6"), sena=30000, sucursal="sucursal_2", estimada=-3)
                 await self.estado(o, "ingresada", "en_reparacion", "lista")
                 pendientes.append(("entregar", o))
             if atras == 3:
                 for accion, o in pendientes:
                     await self.cobrar_y_entregar(C2, o)
                 o = await self.orden(C1, cl[2], "Apple", "iPhone 12", self.tipos[1], "La batería dura menos de medio día",
-                                     ("pin", "4821"), sena=20000)
+                                     ("pin", "4821"), sena=20000, estimada=-1)
                 await self.estado(o, "ingresada", "en_reparacion")
             if atras == 2:
                 await self.api("POST", "/api/stock/movimiento", "deposito@cellmin-demo.com", {
@@ -348,15 +352,25 @@ class Demo:
                     "cantidad": 2, "sucursal": "sucursal_1", "motivo": "ajuste_manual", "notas": "Conteo semanal: una funda dañada"})
             if atras == 1:
                 o = await self.orden(C1, cl[3], "Motorola", "Moto G24", self.tipos[2], "No carga, hay que mover el cable",
-                                     ("patron", "7-4-1-2-3"), sena=10000)
+                                     ("patron", "7-4-1-2-3"), sena=10000, estimada=0)
                 await self.estado(o, "ingresada", "en_reparacion", "lista")
-                o = await self.orden(C2, cl[4], "Samsung", "Galaxy A54", self.tipos[3], "Se apaga solo", sucursal="sucursal_2")
+                o = await self.orden(C2, cl[4], "Samsung", "Galaxy A54", self.tipos[3], "Se apaga solo", sucursal="sucursal_2",
+                                     estimada=1)
             await self.cerrar(C1)
             await self.cerrar(C2)
             await self.correr_dias(antes, inicio, atras)
         await self.dolar(valor[0])
         # una orden recién ingresada hoy, sin seña (no hace falta caja abierta)
         await self.orden(V, cl[5], "Xiaomi", "Redmi Note 13", self.tipos[3], "Se mojó; no enciende")
+        # Tarjetas y marcas para mostrar en la demo (datos de ejemplo: los
+        # recargos reales los carga el local en Configuración → Medios de pago)
+        from app.utils.tarjetas import crear_tarjetas_iniciales
+        from app.utils.marcas import cargar_marcas_iniciales
+        await crear_tarjetas_iniciales(self.db)
+        for nombre in ("Visa", "Mastercard"):
+            await self.db.tarjetas.update_one({"nombre": nombre}, {"$set": {"planes": [
+                {"cuotas": 1, "recargo": 0}, {"cuotas": 3, "recargo": 10}, {"cuotas": 6, "recargo": 20}]}})
+        await cargar_marcas_iniciales(self.db)
 
 
 async def principal():

@@ -45,6 +45,11 @@ export const MODULOS = [
         path: "/reparaciones?vista=tipos",
         roles: ["administrador", "cajero", "vendedor", "tecnico"],
       },
+      {
+        label: "Marcas y modelos",
+        path: "/marcas",
+        roles: ["administrador", "cajero", "vendedor", "tecnico"],
+      },
     ],
   },
   {

@@ -15,3 +15,5 @@ async def aplicar_migraciones(db):
     from app.utils.tarjetas import crear_tarjetas_iniciales
     await aplanar_categorias(db)
     await crear_tarjetas_iniciales(db)
+    from app.utils.marcas import cargar_marcas_iniciales
+    await cargar_marcas_iniciales(db)
