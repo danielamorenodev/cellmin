@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   X,
+  PlusCircle,
   Filter,
   ExternalLink,
   Printer,
@@ -34,7 +35,11 @@ import {
   nombreSucursal,
   parsearMetodoPago,
   stockEn,
+  recargoTarjeta,
+  MEDIOS_UNICOS,
 } from "../utils/helpers";
+import CamposTarjeta from "../components/ui/CamposTarjeta";
+import { useTarjetas } from "../hooks/useTarjetas";
 import { useAuth } from "../context/AuthContext";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
@@ -135,6 +140,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
   const [porcentajeAjuste, setPorcentajeAjuste] = useState(0);
   const [pagoMixto, setPagoMixto] = useState(false);
   const [pagos, setPagos] = useState([{ metodo: "efectivo", monto: 0 }]);
+  const tarjetas = useTarjetas();
   const [loading, setLoading] = useState(false);
   // Una clave por formulario abierto + bloqueo inmediato: un doble click no duplica la venta
   const claveVenta = useRef(
@@ -400,6 +406,19 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
     (!hayUSD || diferencia > enEfectivo + 0.01);
   const sinCotizacion = hayUSD && !cotizacion.disponible;
 
+  // Tarjetas: cada pago con débito o crédito indica la tarjeta (si hay
+  // tarjetas cargadas) y, en crédito, las cuotas, que pueden tener recargo
+  const baseDe = (p) => (pagoMixto ? pesosDe(p) : total);
+  const recargos = pagos.map((p) => recargoTarjeta(p, tarjetas, baseDe(p)).monto);
+  const recargoTotal = Math.round(recargos.reduce((a, b) => a + b, 0) * 100) / 100;
+  const totalACobrar = total + recargoTotal;
+  const faltaTarjeta = pagos.some(
+    (p) =>
+      (p.metodo === "debito" || p.metodo === "credito") &&
+      tarjetas.some((t) => t[p.metodo]) &&
+      !p.tarjeta_id,
+  );
+
   useEffect(() => {
     const p = pagos[0];
     if (!pagoMixto && (p?.metodo === "efectivo" || p?.metodo === "usd") && !montoEditado) {
@@ -414,6 +433,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
     faltaCobrar === null &&
     !mixtoExcede &&
     !sinCotizacion &&
+    !faltaTarjeta &&
     !problemaImei;
 
   const handlePagoChange = (index, field, value) => {
@@ -424,6 +444,11 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
     const newPagos = [...pagos];
     const anterior = newPagos[index];
     newPagos[index] = { ...anterior, [field]: value };
+    // Al cambiar de medio se vuelve a elegir la tarjeta
+    if (field === "metodo") {
+      newPagos[index].tarjeta_id = "";
+      newPagos[index].cuotas = 1;
+    }
     // Si se cambia entre dólares y otro medio, se conserva el valor en pesos
     if (field === "metodo" && esUSD(anterior) !== (value === "usd")) {
       newPagos[index].monto = pagoMixto
@@ -441,6 +466,21 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
     }
     setPagos(newPagos);
   };
+
+  const cambiarTarjeta = (index, datos) =>
+    setPagos(pagos.map((p, i) => (i === index ? { ...p, ...datos } : p)));
+
+  // Pago mixto: se pueden sumar más medios. Efectivo y dólares, una sola vez.
+  const usadoEnOtro = (metodo, index) =>
+    MEDIOS_UNICOS.includes(metodo) && pagos.some((p, i) => i !== index && p.metodo === metodo);
+  const agregarPago = () => {
+    const libre = ["transferencia", "debito", "credito", "efectivo"].find(
+      (m) => !usadoEnOtro(m, -1),
+    );
+    const resto = Math.max(0, total - pagadoPesos);
+    setPagos([...pagos, { metodo: libre, monto: Math.round(resto * 100) / 100 }]);
+  };
+  const quitarPago = (index) => setPagos(pagos.filter((_, i) => i !== index));
 
   const togglePagoMixto = (value) => {
     setMontoEditado(false);
@@ -493,6 +533,8 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
         pagos: pagos.map((p) => ({
           metodo: p.metodo,
           monto: parseFloat(p.monto) || 0,
+          tarjeta_id: p.tarjeta_id || null,
+          cuotas: p.metodo === "credito" ? Number(p.cuotas) || 1 : null,
         })),
         metodo_pago,
         items: carrito.map((item) => ({
@@ -848,7 +890,21 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                 </label>
               </div>
               {pagos.map((pago, index) => (
-                <div key={index} className="grid grid-cols-2 gap-2">
+                <div
+                  key={index}
+                  className={`grid grid-cols-2 gap-2 ${pagoMixto ? "relative bg-white border border-gray-200 rounded-xl p-2 pr-8" : ""}`}
+                >
+                  {pagoMixto && pagos.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => quitarPago(index)}
+                      aria-label="Quitar este medio de pago"
+                      title="Quitar este medio de pago"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                   <select
                     value={pago.metodo}
                     onChange={(e) =>
@@ -859,8 +915,13 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                     {METODOS_PAGO.filter(
                       (m) => m.value !== "usd" || cotizacion.disponible,
                     ).map((m) => (
-                      <option key={m.value} value={m.value}>
+                      <option
+                        key={m.value}
+                        value={m.value}
+                        disabled={usadoEnOtro(m.value, index)}
+                      >
                         {m.label}
+                        {usadoEnOtro(m.value, index) ? " (ya cargado)" : ""}
                       </option>
                     ))}
                   </select>
@@ -889,6 +950,13 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                       </span>
                     </div>
                   )}
+                  <CamposTarjeta
+                    pago={pago}
+                    tarjetas={tarjetas}
+                    base={baseDe(pago)}
+                    onChange={(datos) => cambiarTarjeta(index, datos)}
+                    className="col-span-2"
+                  />
                   {esUSD(pago) && (
                     <p className="col-span-2 text-xs text-gray-500">
                       Equivale a{" "}
@@ -900,6 +968,15 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                   )}
                 </div>
               ))}
+              {pagoMixto && pagos.length < 5 && (
+                <button
+                  type="button"
+                  onClick={agregarPago}
+                  className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+                >
+                  <PlusCircle size={15} /> Agregar otro medio de pago
+                </button>
+              )}
               {vuelto !== null && hayUSD && (
                 <p className="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">
                   El vuelto de {formatCurrency(vuelto)} se entrega en pesos.
@@ -967,9 +1044,15 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
             <div>
               <p className="text-xs text-gray-500">Total a cobrar</p>
               <p className="text-xl font-bold text-gray-800">
-                {formatCurrency(total)}
+                {formatCurrency(totalACobrar)}
               </p>
-              <PrecioUSD pesos={total} />
+              {recargoTotal > 0 ? (
+                <p className="text-xs text-orange-600">
+                  Incluye recargo tarjeta {formatCurrency(recargoTotal)}
+                </p>
+              ) : (
+                <PrecioUSD pesos={total} />
+              )}
             </div>
             <div>
               {vuelto !== null && (
@@ -1005,7 +1088,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
           >
             {loading
               ? "Registrando..."
-              : `Confirmar venta — ${formatCurrency(total)}`}
+              : `Confirmar venta — ${formatCurrency(totalACobrar)}`}
           </button>
         </div>
       </div>

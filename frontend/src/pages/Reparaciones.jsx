@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { tiposReparacionService } from "../services/tiposReparacion.service";
 import InputNumero from "../components/ui/InputNumero";
 import { useCotizacion } from "../hooks/useCotizacion";
@@ -21,6 +22,7 @@ import {
   Trash2,
   Wrench,
   X,
+  PlusCircle,
 } from "lucide-react";
 import { reparacionesService } from "../services/reparaciones.service";
 import { clientesService } from "../services/clientes.service";
@@ -32,7 +34,11 @@ import {
   METODOS_PAGO,
   etiquetaPago,
   ESTADOS_REP,
+  recargoTarjeta,
+  MEDIOS_UNICOS,
 } from "../utils/helpers";
+import CamposTarjeta from "../components/ui/CamposTarjeta";
+import { useTarjetas } from "../hooks/useTarjetas";
 import { cajaService } from "../services/caja.service";
 import { useAuth } from "../context/AuthContext";
 import { useSucursales } from "../hooks/useSucursales";
@@ -314,8 +320,9 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
   });
   const [loading, setLoading] = useState(false);
   const [cobrarSena, setCobrarSena] = useState(false);
-  const [sena, setSena] = useState({ monto: "", metodo: "efectivo" });
+  const [sena, setSena] = useState({ monto: "", metodo: "efectivo", tarjeta_id: "", cuotas: 1 });
   const cotizacion = useCotizacion();
+  const tarjetas = useTarjetas();
 
   useEffect(() => {
     Promise.all([
@@ -399,6 +406,14 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
         toast.error("La seña no puede superar el total");
         return;
       }
+      if (
+        (sena.metodo === "debito" || sena.metodo === "credito") &&
+        tarjetas.some((t) => t[sena.metodo]) &&
+        !sena.tarjeta_id
+      ) {
+        toast.error("Elegí la tarjeta con la que se paga la seña");
+        return;
+      }
     }
     setLoading(true);
     try {
@@ -406,7 +421,16 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
         ...form,
         tipos_reparacion: tiposSeleccionados,
         estado: estadoFinal,
-        ...(senaActiva ? { sena: { monto: montoIngresado, metodo: sena.metodo } } : {}),
+        ...(senaActiva
+          ? {
+              sena: {
+                monto: montoIngresado,
+                metodo: sena.metodo,
+                tarjeta_id: sena.tarjeta_id || null,
+                cuotas: sena.metodo === "credito" ? Number(sena.cuotas) || 1 : null,
+              },
+            }
+          : {}),
       });
       toast.success(
         senaActiva
@@ -754,7 +778,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                               (nuevo === "usd") !== senaEsUSD && sena.monto !== ""
                                 ? desdePesos(nuevo, senaEnPesos)
                                 : sena.monto;
-                            setSena({ monto, metodo: nuevo });
+                            setSena({ monto, metodo: nuevo, tarjeta_id: "", cuotas: 1 });
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         >
@@ -768,6 +792,12 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                         </select>
                       </div>
                     </div>
+                    <CamposTarjeta
+                      pago={sena}
+                      tarjetas={tarjetas}
+                      base={montoSena}
+                      onChange={(datos) => setSena({ ...sena, ...datos })}
+                    />
                     {senaEsUSD && (
                       <p className="text-xs text-gray-500">
                         Equivale a{" "}
@@ -979,6 +1009,7 @@ function PagoModal({ reparacion, onClose, onSave }) {
   const [pagoMixto, setPagoMixto] = useState(false);
   const [pagos, setPagos] = useState([{ metodo: "efectivo", monto: saldo }]);
   const [loading, setLoading] = useState(false);
+  const tarjetas = useTarjetas();
 
   // Con medio "dólares" el monto es en US$; se compara en pesos con el dólar
   // blue y lo que supere el saldo se devuelve en pesos.
@@ -1008,6 +1039,10 @@ function PagoModal({ reparacion, onClose, onSave }) {
     const newPagos = [...pagos];
     const anterior = newPagos[index];
     newPagos[index] = { ...anterior, [field]: value };
+    if (field === "metodo") {
+      newPagos[index].tarjeta_id = "";
+      newPagos[index].cuotas = 1;
+    }
     // Al pasar de/hacia dólares se conserva el valor en pesos
     if (
       field === "metodo" &&
@@ -1034,8 +1069,36 @@ function PagoModal({ reparacion, onClose, onSave }) {
       (diferencia > 0.01 && (!hayUSD || diferencia > enEfectivo + 0.01)));
   const sinCotizacion = hayUSD && !cotizacion.disponible;
 
+  // Tarjetas: cuál y, en crédito, cuotas (el recargo se cobra aparte del saldo)
+  const recargoTotal =
+    Math.round(
+      pagos.reduce((acc, p) => acc + recargoTarjeta(p, tarjetas, pesosDe(p)).monto, 0) * 100,
+    ) / 100;
+  const faltaTarjeta = pagos.some(
+    (p) =>
+      (p.metodo === "debito" || p.metodo === "credito") &&
+      tarjetas.some((t) => t[p.metodo]) &&
+      !p.tarjeta_id,
+  );
+  const cambiarTarjeta = (index, datos) =>
+    setPagos(pagos.map((p, i) => (i === index ? { ...p, ...datos } : p)));
+  // Mixto: efectivo y dólares una sola vez; tarjetas y transferencias, varias
+  const usadoEnOtro = (metodo, index) =>
+    MEDIOS_UNICOS.includes(metodo) && pagos.some((p, i) => i !== index && p.metodo === metodo);
+  const agregarPago = () => {
+    const libre = ["transferencia", "debito", "credito", "efectivo"].find(
+      (m) => !usadoEnOtro(m, -1),
+    );
+    const resto = Math.max(0, saldo - totalPagado);
+    setPagos([...pagos, { metodo: libre, monto: Math.round(resto * 100) / 100 }]);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (faltaTarjeta) {
+      toast.error("Elegí la tarjeta con la que se paga");
+      return;
+    }
     if (mixtoInvalido) {
       toast.error(
         `El total pagado (${formatCurrency(totalPagado)}) no coincide con el saldo (${formatCurrency(saldo)})`,
@@ -1058,6 +1121,8 @@ function PagoModal({ reparacion, onClose, onSave }) {
           monto: parseFloat(pago.monto),
           tipo: "total",
           metodo: pago.metodo,
+          tarjeta_id: pago.tarjeta_id || null,
+          cuotas: pago.metodo === "credito" ? Number(pago.cuotas) || 1 : null,
         });
       }
       toast.success(
@@ -1116,7 +1181,21 @@ function PagoModal({ reparacion, onClose, onSave }) {
 
           <div className="space-y-2">
             {pagos.map((pago, index) => (
-              <div key={index} className="grid grid-cols-2 gap-2">
+              <div
+                key={index}
+                className={`grid grid-cols-2 gap-2 ${pagoMixto ? "relative border border-gray-200 rounded-xl p-2 pr-8" : ""}`}
+              >
+                {pagoMixto && pagos.length > 2 && (
+                  <button
+                    type="button"
+                    onClick={() => setPagos(pagos.filter((_, i) => i !== index))}
+                    aria-label="Quitar este medio de pago"
+                    title="Quitar este medio de pago"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-red-600"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
                 <select
                   value={pago.metodo}
                   onChange={(e) =>
@@ -1127,8 +1206,9 @@ function PagoModal({ reparacion, onClose, onSave }) {
                   {METODOS_PAGO.filter(
                     (m) => m.value !== "usd" || cotizacion.disponible,
                   ).map((m) => (
-                    <option key={m.value} value={m.value}>
+                    <option key={m.value} value={m.value} disabled={usadoEnOtro(m.value, index)}>
                       {m.label}
+                      {usadoEnOtro(m.value, index) ? " (ya cargado)" : ""}
                     </option>
                   ))}
                 </select>
@@ -1138,6 +1218,13 @@ function PagoModal({ reparacion, onClose, onSave }) {
                     handlePagoChange(index, "monto", v)}
                   placeholder={esUSD(pago) ? "US$ 0.00" : "$ 0.00"}
                   className="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <CamposTarjeta
+                  pago={pago}
+                  tarjetas={tarjetas}
+                  base={pesosDe(pago)}
+                  onChange={(datos) => cambiarTarjeta(index, datos)}
+                  className="col-span-2"
                 />
                 {esUSD(pago) && (
                   <p className="col-span-2 text-xs text-gray-500">
@@ -1151,6 +1238,16 @@ function PagoModal({ reparacion, onClose, onSave }) {
               </div>
             ))}
           </div>
+
+          {pagoMixto && pagos.length < 5 && (
+            <button
+              type="button"
+              onClick={agregarPago}
+              className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
+            >
+              <PlusCircle size={15} /> Agregar otro medio de pago
+            </button>
+          )}
 
           {vuelto && (
             <p className="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2">
@@ -1200,7 +1297,9 @@ function PagoModal({ reparacion, onClose, onSave }) {
               disabled={loading}
               className="flex-1 py-2 bg-green-600 text-white rounded-xl text-sm hover:bg-green-700 disabled:bg-green-400 transition"
             >
-              {loading ? "Registrando..." : `Cobrar ${formatCurrency(saldo)}`}
+              {loading
+                ? "Registrando..."
+                : `Cobrar ${formatCurrency(saldo + recargoTotal)}`}
             </button>
           </div>
         </form>
@@ -2047,7 +2146,9 @@ function GestionTiposReparacion() {
 }
 
 export default function Reparaciones() {
-  const [tab, setTab] = useState("reparaciones");
+  // La vista sale de la dirección (?vista=...): la eligen el menú y las pestañas del módulo
+  const [params] = useSearchParams();
+  const tab = params.get("vista") === "tipos" ? "tipos" : "reparaciones";
   const [reparaciones, setReparaciones] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [tiposDisponibles, setTiposDisponibles] = useState([]);
@@ -2169,31 +2270,9 @@ export default function Reparaciones() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Reparaciones</h1>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
-        <button
-          onClick={() => setTab("reparaciones")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-            tab === "reparaciones"
-              ? "bg-white shadow text-gray-800"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Reparaciones
-        </button>
-        <button
-          onClick={() => setTab("tipos")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-            tab === "tipos"
-              ? "bg-white shadow text-gray-800"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Tipos de Reparación
-        </button>
+        <h1 className="text-2xl font-bold text-gray-800">
+          {tab === "tipos" ? "Tipos de reparación" : "Reparaciones"}
+        </h1>
       </div>
 
       {tab === "tipos" ? (

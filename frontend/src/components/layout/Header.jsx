@@ -22,6 +22,7 @@ export default function Header() {
     cajero: "Cajero",
     vendedor: "Vendedor",
     deposito: "Depósito",
+    tecnico: "Técnico",
   };
 
   return (

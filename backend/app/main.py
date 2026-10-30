@@ -11,6 +11,7 @@ from app.routers import (
 from app.routers import repair_types
 import time
 from app.routers import cotizacion
+from app.routers import tarjetas
 import traceback
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -35,6 +36,8 @@ async def lifespan(app: FastAPI):
     from app.database import get_db
     from app.utils.stock import migrar_stock_por_sucursal
     await migrar_stock_por_sucursal(get_db())
+    from app.utils.migraciones import aplicar_migraciones
+    await aplicar_migraciones(get_db())
     yield
     await close_db()
 
@@ -71,6 +74,7 @@ app.include_router(reports.router,       prefix="/api/reports",     tags=["Repor
 app.include_router(backup.router,        prefix="/api/backup",      tags=["Backup"])
 app.include_router(repair_types.router, prefix="/api/repair-types", tags=["Tipos de Reparación"])
 app.include_router(cotizacion.router, prefix="/api/cotizacion", tags=["Cotización"])
+app.include_router(tarjetas.router,      prefix="/api/tarjetas",    tags=["Tarjetas"])
 
 
 @app.middleware("http")

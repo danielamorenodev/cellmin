@@ -5,6 +5,7 @@ from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
+import re
 
 router = APIRouter()
 
@@ -13,7 +14,6 @@ def format_cat(c):
         "id": str(c["_id"]),
         "nombre": c["nombre"],
         "descripcion": c.get("descripcion"),
-        "categoria_padre_id": c.get("categoria_padre_id"),
         "activo": c.get("activo", True)
     }
 
@@ -31,12 +31,13 @@ async def create_category(cat: CategoryCreate, current_user: dict = Depends(get_
     check_permission(current_user["role"], "categorias:create")
     db = get_db()
     existing = await db.categorias.find_one({
-        "nombre": {"$regex": f"^{cat.nombre}$", "$options": "i"}
+        "nombre": {"$regex": f"^{re.escape(cat.nombre.strip())}$", "$options": "i"}
     })
     if existing:
         raise HTTPException(status_code=400, detail=f"Ya existe una categoría con el nombre '{cat.nombre}'")
     new_cat = {
-        **cat.dict(),
+        "nombre": cat.nombre.strip(),
+        "descripcion": cat.descripcion,
         "activo": True,
         "fecha_creacion": datetime.utcnow()
     }
@@ -50,7 +51,7 @@ async def update_category(cat_id: str, cat: CategoryUpdate, current_user: dict =
     db = get_db()
     if cat.nombre:
         existing = await db.categorias.find_one({
-            "nombre": {"$regex": f"^{cat.nombre}$", "$options": "i"},
+            "nombre": {"$regex": f"^{re.escape(cat.nombre.strip())}$", "$options": "i"},
             "_id": {"$ne": ObjectId(cat_id)}
         })
         if existing:
@@ -58,10 +59,8 @@ async def update_category(cat_id: str, cat: CategoryUpdate, current_user: dict =
     update_data = {}
     cat_dict = cat.dict()
     for k, v in cat_dict.items():
-        if k == "categoria_padre_id":
-            update_data[k] = None if (v is None or v == '__CLEAR__') else v
-        elif v is not None:
-            update_data[k] = v
+        if v is not None:
+            update_data[k] = v.strip() if k == "nombre" else v
     await db.categorias.update_one({"_id": ObjectId(cat_id)}, {"$set": update_data})
     updated = await db.categorias.find_one({"_id": ObjectId(cat_id)})
     return format_cat(updated)

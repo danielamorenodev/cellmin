@@ -116,32 +116,12 @@ export const imeiValido = (imei) => {
   return suma % 10 === 0;
 };
 
-// ¿La categoría (o alguna categoría padre) es de celulares?
-export const esCategoriaCelulares = (categorias, id) => {
-  let actual = categorias.find((c) => c.id === id);
-  for (let n = 0; actual && n < 10; n++) {
-    if (/celular/i.test(actual.nombre || "")) return true;
-    actual = categorias.find((c) => c.id === actual.categoria_padre_id);
-  }
-  return false;
-};
+// ¿La categoría es de celulares?
+export const esCategoriaCelulares = (categorias, id) =>
+  /celular/i.test(categorias.find((c) => c.id === id)?.nombre || "");
 
-// Ids de una categoría y de todas sus subcategorías (a cualquier nivel).
-// Así, filtrar por "Celulares" muestra también los productos de "Samsung", etc.
-export const idsConSubcategorias = (categorias, id) => {
-  const ids = new Set([id]);
-  let agregado = true;
-  while (agregado) {
-    agregado = false;
-    for (const c of categorias) {
-      if (c.categoria_padre_id && ids.has(c.categoria_padre_id) && !ids.has(c.id)) {
-        ids.add(c.id);
-        agregado = true;
-      }
-    }
-  }
-  return ids;
-};
+// Ids elegidos en un filtro de varias opciones (guardados como "a,b,c")
+export const idsFiltro = (value) => (value ? value.split(",") : []);
 
 export const formatInputMoneda = (valor) => {
   // Permitir solo números, punto y coma
@@ -174,10 +154,12 @@ export const parsearMetodoPago = (texto) => {
   if (!texto) return { esMixto: false, partes: [] };
   const partes = texto.split(" + ").map((parte) => {
     const [metodo, ...resto] = parte.split(": ");
-    const clave = metodo.trim();
+    // "credito (Visa 3 cuotas)": medio y, entre paréntesis, la tarjeta
+    const [, clave, detalle] = metodo.trim().match(/^([^(]+?)\s*(?:\((.*)\))?$/) || [null, metodo.trim()];
     const info = METODOS_PAGO.find((m) => m.value === clave);
+    const nombre = info ? info.label : clave;
     return {
-      metodo: info ? info.label : clave,
+      metodo: detalle ? `${nombre} (${detalle})` : nombre,
       monto: resto.length ? resto.join(": ") : null,
     };
   });
@@ -208,8 +190,32 @@ export const describirPago = (venta) => {
   };
 };
 
-// Medio de pago de un cobro de reparación; si fue en dólares, cuántos
+// Tarjeta de un pago: "Visa 3 cuotas" / "Visa"
+export const textoTarjeta = (pago) =>
+  !pago?.tarjeta
+    ? ""
+    : pago.metodo === "credito" && (pago.cuotas || 1) > 1
+      ? `${pago.tarjeta} ${pago.cuotas} cuotas`
+      : pago.tarjeta;
+
+// Medio de pago de un cobro de reparación; si fue en dólares, cuántos, y si
+// fue con tarjeta, cuál
 export const etiquetaPago = (pago) =>
   pago.metodo === "usd" && pago.usd != null
     ? `Dólares (${formatUSD(pago.usd)})`
-    : pago.metodo;
+    : pago.tarjeta
+      ? `${METODOS_PAGO.find((m) => m.value === pago.metodo)?.label || pago.metodo} (${textoTarjeta(pago)})`
+      : pago.metodo;
+
+// Recargo de un pago con tarjeta de crédito en cuotas, sobre "base" pesos
+export const recargoTarjeta = (pago, tarjetas, base) => {
+  if (pago?.metodo !== "credito" || !pago.tarjeta_id) return { pct: 0, monto: 0 };
+  const t = tarjetas.find((x) => x.id === pago.tarjeta_id);
+  const plan = t?.planes.find((p) => p.cuotas === Number(pago.cuotas || 1));
+  const pct = plan?.recargo || 0;
+  return { pct, monto: Math.round(base * pct) / 100 };
+};
+
+// Efectivo y dólares van una sola vez por cobro; tarjetas y transferencias
+// se pueden repetir (por ejemplo, dos tarjetas distintas)
+export const MEDIOS_UNICOS = ["efectivo", "usd"];

@@ -10,7 +10,9 @@ from app.utils import imei as imei_util
 from app.utils.stock import stock_en, aplicar_delta, descontar_varios
 from app.utils.cajas import caja_para_vender, exigir_dueno_o_admin
 from app.utils.idempotencia import resultado_previo, reclamar_clave, guardar_resultado, liberar_clave
+from app.utils.tarjetas import datos_tarjeta, texto_tarjeta
 from app.utils.pagos import (
+    validar_medios_unicos,
     METODOS_VALIDOS,
     USD,
     cotizacion_para_cobro,
@@ -190,6 +192,7 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
         for p in sale.pagos:
             if p.metodo not in METODOS_VALIDOS:
                 raise HTTPException(status_code=400, detail=f"Medio de pago inválido: {p.metodo}")
+        validar_medios_unicos([p.metodo for p in sale.pagos])
         usa_usd = any(p.metodo == USD for p in sale.pagos)
         if usa_usd:
             cotizacion = await cotizacion_para_cobro(db)
@@ -252,6 +255,29 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
         metodo_pago = sale.metodo_pago
         pagos_venta = [{"metodo": metodo_pago, "monto": total}]
 
+    # 4b. Tarjetas: cuál se usó, cuotas y recargo. El recargo se suma a lo
+    #     que se cobra en esa tarjeta y al total de la venta.
+    if sale.pagos:
+        for entrada, pv in zip(sale.pagos, pagos_venta):
+            extra = await datos_tarjeta(db, pv["metodo"], entrada.tarjeta_id, entrada.cuotas, pv["monto"])
+            if extra:
+                pv.update(extra)
+                pv["monto"] = redondear(pv["monto"] + extra["recargo"])
+        recargo_tarjeta = redondear(sum(pv.get("recargo", 0) for pv in pagos_venta))
+        if recargo_tarjeta or any(pv.get("tarjeta") for pv in pagos_venta):
+            total = redondear(total + recargo_tarjeta)
+
+            def texto_con_tarjeta(p):
+                if p["metodo"] == USD:
+                    return f"usd: {formato_usd(p['usd'])}"
+                tarjeta = texto_tarjeta(p)
+                return f"{p['metodo']}{' (' + tarjeta + ')' if tarjeta else ''}: {formato_monto(p['monto'])}"
+
+            if len(pagos_venta) > 1:
+                metodo_pago = " + ".join(texto_con_tarjeta(p) for p in pagos_venta)
+            elif pagos_venta[0].get("tarjeta"):
+                metodo_pago = f"{pagos_venta[0]['metodo']} ({texto_tarjeta(pagos_venta[0])})"
+
     # 5. Registrar la venta (una sola vez por clave: un doble click no duplica)
     previa = await reclamar_clave(db, sale.clave_idempotencia, "venta")
     if previa:
@@ -310,6 +336,7 @@ async def _guardar_venta(db, sale, current_user, items_finales, subtotal, porcen
         "descuento": descuento,
         "interes": interes,
         "total": total,
+        "recargo_tarjeta": redondear(sum(p.get("recargo", 0) for p in pagos_venta)),
         "metodo_pago": metodo_pago,
         "pagos": pagos_venta,
         "vuelto": vuelto,
