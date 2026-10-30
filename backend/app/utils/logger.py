@@ -61,6 +61,39 @@ def _limpiar(valor, profundidad=0):
     return valor
 
 
+async def guardar_evento(db=None, tipo="actividad", modulo="", accion="", descripcion="",
+                         usuario_id="", usuario_nombre="", rol="", ip=None, detalle=None):
+    """Guarda el evento en la base (colección 'actividad') para verlo desde
+    Configuración → Registro de actividad. Nunca rompe la operación.
+    tipo: actividad | ingreso_fallido | error"""
+    try:
+        if db is None:
+            from app.database import get_db
+            db = get_db()
+        if db is None:
+            return
+        if usuario_id and not usuario_nombre:
+            from bson import ObjectId
+            if ObjectId.is_valid(usuario_id):
+                u = await db.usuarios.find_one({"_id": ObjectId(usuario_id)}, {"nombre": 1})
+                usuario_nombre = (u or {}).get("nombre", "")
+        from datetime import datetime
+        await db.actividad.insert_one({
+            "fecha": datetime.utcnow(),
+            "tipo": tipo,
+            "modulo": modulo,
+            "accion": accion,
+            "descripcion": (descripcion or "")[:500],
+            "usuario_id": usuario_id or None,
+            "usuario_nombre": usuario_nombre or None,
+            "rol": rol or None,
+            "ip": ip,
+            "detalle": detalle,
+        })
+    except Exception:
+        pass
+
+
 async def registrar_auditoria(
     db=None,
     usuario_id: str = "",
@@ -72,9 +105,9 @@ async def registrar_auditoria(
     dato_anterior=None,
     dato_nuevo=None,
 ):
-    """Misma firma que antes; ahora escribe en actividad.log. Nunca rompe la operacion."""
+    """Escribe en actividad.log y en la base (Registro de actividad). Nunca rompe la operacion."""
+    extra = {}
     try:
-        extra = {}
         if dato_anterior is not None:
             extra["antes"] = _limpiar(dato_anterior)
         if dato_nuevo is not None:
@@ -85,3 +118,7 @@ async def registrar_auditoria(
         )
     except Exception:
         pass
+    await guardar_evento(
+        db, "actividad", modulo, accion, descripcion, usuario_id, usuario_nombre, rol,
+        detalle=json.loads(json.dumps(extra, default=str)) if extra else None,
+    )

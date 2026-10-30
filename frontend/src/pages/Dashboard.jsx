@@ -7,25 +7,44 @@ import {
   Users,
   TrendingUp,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import DetalleInicio from "../components/DetalleInicio";
 import api from "../services/api";
 import { formatCurrency } from "../utils/helpers";
 import { useAuth } from "../context/AuthContext";
 
-function StatCard({ title, value, icon: Icon, color, subtitle }) {
+// Tarjeta del Inicio. Si tiene detalle, al tocarla se abre la lista debajo.
+function StatCard({ title, value, icon: Icon, color, subtitle, alerta, onClick, activo, accion = "Ver detalle" }) {
+  const Contenedor = onClick ? "button" : "div";
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+    <Contenedor
+      {...(onClick ? { type: "button", onClick, "aria-expanded": activo } : {})}
+      className={`text-left bg-white rounded-2xl p-6 shadow-sm border transition ${
+        activo ? "border-blue-400 ring-2 ring-blue-100" : "border-gray-100"
+      } ${onClick ? "hover:border-blue-300 hover:shadow" : ""}`}
+    >
       <div className="flex items-center justify-between mb-4">
         <div
           className={`w-12 h-12 ${color} rounded-xl flex items-center justify-center`}
         >
           <Icon size={22} className="text-white" />
         </div>
+        {onClick && (
+          <span className="inline-flex items-center gap-1 text-xs text-blue-600">
+            {accion} {activo ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </span>
+        )}
       </div>
       <p className="text-2xl font-bold text-gray-800">{value}</p>
       <p className="text-sm font-medium text-gray-600 mt-1">{title}</p>
-      {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
-    </div>
+      {alerta ? (
+        <p className="text-xs font-semibold text-red-600 mt-1">{alerta}</p>
+      ) : (
+        subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
+      )}
+    </Contenedor>
   );
 }
 
@@ -34,6 +53,22 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { user } = useAuth();
+  // Tarjeta abierta: ventas | reparaciones | stock
+  const [detalle, setDetalle] = useState(null);
+  const alternar = (tipo) => setDetalle(detalle === tipo ? null : tipo);
+  const atrasadas = stats?.reparaciones_atrasadas ?? 0;
+  const tarjetaReparaciones = (
+    <StatCard
+      title="Reparaciones activas"
+      value={stats?.reparaciones_activas ?? 0}
+      icon={Wrench}
+      color="bg-orange-500"
+      subtitle="Con técnico a cargo y demora"
+      alerta={atrasadas > 0 ? `${atrasadas} ${atrasadas === 1 ? "atrasada" : "atrasadas"}` : null}
+      onClick={() => alternar("reparaciones")}
+      activo={detalle === "reparaciones"}
+    />
+  );
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -201,22 +236,20 @@ export default function Dashboard() {
               icon={ShoppingCart}
               color="bg-blue-500"
               subtitle={formatCurrency(stats?.total_ventas_hoy ?? 0)}
+              onClick={() => alternar("ventas")}
+              activo={detalle === "ventas"}
             />
           )}
-          <StatCard
-            title="Reparaciones activas"
-            value={stats?.reparaciones_activas ?? 0}
-            icon={Wrench}
-            color="bg-orange-500"
-            subtitle="En proceso"
-          />
+          {user?.rol !== "deposito" && tarjetaReparaciones}
           {(user?.rol === "administrador" || user?.rol === "deposito") && (
             <StatCard
               title="Stock bajo"
               value={stats?.stock_bajo ?? 0}
               icon={AlertTriangle}
               color="bg-red-500"
-              subtitle="Requieren reposición"
+              subtitle="Artículos por sucursal para reponer"
+              onClick={() => alternar("stock")}
+              activo={detalle === "stock"}
             />
           )}
           {user?.rol !== "deposito" && (
@@ -226,6 +259,8 @@ export default function Dashboard() {
               icon={Users}
               color="bg-green-500"
               subtitle="Registrados"
+              onClick={() => navigate("/clientes")}
+              accion="Ver clientes"
             />
           )}
         </div>
@@ -234,13 +269,7 @@ export default function Dashboard() {
       {/* Para técnico solo reparaciones activas */}
       {user?.rol === "tecnico" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <StatCard
-            title="Reparaciones activas"
-            value={stats?.reparaciones_activas ?? 0}
-            icon={Wrench}
-            color="bg-orange-500"
-            subtitle="En proceso"
-          />
+          {tarjetaReparaciones}
           <StatCard
             title="Total clientes"
             value={stats?.total_clientes ?? 0}
@@ -250,6 +279,8 @@ export default function Dashboard() {
           />
         </div>
       )}
+
+      {detalle && <DetalleInicio tipo={detalle} onClose={() => setDetalle(null)} />}
 
       {/* Accesos rápidos */}
       <div>

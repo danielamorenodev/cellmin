@@ -1,17 +1,31 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from app.database import get_db
 from app.utils.auth import verify_password, create_access_token, get_current_user
 from bson import ObjectId
-from app.utils.logger import registrar_auditoria
+from app.utils.logger import registrar_auditoria, guardar_evento
 
 router = APIRouter()
 
 @router.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     db = get_db()
     user = await db.usuarios.find_one({"email": form_data.username, "activo": True})
     if not user or not verify_password(form_data.password, user["password"]):
+        # Se registra el intento (email y dirección), nunca la contraseña
+        existe = await db.usuarios.find_one({"email": form_data.username}, {"nombre": 1, "activo": 1})
+        motivo = (
+            "contraseña incorrecta" if existe and existe.get("activo", True)
+            else "usuario desactivado" if existe
+            else "email no registrado"
+        )
+        await guardar_evento(
+            db, "ingreso_fallido", "autenticacion", "login_fallido",
+            f"Intento de ingreso con {form_data.username[:120]}: {motivo}",
+            usuario_id=str(existe["_id"]) if existe else "",
+            usuario_nombre=(existe or {}).get("nombre", ""),
+            ip=request.client.host if request.client else None,
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email o contraseña incorrectos"

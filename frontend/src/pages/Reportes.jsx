@@ -24,6 +24,7 @@ import {
   Legend,
 } from "recharts";
 import toast from "react-hot-toast";
+import ReporteReparaciones from "../components/reportes/ReporteReparaciones";
 
 const COLORES = [
   "#3b82f6",
@@ -374,6 +375,38 @@ export default function Reportes() {
                   </div>
                 )}
               </div>
+
+              {/* Ventas por vendedor */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+                <h3 className="px-6 pt-5 pb-2 font-semibold text-gray-700">Ventas por vendedor</h3>
+                <table className="w-full text-sm">
+                  <thead className="text-xs text-gray-500 bg-gray-50">
+                    <tr>
+                      <th className="text-left font-medium px-6 py-2">Vendedor</th>
+                      <th className="text-right font-medium px-4 py-2">Ventas</th>
+                      <th className="text-right font-medium px-4 py-2">Total</th>
+                      <th className="text-right font-medium px-6 py-2">Ticket promedio</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {(ventasData.por_vendedor || []).map((f) => (
+                      <tr key={f.vendedor}>
+                        <td className="px-6 py-2 text-gray-800">{f.vendedor}</td>
+                        <td className="px-4 py-2 text-right">{f.cantidad}</td>
+                        <td className="px-4 py-2 text-right font-medium">{formatCurrency(f.total)}</td>
+                        <td className="px-6 py-2 text-right text-gray-600">
+                          {formatCurrency(f.cantidad ? f.total / f.cantidad : 0)}
+                        </td>
+                      </tr>
+                    ))}
+                    {(ventasData.por_vendedor || []).length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-4 text-center text-gray-400">Sin ventas en el período</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -594,6 +627,11 @@ export default function Reportes() {
                   )}
                 </div>
               </div>
+              <ReporteReparaciones
+                periodo={periodo}
+                desde={usandoFechaPersonalizada ? fechaDesde : ""}
+                hasta={usandoFechaPersonalizada ? fechaHasta : ""}
+              />
             </div>
           )}
 

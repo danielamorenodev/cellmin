@@ -1,6 +1,6 @@
 # Cellmin Gestión — Sistema de gestión para venta y reparación de celulares
 
-Sistema web para **Cellmin**, un comercio con dos sucursales que vende y repara celulares, accesorios y productos tecnológicos. Reúne en un solo lugar el stock de cada sucursal, las ventas, la caja, las órdenes de reparación, las compras a proveedores y los reportes.
+Sistema web para **Cellmin**, un comercio con dos sucursales que vende y repara celulares, accesorios y productos tecnológicos. Reúne en un solo lugar el stock de cada sucursal, las ventas, la caja, las órdenes de reparación, los ingresos de mercadería, los remitos entre sucursales y los reportes.
 
 **Sitio publicado:** https://cellmin.jybora.com
 **Tablero del proyecto:** https://github.com/users/danielamorenodev/projects/1
@@ -13,15 +13,16 @@ Sistema web para **Cellmin**, un comercio con dos sucursales que vende y repara 
 
 ## Funcionalidades
 
-- **Stock por sucursal:** productos con variantes, categorías, entradas, salidas y ajustes por sucursal, y alertas de stock bajo. Dos ventas simultáneas no pueden llevarse la misma última unidad.
-- **Ventas:** carrito, varios medios de pago (efectivo, transferencia, débito, crédito y dólares), ticket en PDF y detalle de cada operación.
+- **Menú de 7 módulos** (Inicio, Ventas, Reparaciones, Inventario, Clientes, Reportes, Configuración) con submódulos al apoyar el mouse y como pestañas en cada pantalla; la página se acomoda al menú.
+- **Inventario:** productos con variantes y categorías (filtro de varias), stock total que se amplía por sucursal, alertas de stock bajo, ingresos de mercadería (con alta de producto y proveedor en el momento), **remitos entre sucursales** y ajustes con historial. Dos ventas simultáneas no pueden llevarse la misma última unidad.
+- **Ventas:** carrito, vendedor, varios medios de pago (efectivo y dólares una vez; tarjetas y transferencias repetibles), tarjeta y cuotas con recargo configurable, ticket en PDF y detalle de cada operación.
 - **Caja:** apertura y cierre diario por sucursal, ingresos y egresos, y al cerrar muestra cuánto debería haber por cada medio de pago.
-- **Reparaciones:** orden imprimible con seña, datos del equipo y **código o patrón de bloqueo**. Los estados avanzan de a un paso: En diagnóstico → Ingresada → En reparación → Lista → Entregada. Solo se entrega un equipo pagado por completo, y al entregarlo empieza la garantía (90 días, editable por orden).
+- **Reparaciones:** orden imprimible con seña, datos del equipo y **código o patrón de bloqueo**. Los estados avanzan de a un paso: En diagnóstico → Ingresada → En reparación → Lista → Entregada. Cada orden registra quién atendió, la sucursal de ingreso, la entrega estimada (con aviso de atraso) y el técnico que la repara. Marca y modelo se buscan en un catálogo y se crean en el momento. Solo se entrega un equipo pagado por completo, y al entregarlo empieza la garantía (90 días, editable por orden).
 - **Dólar:** el administrador carga el valor del día y queda un historial de cambios. Se puede cobrar en dólares y dar el vuelto en pesos.
-- **Compras y proveedores:** cada compra registrada suma el stock de la sucursal que la recibe.
-- **Reportes** con gráficos y **exportación a Excel**.
+- **Inicio** con tarjetas que se abren con su detalle (reparaciones activas con técnico y demora, ventas del día, stock bajo).
+- **Reportes** con gráficos, ventas por vendedor, reparaciones por técnico/sucursal/quién atendió con historial, y **exportación a Excel**.
 - **Respaldo:** copia automática diaria en el servidor (se guardan 14 días) y descarga completa desde Reportes. `restaurar_respaldo.py` permite comprobar o recuperar un respaldo.
-- **Registro de actividad:** quién vendió, cobró, ajustó stock o cambió un precio, en archivos que rotan solos.
+- **Registro de actividad:** quién vendió, cobró, ajustó stock o cambió un precio, ingresos fallidos y errores; en archivos que rotan solos y en pantalla (Configuración → Registro de actividad, se guarda un año).
 - **Funciona en computadora, tablet y celular**, desde el navegador y sin instalar nada.
 
 ## Roles y permisos
@@ -34,7 +35,7 @@ Hay cinco roles con permisos definidos en el backend (`backend/app/utils/permiss
 | Cajero | Abrir y cerrar la caja de su sucursal, vender, cobrar reparaciones y anular ventas. |
 | Vendedor | Vender en la caja abierta de su sucursal, atender clientes y tomar reparaciones. |
 | Técnico | Gestionar las reparaciones: diagnóstico, presupuesto y cambios de estado. |
-| Depósito | Productos, stock, proveedores y compras. |
+| Depósito | Inventario: productos, stock, ingresos de mercadería, remitos, proveedores y categorías. |
 
 El código de desbloqueo de los equipos solo lo ven el técnico y el administrador, y se borra al entregar el equipo.
 
@@ -128,7 +129,7 @@ Abrir `http://localhost:5173` e iniciar sesión con el administrador creado. Vit
 
 1. En **Usuarios**, crear los usuarios de cada rol y asignarles su sucursal.
 2. En **Dólar**, cargar el valor del día (sin ese valor no se muestran precios en dólares ni se puede cobrar en dólares).
-3. En **Categorías** y **Productos**, cargar el catálogo; en **Compras** o **Stock**, las existencias de cada sucursal.
+3. En **Inventario**, cargar categorías y productos y las existencias de cada sucursal (ingresos de mercadería o ajustes). En **Configuración → Medios de pago**, cargar los planes de cuotas de cada tarjeta.
 4. Con un cajero, abrir la **Caja** de la sucursal: desde ahí ya se puede vender.
 
 ### Problemas frecuentes
