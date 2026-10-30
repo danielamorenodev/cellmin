@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, HTTPException, Depends
 from app.database import get_db
 from app.models.repair_type import RepairTypeCreate, RepairTypeUpdate
@@ -31,7 +32,7 @@ async def create_repair_type(tipo: RepairTypeCreate, current_user: dict = Depend
     check_permission(current_user["role"], "*")
     db = get_db()
     existing = await db.tipos_reparacion.find_one({
-        "nombre": {"$regex": f"^{tipo.nombre}$", "$options": "i"}
+        "nombre": {"$regex": f"^{re.escape(tipo.nombre.strip())}$", "$options": "i"}
     })
     if existing:
         raise HTTPException(status_code=400, detail=f"Ya existe un tipo de reparación con el nombre '{tipo.nombre}'")
@@ -49,7 +50,7 @@ async def update_repair_type(tipo_id: str, tipo: RepairTypeUpdate, current_user:
     db = get_db()
     if tipo.nombre:
         existing = await db.tipos_reparacion.find_one({
-            "nombre": {"$regex": f"^{tipo.nombre}$", "$options": "i"},
+            "nombre": {"$regex": f"^{re.escape(tipo.nombre.strip())}$", "$options": "i"},
             "_id": {"$ne": ObjectId(tipo_id)}
         })
         if existing:

@@ -71,6 +71,20 @@ export const METODOS_PAGO = [
   { value: "usd", label: "Dólares (US$)" },
 ];
 
+// Motivos de los movimientos de stock, como se muestran en pantalla
+export const MOTIVOS_STOCK = {
+  ajuste_manual: "Ajuste manual",
+  devolucion: "Devolución",
+  perdida: "Pérdida / Rotura",
+  inventario: "Conteo de inventario",
+  compra: "Ingreso de mercadería",
+  cancelacion_compra: "Anulación de ingreso",
+  venta: "Venta",
+  cancelacion_venta: "Cancelación de venta",
+  remito_salida: "Remito: envío a otra sucursal",
+  remito_entrada: "Remito: recibido de otra sucursal",
+};
+
 export const SUCURSALES = [
   { value: "sucursal_1", label: "Sucursal 1" },
   { value: "sucursal_2", label: "Sucursal 2" },

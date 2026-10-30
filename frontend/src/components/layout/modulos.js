@@ -52,10 +52,15 @@ export const MODULOS = [
     label: "Inventario",
     icon: Package,
     items: [
-      { label: "Stock", path: "/stock", roles: ["administrador", "deposito", "cajero", "vendedor"] },
-      { label: "Productos", path: "/productos", roles: ["administrador", "deposito"] },
+      {
+        label: "Productos y stock",
+        path: "/productos",
+        roles: ["administrador", "deposito", "cajero", "vendedor"],
+      },
+      { label: "Ingresos de mercadería", path: "/compras", roles: ["administrador", "deposito"] },
+      { label: "Remitos", path: "/remitos", roles: ["administrador", "deposito"] },
+      { label: "Movimientos", path: "/movimientos", roles: ["administrador", "deposito"] },
       { label: "Categorías", path: "/productos?vista=categorias", roles: ["administrador", "deposito"] },
-      { label: "Compras", path: "/compras", roles: ["administrador", "deposito"] },
       { label: "Proveedores", path: "/compras?vista=proveedores", roles: ["administrador", "deposito"] },
     ],
   },

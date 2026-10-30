@@ -77,10 +77,10 @@ export default function Dashboard() {
         path: "/reportes",
       },
       {
-        label: "Gestionar Stock",
+        label: "Productos y stock",
         icon: Package,
         color: "bg-green-50 text-green-700 hover:bg-green-100",
-        path: "/stock",
+        path: "/productos",
       },
     ],
     cajero: [
@@ -129,10 +129,10 @@ export default function Dashboard() {
         path: "/clientes",
       },
       {
-        label: "Ver Stock",
+        label: "Productos y stock",
         icon: Package,
         color: "bg-green-50 text-green-700 hover:bg-green-100",
-        path: "/stock",
+        path: "/productos",
       },
     ],
     tecnico: [
@@ -151,22 +151,22 @@ export default function Dashboard() {
     ],
     deposito: [
       {
-        label: "Ver Stock",
+        label: "Productos y stock",
         icon: Package,
         color: "bg-green-50 text-green-700 hover:bg-green-100",
-        path: "/stock",
+        path: "/productos",
       },
       {
-        label: "Nueva Compra",
+        label: "Ingreso de mercadería",
         icon: ShoppingCart,
         color: "bg-blue-50 text-blue-600 hover:bg-blue-100",
-        path: "/compras",
+        path: "/compras?nuevo=1",
       },
       {
-        label: "Ver Productos",
+        label: "Remito entre sucursales",
         icon: Package,
         color: "bg-orange-50 text-orange-700 hover:bg-orange-100",
-        path: "/productos",
+        path: "/remitos",
       },
     ],
   };

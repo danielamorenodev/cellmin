@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, HTTPException, Depends
 from app.database import get_db
 from app.models.product import ProductCreate, ProductUpdate
@@ -69,7 +70,7 @@ async def get_product(product_id: str, current_user: dict = Depends(get_current_
 async def create_product(product: ProductCreate, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "productos:create")
     db = get_db()
-    existing = await db.productos.find_one({"nombre": {"$regex": f"^{product.nombre}$", "$options": "i"}})
+    existing = await db.productos.find_one({"nombre": {"$regex": f"^{re.escape(product.nombre.strip())}$", "$options": "i"}})
     if existing:
         raise HTTPException(status_code=400, detail=f"Ya existe un producto con el nombre '{product.nombre}'")
     datos = product.dict()
@@ -95,7 +96,7 @@ async def update_product(product_id: str, product: ProductUpdate, current_user: 
     db = get_db()
     if product.nombre:
         existing = await db.productos.find_one({
-            "nombre": {"$regex": f"^{product.nombre}$", "$options": "i"},
+            "nombre": {"$regex": f"^{re.escape(product.nombre.strip())}$", "$options": "i"},
             "_id": {"$ne": ObjectId(product_id)}
         })
         if existing:
