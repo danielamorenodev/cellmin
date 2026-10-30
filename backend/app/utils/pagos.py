@@ -9,6 +9,17 @@ USD = "usd"
 METODOS_VALIDOS = ("efectivo", "transferencia", "debito", "credito", USD)
 
 
+# Efectivo y dólares se cargan una sola vez por cobro; tarjetas y
+# transferencias se pueden repetir (por ejemplo, dos tarjetas distintas).
+MEDIOS_UNICOS = {"efectivo": "efectivo", USD: "dólares"}
+
+
+def validar_medios_unicos(metodos: list):
+    for metodo, nombre in MEDIOS_UNICOS.items():
+        if metodos.count(metodo) > 1:
+            raise HTTPException(status_code=400, detail=f"El pago en {nombre} se carga una sola vez")
+
+
 def redondear(valor: float) -> float:
     return round(valor + 1e-9, 2)
 

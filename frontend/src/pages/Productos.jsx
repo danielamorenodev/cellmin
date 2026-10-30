@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import SelectorCategoria from "../components/ui/SelectorCategoria";
 import InputNumero from "../components/ui/InputNumero";
 import InputPrecio, { SelectorMoneda } from "../components/ui/InputPrecio";
@@ -36,8 +37,9 @@ import {
   minimoEn,
   bajoMinimo,
   esCategoriaCelulares,
-  idsConSubcategorias,
+  idsFiltro,
 } from "../utils/helpers";
+import FiltroCategorias from "../components/ui/FiltroCategorias";
 import { exportarListaPrecios } from "../utils/exportExcel";
 import Paginacion from "../components/ui/Paginacion";
 
@@ -982,11 +984,10 @@ function FilaProducto({ producto, categorias, onEdit, onDelete }) {
   );
 }
 
-function CategoriaModal({ categoria, categorias, onClose, onSave }) {
+function CategoriaModal({ categoria, onClose, onSave }) {
   const [form, setForm] = useState({
     nombre: categoria?.nombre || "",
     descripcion: categoria?.descripcion || "",
-    categoria_padre_id: categoria?.categoria_padre_id || "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -997,7 +998,6 @@ function CategoriaModal({ categoria, categorias, onClose, onSave }) {
       const data = {
         nombre: form.nombre,
         descripcion: form.descripcion || null,
-        categoria_padre_id: form.categoria_padre_id || null,
       };
       if (categoria) {
         await categoriasService.update(categoria.id, data);
@@ -1008,12 +1008,11 @@ function CategoriaModal({ categoria, categorias, onClose, onSave }) {
       }
       onSave();
     } catch (error) {
-      toast.error("Error al guardar la categoría");
+      toast.error(error.response?.data?.detail || "Error al guardar la categoría");
     } finally {
       setLoading(false);
     }
   };
-  const padres = categorias.filter((c) => c.id !== categoria?.id);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -1047,19 +1046,6 @@ function CategoriaModal({ categoria, categorias, onClose, onSave }) {
               }
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Categoría padre
-            </label>
-            <SelectorCategoria
-              categorias={categorias}
-              value={form.categoria_padre_id}
-              onChange={(id) => setForm({ ...form, categoria_padre_id: id })}
-              textoVacio="Sin categoría padre"
-              permitirVacio
-              excluirId={categoria?.id}
             />
           </div>
           <div className="flex gap-3 pt-2">
@@ -1118,8 +1104,6 @@ function GestionCategorias({ onCambio }) {
     fetchCategorias();
   }, []);
 
-  const getNombrePadre = (id) =>
-    categorias.find((c) => c.id === id)?.nombre || "-";
 
   const handleToggle = async (categoria) => {
     const accion = categoria.activo ? "desactivar" : "activar";
@@ -1161,9 +1145,6 @@ function GestionCategorias({ onCambio }) {
   const tabla = useTabla(filtered, {
     porPagina: 20,
     ordenInicial: { campo: "nombre", dir: "asc" },
-    accessors: {
-      padre: (c) => (c.categoria_padre_id ? getNombrePadre(c.categoria_padre_id) : null)
-    },
   });
 
   return (
@@ -1222,7 +1203,6 @@ function GestionCategorias({ onCambio }) {
                 <tr>
                   <ThOrdenable campo="nombre" tabla={tabla} align="center" className="px-6 py-3">Nombre</ThOrdenable>
                   <ThOrdenable campo="descripcion" tabla={tabla} align="center" className="px-6 py-3">Descripción</ThOrdenable>
-                  <ThOrdenable campo="padre" tabla={tabla} align="center" className="px-6 py-3">Categoría Padre</ThOrdenable>
                   <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                     Acciones
                   </th>
@@ -1253,11 +1233,6 @@ function GestionCategorias({ onCambio }) {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {categoria.descripcion || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {categoria.categoria_padre_id
-                        ? getNombrePadre(categoria.categoria_padre_id)
-                        : "-"}
                     </td>
                     <td className="col-acc px-6 py-4 ">
                       <MenuAcciones acciones={accionesCategoria(categoria)} />
@@ -1296,12 +1271,6 @@ function GestionCategorias({ onCambio }) {
                           {categoria.descripcion}
                         </p>
                       )}
-                      {categoria.categoria_padre_id && (
-                        <p className="text-xs text-gray-500">
-                          Subcategoría de:{" "}
-                          {getNombrePadre(categoria.categoria_padre_id)}
-                        </p>
-                      )}
                     </div>
                   </div>
                   <MenuAcciones acciones={accionesCategoria(categoria)} />
@@ -1335,12 +1304,19 @@ function GestionCategorias({ onCambio }) {
 }
 
 export default function Productos() {
-  const [tab, setTab] = useState("productos");
+  // La vista sale de la dirección (?vista=...): la eligen el menú y las pestañas del módulo
+  const [params] = useSearchParams();
+  const tab = params.get("vista") === "categorias" ? "categorias" : "productos";
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selectedProducto, setSelectedProducto] = useState(null);
+  // Al volver a Productos, las categorías pudieron cambiar en la otra vista
+  useEffect(() => {
+    if (tab === "productos") categoriasService.getAll().then(setCategorias).catch(() => {});
+  }, [tab]);
+
   const [filtros, setFiltros] = useState({
     nombre: "",
     categoria_id: "",
@@ -1407,9 +1383,9 @@ export default function Productos() {
     return producto.precio_venta || 0;
   };
 
-  // La categoría elegida incluye sus subcategorías
+  // Se puede filtrar por una o varias categorías
   const categoriasFiltro = filtros.categoria_id
-    ? idsConSubcategorias(categorias, filtros.categoria_id)
+    ? new Set(idsFiltro(filtros.categoria_id))
     : null;
   const filtered = productos.filter((p) => {
     if (
@@ -1471,38 +1447,9 @@ export default function Productos() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Productos</h1>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
-        <button
-          onClick={() => {
-            setTab("productos");
-            // Las categorías pudieron cambiar en la otra pestaña
-            categoriasService
-              .getAll()
-              .then(setCategorias)
-              .catch(() => {});
-          }}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-            tab === "productos"
-              ? "bg-white shadow text-gray-800"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Productos
-        </button>
-        <button
-          onClick={() => setTab("categorias")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-            tab === "categorias"
-              ? "bg-white shadow text-gray-800"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Categorías
-        </button>
+        <h1 className="text-2xl font-bold text-gray-800">
+          {tab === "categorias" ? "Categorías" : "Productos"}
+        </h1>
       </div>
 
       {tab === "categorias" ? (
@@ -1580,22 +1527,13 @@ export default function Productos() {
               <div className="bg-white border border-gray-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Categoría
+                    Categorías
                   </label>
-                  <select
+                  <FiltroCategorias
+                    categorias={categorias}
                     value={filtros.categoria_id}
-                    onChange={(e) =>
-                      setFiltros({ ...filtros, categoria_id: e.target.value })
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Todas las categorías</option>
-                    {categorias.filter((c) => c.activo !== false).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setFiltros({ ...filtros, categoria_id: v })}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">

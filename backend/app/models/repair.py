@@ -12,7 +12,9 @@ class Equipo(BaseModel):
 
 class Sena(BaseModel):
     monto: float
-    metodo: str  # efectivo, transferencia, debito, credito
+    metodo: str  # efectivo, transferencia, debito, credito, usd
+    tarjeta_id: Optional[str] = None
+    cuotas: Optional[int] = None
 
 class TipoReparacionItem(BaseModel):
     tipo_id: str
@@ -22,7 +24,10 @@ class TipoReparacionItem(BaseModel):
 class Pago(BaseModel):
     monto: float
     tipo: str   # seña, saldo, total
-    metodo: str # efectivo, transferencia, debito, credito
+    metodo: str # efectivo, transferencia, debito, credito, usd
+    # Con débito o crédito: tarjeta elegida y, en crédito, cantidad de cuotas
+    tarjeta_id: Optional[str] = None
+    cuotas: Optional[int] = None
 
 class RepairCreate(BaseModel):
     cliente_id: str

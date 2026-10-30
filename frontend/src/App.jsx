@@ -5,10 +5,8 @@ import Layout from "./components/layout/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
-import Categorias from "./pages/Categorias";
 import NotFound from "./pages/NotFound";
 import Productos from "./pages/Productos";
-import Proveedores from "./pages/Proveedores";
 import Stock from "./pages/Stock";
 import Compras from "./pages/Compras";
 import CompraDetalle from "./pages/CompraDetalle";
@@ -17,10 +15,10 @@ import VentaDetalle from "./pages/VentaDetalle";
 import Caja from "./pages/Caja";
 import Reparaciones from "./pages/Reparaciones";
 import ReparacionDetalle from "./pages/ReparacionDetalle";
-import TiposReparacion from "./pages/TiposReparacion";
 import Usuarios from "./pages/Usuarios";
 import Reportes from "./pages/Reportes";
 import Dolar from "./pages/Dolar";
+import MediosPago from "./pages/MediosPago";
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth();
@@ -64,14 +62,7 @@ export default function App() {
           </PrivateLayout>
         }
       />
-      <Route
-        path="/categorias"
-        element={
-          <PrivateLayout>
-            <Categorias />
-          </PrivateLayout>
-        }
-      />
+      <Route path="/categorias" element={<Navigate to="/productos?vista=categorias" replace />} />
       <Route
         path="/productos"
         element={
@@ -80,14 +71,7 @@ export default function App() {
           </PrivateLayout>
         }
       />
-      <Route
-        path="/proveedores"
-        element={
-          <PrivateLayout>
-            <Proveedores />
-          </PrivateLayout>
-        }
-      />
+      <Route path="/proveedores" element={<Navigate to="/compras?vista=proveedores" replace />} />
       <Route
         path="/stock"
         element={
@@ -152,14 +136,7 @@ export default function App() {
           </PrivateLayout>
         }
       />
-      <Route
-        path="/tipos-reparacion"
-        element={
-          <PrivateLayout>
-            <TiposReparacion />
-          </PrivateLayout>
-        }
-      />
+      <Route path="/tipos-reparacion" element={<Navigate to="/reparaciones?vista=tipos" replace />} />
       <Route
         path="/usuarios"
         element={
@@ -181,6 +158,14 @@ export default function App() {
         element={
           <PrivateLayout>
             <Dolar />
+          </PrivateLayout>
+        }
+      />
+      <Route
+        path="/medios-pago"
+        element={
+          <PrivateLayout>
+            <MediosPago />
           </PrivateLayout>
         }
       />

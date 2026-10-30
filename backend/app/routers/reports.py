@@ -79,6 +79,7 @@ async def get_ventas_report(
         metodo = v.get("metodo_pago", "efectivo")
         if "+" in metodo:
             metodo = "mixto"
+        metodo = metodo.split(" (")[0]  # "credito (Visa 3 cuotas)" -> "credito"
         por_metodo[metodo] = por_metodo.get(metodo, 0) + v["total"]
 
     por_sucursal = {}
@@ -132,6 +133,7 @@ async def get_ventas_report(
         metodo = v.get("metodo_pago", "efectivo")
         if "+" in metodo:
             metodo = "mixto"
+        metodo = metodo.split(" (")[0]  # "credito (Visa 3 cuotas)" -> "credito"
         por_metodo[metodo] = por_metodo.get(metodo, 0) + v["total"]
 
     # Agrupar por sucursal

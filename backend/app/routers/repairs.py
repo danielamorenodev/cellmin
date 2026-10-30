@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from app.utils.logger import registrar_auditoria
 from app.utils.cajas import caja_propia, puede_sucursal
 from app.utils.stock import validar_sucursal
+from app.utils.tarjetas import datos_tarjeta, texto_tarjeta
 from app.utils.pagos import (
     METODOS_VALIDOS,
     USD,
@@ -70,7 +71,7 @@ def validar_cambio_estado(actual: str, nuevo: str):
 
 
 
-async def planear_cobro(db, metodo: str, monto: float, saldo: float) -> dict:
+async def planear_cobro(db, metodo: str, monto: float, saldo: float, tarjeta_id=None, cuotas=None) -> dict:
     """Cómo se registra un cobro (seña o saldo) de una reparación.
     En medios comunes el monto es en pesos. Con "usd" el monto es en dólares:
     se convierte con la cotización del servidor, lo que supere el saldo se
@@ -81,7 +82,14 @@ async def planear_cobro(db, metodo: str, monto: float, saldo: float) -> dict:
                 status_code=400,
                 detail=f"El monto supera el saldo pendiente ($ {saldo:,.2f})".replace(",", "X").replace(".", ",").replace("X", "."),
             )
-        return {"monto": monto, "monto_caja": monto, "vuelto": 0.0, "extra": {}}
+        # Con tarjeta: el recargo de las cuotas se cobra aparte del saldo
+        tarjeta = await datos_tarjeta(db, metodo, tarjeta_id, cuotas, monto)
+        return {
+            "monto": monto,
+            "monto_caja": redondear(monto + tarjeta.get("recargo", 0)),
+            "vuelto": 0.0,
+            "extra": tarjeta,
+        }
     cotizacion = await cotizacion_para_cobro(db)
     usd = redondear(monto)
     pesos = redondear(usd * cotizacion)
@@ -100,7 +108,7 @@ def movimientos_de_cobro(plan: dict, metodo: str, numero: str, repair_id: str, n
     ingreso = {
         "tipo": "ingreso",
         "monto": plan["monto_caja"],
-        "motivo": f"Reparación {numero} — {metodo}",
+        "motivo": f"Reparación {numero} — {metodo}" + (f" ({texto_tarjeta({**plan['extra'], 'metodo': metodo})})" if plan["extra"].get("tarjeta") else ""),
         "metodo_pago": metodo,
         "concepto": "reparacion",
         "referencia_id": repair_id,
@@ -108,6 +116,8 @@ def movimientos_de_cobro(plan: dict, metodo: str, numero: str, repair_id: str, n
         "usuario_id": usuario_id,
         "fecha": datetime.utcnow(),
     }
+    if plan["extra"].get("tarjeta"):
+        ingreso.update({k: plan["extra"][k] for k in ("tarjeta", "cuotas", "recargo")})
     if metodo == USD:
         ingreso["monto_usd"] = plan["extra"]["usd"]
         ingreso["cotizacion"] = plan["extra"]["cotizacion"]
@@ -217,7 +227,8 @@ async def create_repair(repair: RepairCreate, current_user: dict = Depends(get_c
         caja = await caja_abierta_del_usuario(db, current_user)
         if not caja:
             raise HTTPException(status_code=400, detail="Debe haber una caja abierta para cobrar la seña")
-        plan_sena = await planear_cobro(db, sena["metodo"], sena["monto"], precio_total)
+        plan_sena = await planear_cobro(db, sena["metodo"], sena["monto"], precio_total,
+                                        sena.get("tarjeta_id"), sena.get("cuotas"))
 
     numero = await get_next_number(db)
     pagos = []
@@ -357,7 +368,7 @@ async def add_payment(repair_id: str, pago: Pago, current_user: dict = Depends(g
     if pago.monto <= 0:
         raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0")
     saldo_actual = repair.get("precio_total", 0) - repair.get("total_pagado", 0)
-    plan = await planear_cobro(db, pago.metodo, pago.monto, saldo_actual)
+    plan = await planear_cobro(db, pago.metodo, pago.monto, saldo_actual, pago.tarjeta_id, pago.cuotas)
 
     nuevo_pago = {
         "monto": plan["monto"],
@@ -430,7 +441,8 @@ async def cancel_repair(repair_id: str, current_user: dict = Depends(get_current
             # Se devuelve por el mismo medio con el que se cobró. Lo cobrado en
             # dólares se descuenta del esperado en dólares; si hubo vuelto en
             # pesos, se revierte.
-            monto_egreso = p["monto"]
+            # Con tarjeta se devuelve también el recargo de las cuotas
+            monto_egreso = redondear(p["monto"] + (p.get("recargo") or 0))
             if p["metodo"] == USD and p.get("usd") is not None:
                 monto_egreso = redondear(p["usd"] * p["cotizacion"])
             egreso = {

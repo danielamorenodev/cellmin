@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import InputNumero from "../components/ui/InputNumero";
@@ -1070,7 +1071,9 @@ export default function Compras() {
   const { user } = useAuth();
   // Cancelar una compra revierte stock: administrador y depósito
   const puedeCancelar = ["administrador", "deposito"].includes(user?.rol);
-  const [tab, setTab] = useState("compras");
+  // La vista sale de la dirección (?vista=...): la eligen el menú y las pestañas del módulo
+  const [params] = useSearchParams();
+  const tab = params.get("vista") === "proveedores" ? "proveedores" : "compras";
   const [compras, setCompras] = useState([]);
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1136,31 +1139,9 @@ export default function Compras() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Compras</h1>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
-        <button
-          onClick={() => setTab("compras")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-            tab === "compras"
-              ? "bg-white shadow text-gray-800"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Compras
-        </button>
-        <button
-          onClick={() => setTab("proveedores")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-            tab === "proveedores"
-              ? "bg-white shadow text-gray-800"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          Proveedores
-        </button>
+        <h1 className="text-2xl font-bold text-gray-800">
+          {tab === "proveedores" ? "Proveedores" : "Compras"}
+        </h1>
       </div>
 
       {tab === "proveedores" ? (

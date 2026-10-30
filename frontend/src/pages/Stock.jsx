@@ -26,8 +26,9 @@ import {
   bajoMinimo,
   nombreSucursal,
   stockEn,
-  idsConSubcategorias,
+  idsFiltro,
 } from "../utils/helpers";
+import FiltroCategorias from "../components/ui/FiltroCategorias";
 import { useSucursales } from "../hooks/useSucursales";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
@@ -323,9 +324,9 @@ export default function Stock() {
       ? (p.variantes || []).reduce((a, v) => a + (stockEn(v, sucursal) || 0), 0)
       : stockEn(p, sucursal) || 0;
 
-  // La categoría elegida incluye sus subcategorías
+  // Se puede filtrar por una o varias categorías
   const categoriasFiltro = filtros.categoria_id
-    ? idsConSubcategorias(categorias, filtros.categoria_id)
+    ? new Set(idsFiltro(filtros.categoria_id))
     : null;
   const filteredProductos = productos.filter((p) => {
     if (!p.nombre.toLowerCase().includes(search.toLowerCase())) return false;
@@ -638,24 +639,13 @@ export default function Stock() {
             <div className="bg-white border border-gray-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Categoría
+                  Categorías
                 </label>
-                <select
+                <FiltroCategorias
+                  categorias={categorias}
                   value={filtros.categoria_id}
-                  onChange={(e) =>
-                    setFiltros({ ...filtros, categoria_id: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todas las categorías</option>
-                  {categorias
-                    .filter((c) => c.activo !== false)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.nombre}
-                      </option>
-                    ))}
-                </select>
+                  onChange={(v) => setFiltros({ ...filtros, categoria_id: v })}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">

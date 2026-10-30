@@ -13,8 +13,11 @@ class SaleItem(BaseModel):
     imeis: Optional[List[str]] = None
 
 class PagoVenta(BaseModel):
-    metodo: str  # efectivo, transferencia, debito, credito
+    metodo: str  # efectivo, transferencia, debito, credito, usd
     monto: float = 0
+    # Con débito o crédito: tarjeta elegida y, en crédito, cantidad de cuotas
+    tarjeta_id: Optional[str] = None
+    cuotas: Optional[int] = None
 
 class SaleCreate(BaseModel):
     cliente_id: Optional[str] = None
