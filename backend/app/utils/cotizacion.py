@@ -1,5 +1,6 @@
 """
-Cotización del dólar, cargada A MANO por el administrador.
+Cotización del dólar: la carga el administrador A MANO o se trae de
+InfoDolar (dólar blue en Córdoba), con un botón o en forma automática.
 
 - El valor vigente se guarda en la colección "configuracion" (un solo
   documento). Todo el sistema (precios en USD, cobros en dólares, caja,
@@ -41,7 +42,7 @@ def _respuesta(doc: dict | None) -> dict:
         "venta": float(doc["venta"]),
         "fecha": fecha,
         "obsoleta": obsoleta,
-        "fuente": "Cargada manualmente",
+        "fuente": doc.get("fuente") or "Cargada manualmente",
         "actualizada_por": doc.get("actualizada_por"),
     }
 
@@ -62,23 +63,24 @@ async def cotizacion_venta(db=None) -> float | None:
     return c["venta"] if c["disponible"] else None
 
 
-async def guardar_cotizacion(db, valor: float, user_id: str) -> dict:
+async def guardar_cotizacion(db, valor: float, user_id: str, fuente: str = "Cargada manualmente",
+                            nombre_si_no_hay: str = "") -> dict:
     """Guarda el valor vigente y lo anota en el historial."""
     valor = round(float(valor), 2)
     anterior_doc = await db.configuracion.find_one({"_id": DOC_ID})
     anterior = float(anterior_doc["venta"]) if anterior_doc and anterior_doc.get("venta") else None
 
-    nombre = ""
+    nombre = nombre_si_no_hay
     try:
         u = await db.usuarios.find_one({"_id": ObjectId(user_id)})
-        nombre = (u or {}).get("nombre", "")
+        nombre = (u or {}).get("nombre", "") or nombre_si_no_hay
     except Exception:
         pass
 
     ahora = datetime.now(timezone.utc)
     await db.configuracion.update_one(
         {"_id": DOC_ID},
-        {"$set": {"venta": valor, "guardada": ahora, "actualizada_por": nombre}},
+        {"$set": {"venta": valor, "guardada": ahora, "actualizada_por": nombre, "fuente": fuente}},
         upsert=True,
     )
     await db.cotizacion_historial.insert_one({
@@ -86,6 +88,70 @@ async def guardar_cotizacion(db, valor: float, user_id: str) -> dict:
         "anterior": anterior,
         "usuario_id": user_id,
         "usuario_nombre": nombre,
+        "fuente": fuente,
         "fecha": ahora,
     })
     return await obtener_cotizacion(db)
+
+
+# ---- Actualización automática desde InfoDolar -------------------------
+CONFIG_AUTO = "cotizacion_automatica"
+
+
+async def config_automatica(db) -> dict:
+    doc = await db.configuracion.find_one({"_id": CONFIG_AUTO}) or {}
+    return {
+        "activa": bool(doc.get("activa", False)),
+        "usar": doc.get("usar", "venta"),  # venta | compra
+        "ultimo_intento": doc.get("ultimo_intento"),
+        "ultimo_error": doc.get("ultimo_error"),
+    }
+
+
+async def actualizar_desde_infodolar(db, usar: str, user_id: str = "", nombre: str = "") -> dict:
+    """Trae el blue de Córdoba y lo guarda si es razonable (no se aleja más
+    de un 25 % del valor vigente: protege de una lectura equivocada)."""
+    from app.utils.cotizacion_externa import consultar_blue_cordoba, FUENTE, CotizacionNoDisponible
+    datos = await consultar_blue_cordoba()
+    valor = datos["venta"] if usar != "compra" else datos["compra"]
+    vigente = await cotizacion_venta(db)
+    if vigente and abs(valor - vigente) / vigente > 0.25:
+        monto = f"{valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        raise CotizacionNoDisponible(
+            f"InfoDolar informa $ {monto}, muy distinto del valor actual. No se cambió: revisalo y cargalo a mano."
+        )
+    if vigente and abs(valor - vigente) < 0.005:
+        return {**(await obtener_cotizacion(db)), "sin_cambios": True}
+    etiqueta = f"{FUENTE} ({'venta' if usar != 'compra' else 'compra'})"
+    return await guardar_cotizacion(db, valor, user_id, fuente=etiqueta, nombre_si_no_hay=nombre)
+
+
+async def ciclo_automatico(get_db, cada_minutos: int = 30):
+    """Corre mientras el servidor está encendido: si la actualización
+    automática está activa, trae el valor de lunes a sábado de 9 a 21 h."""
+    import asyncio
+    from datetime import timedelta
+    from app.utils.cajas import ZONA_AR
+    from app.utils.logger import log_errores
+    while True:
+        try:
+            db = get_db()
+            cfg = await config_automatica(db) if db is not None else {"activa": False}
+            ahora = datetime.now(timezone.utc).astimezone(ZONA_AR)
+            if cfg["activa"] and ahora.weekday() < 6 and 9 <= ahora.hour < 21:
+                error = None
+                try:
+                    await actualizar_desde_infodolar(db, cfg["usar"], nombre="Actualización automática")
+                except Exception as e:  # la página no respondió o cambió
+                    error = str(e)[:300]
+                    log_errores.error(f"Cotización automática: {error}")
+                await db.configuracion.update_one(
+                    {"_id": CONFIG_AUTO},
+                    {"$set": {"ultimo_intento": datetime.now(timezone.utc), "ultimo_error": error}},
+                    upsert=True,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+        await asyncio.sleep(cada_minutos * 60)

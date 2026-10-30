@@ -50,7 +50,7 @@ export default function Header() {
                 ? "Todavía no se cargó el valor del dólar. Los precios en USD no se muestran."
                 : cotizacion.obsoleta
                   ? "Este valor no se actualizó hoy"
-                  : "Valor del dólar cargado por el administrador"
+                  : `Valor del dólar: ${cotizacion.fuente || "cargado por el administrador"}`
             }
           >
             <DollarSign size={13} />

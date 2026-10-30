@@ -226,7 +226,7 @@ export default function Dashboard() {
 
       {/* Cards métricas — solo para roles que tienen acceso */}
       {user?.rol !== "tecnico" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {(user?.rol === "administrador" ||
             user?.rol === "cajero" ||
             user?.rol === "vendedor") && (
@@ -252,17 +252,6 @@ export default function Dashboard() {
               activo={detalle === "stock"}
             />
           )}
-          {user?.rol !== "deposito" && (
-            <StatCard
-              title="Total clientes"
-              value={stats?.total_clientes ?? 0}
-              icon={Users}
-              color="bg-green-500"
-              subtitle="Registrados"
-              onClick={() => navigate("/clientes")}
-              accion="Ver clientes"
-            />
-          )}
         </div>
       )}
 
@@ -270,13 +259,6 @@ export default function Dashboard() {
       {user?.rol === "tecnico" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {tarjetaReparaciones}
-          <StatCard
-            title="Total clientes"
-            value={stats?.total_clientes ?? 0}
-            icon={Users}
-            color="bg-green-500"
-            subtitle="Registrados"
-          />
         </div>
       )}
 
