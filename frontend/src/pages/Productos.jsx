@@ -1,4 +1,5 @@
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import SelectorCategoria from "../components/ui/SelectorCategoria";
 import InputNumero from "../components/ui/InputNumero";
 import InputPrecio, { SelectorMoneda } from "../components/ui/InputPrecio";
@@ -6,6 +7,7 @@ import { categoriasService } from "../services/categorias.service";
 import { useState, useEffect } from "react";
 import {
   Plus,
+  PackagePlus,
   Edit,
   Trash2,
   Package,
@@ -153,7 +155,40 @@ function Seccion({ titulo, accion, children }) {
 }
 
 // Stock por sucursal como una tabla chica: cada fila es una sucursal
-function StockPorSucursal({ stock, minimo, onStock, onMinimo, stockSoloLectura }) {
+function StockPorSucursal({ stock, minimo, onStock, onMinimo, stockSoloLectura, soloMinimo }) {
+  if (soloMinimo)
+    return (
+      <div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs text-gray-500">
+              <th className="text-left font-medium pb-1 w-1/2">Sucursal</th>
+              <th className="text-left font-medium pb-1 pl-2">Stock mínimo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {SUCURSALES.map((s) => (
+              <tr key={s.value}>
+                <td className="py-1 pr-2 text-gray-700">{s.label}</td>
+                <td className="py-1 pl-2">
+                  <InputNumero
+                    value={minimo?.[s.value] ?? 0}
+                    onChange={(v) => onMinimo(s.value, v)}
+                    decimales={0}
+                    aria-label={`Stock mínimo en ${s.label}`}
+                    className={CAMPO}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="text-xs text-gray-500 mt-1">
+          El stock entra con el ingreso de mercadería. Stock mínimo: al llegar a ese
+          número el sistema avisa que hay que reponer (0 = sin aviso).
+        </p>
+      </div>
+    );
   return (
     <div>
       <table className="w-full text-sm">
@@ -197,7 +232,7 @@ function StockPorSucursal({ stock, minimo, onStock, onMinimo, stockSoloLectura }
       </table>
       <p className="text-xs text-gray-500 mt-1">
         {stockSoloLectura
-          ? "El stock se modifica desde el módulo Stock. "
+          ? "El stock cambia con ingresos de mercadería, remitos o ajustes (Inventario). "
           : "Stock inicial: cantidad con la que empieza el inventario. "}
         Stock mínimo: al llegar a ese número el sistema avisa que hay que
         reponer (0 = sin aviso).
@@ -250,6 +285,7 @@ function VarianteForm({
   onRemove,
   precioGlobal,
   moneda,
+  soloMinimo,
 }) {
   const simbolo = moneda === "usd" ? "US$" : "$";
   return (
@@ -322,6 +358,7 @@ function VarianteForm({
           })
         }
         stockSoloLectura={!!variante.id}
+        soloMinimo={soloMinimo && !variante.id}
       />
     </div>
   );
@@ -349,7 +386,9 @@ function Opcion({ id, checked, onChange, titulo, ayuda, children }) {
   );
 }
 
-function ProductoModal({ producto, categorias, onClose, onSave }) {
+// sinStockInicial: se crea desde un ingreso de mercadería, así que el stock
+// entra con ese ingreso (acá solo se configura el mínimo)
+export function ProductoModal({ producto, categorias, onClose, onSave, sinStockInicial = false }) {
   const [form, setForm] = useState({
     nombre: producto?.nombre || "",
     descripcion: producto?.descripcion || "",
@@ -486,8 +525,10 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
         await productosService.update(producto.id, data);
         toast.success("Producto actualizado");
       } else {
-        await productosService.create(data);
-        toast.success("Producto creado");
+        const creado = await productosService.create(data);
+        toast.success(`Producto «${creado?.nombre || data.nombre}» creado`);
+        onSave(creado);
+        return;
       }
       onSave();
     } catch (error) {
@@ -719,6 +760,7 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
                     })
                   }
                   stockSoloLectura={!!producto}
+                  soloMinimo={sinStockInicial && !producto}
                 />
               )}
               {form.tiene_variantes &&
@@ -731,6 +773,7 @@ function ProductoModal({ producto, categorias, onClose, onSave }) {
                     onRemove={() => removeVariante(i)}
                     precioGlobal={precioGlobal}
                     moneda={moneda}
+                    soloMinimo={sinStockInicial}
                   />
                 ))}
               {form.tiene_variantes && form.variantes.length === 0 && (
@@ -798,6 +841,30 @@ function accionesProducto({ producto, onEdit, onDelete, onToggleDetalle, expandi
 
 const thSub = "text-center px-4 py-2 text-xs font-medium text-gray-500";
 
+// Stock general: suma de todas las sucursales (y de las variantes)
+const stockTotalProducto = (p) =>
+  SUCURSALES.reduce((a, s) => a + stockDeSucursal(p, s.value), 0);
+
+// Sucursales donde el producto (o alguna variante) llegó a su mínimo
+const sucursalesBajasProducto = (p) =>
+  SUCURSALES.filter((s) => bajoEnSucursal(p, s.value));
+
+function EstadoStock({ producto }) {
+  const bajas = sucursalesBajasProducto(producto);
+  if (bajas.length === 0)
+    return (
+      <span className="px-2 py-1 rounded-lg text-xs font-medium bg-green-100 text-green-700">OK</span>
+    );
+  return (
+    <span
+      title="Stock en el mínimo o por debajo: hay que reponer"
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium bg-red-100 text-red-700 whitespace-nowrap"
+    >
+      <AlertTriangle size={11} /> Bajo en {bajas.map((b) => b.label.replace("Sucursal ", "S")).join(" y ")}
+    </span>
+  );
+}
+
 function MinimosSucursal({ item }) {
   return (
     <span className="text-xs text-gray-500 whitespace-nowrap">
@@ -810,7 +877,7 @@ function MinimosSucursal({ item }) {
   );
 }
 
-function FilaProducto({ producto, categorias, onEdit, onDelete }) {
+function FilaProducto({ producto, categorias, onEdit, onDelete, puedeEditar }) {
   const [expandido, setExpandido] = useState(false);
   const getNombreCategoria = (id) =>
     categorias.find((c) => c.id === id)?.nombre || "-";
@@ -854,13 +921,18 @@ function FilaProducto({ producto, categorias, onEdit, onDelete }) {
             }
           />
         </td>
-        {SUCURSALES.map((suc) => (
-          <td key={suc.value} className="col-num px-6 py-4 ">
-            <CeldaStock producto={producto} sucursal={suc.value} />
-          </td>
-        ))}
-        <td className="col-centro px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
-          {producto.fecha_creacion ? formatDate(producto.fecha_creacion) : "-"}
+        <td className="col-num px-6 py-4">
+          <button
+            type="button"
+            onClick={toggle}
+            title="Ver el stock de cada sucursal"
+            className="text-sm font-semibold text-gray-800 hover:text-blue-700"
+          >
+            {stockTotalProducto(producto)}
+          </button>
+        </td>
+        <td className="col-centro px-6 py-4">
+          <EstadoStock producto={producto} />
         </td>
         <td className="col-acc px-6 py-4 ">
           <div className="flex items-center justify-center gap-1">
@@ -871,15 +943,17 @@ function FilaProducto({ producto, categorias, onEdit, onDelete }) {
             >
               {expandido ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
-            <MenuAcciones
-              acciones={accionesProducto({
-                producto,
-                onEdit,
-                onDelete,
-                onToggleDetalle: toggle,
-                expandido,
-              })}
-            />
+            {puedeEditar && (
+              <MenuAcciones
+                acciones={accionesProducto({
+                  producto,
+                  onEdit,
+                  onDelete,
+                  onToggleDetalle: toggle,
+                  expandido,
+                })}
+              />
+            )}
           </div>
         </td>
       </tr>
@@ -887,7 +961,7 @@ function FilaProducto({ producto, categorias, onEdit, onDelete }) {
       {/* Fila expandida */}
       {expandido && (
         <tr>
-          <td colSpan={7} className="px-6 pb-4 bg-gray-50">
+          <td colSpan={6} className="px-6 pb-4 bg-gray-50">
             <div className="rounded-xl border border-gray-200 overflow-hidden">
               {producto.tiene_variantes ? (
                 <table className="w-full text-sm">
@@ -1307,6 +1381,10 @@ export default function Productos() {
   // La vista sale de la dirección (?vista=...): la eligen el menú y las pestañas del módulo
   const [params] = useSearchParams();
   const tab = params.get("vista") === "categorias" ? "categorias" : "productos";
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  // Cajeros y vendedores consultan el stock; lo modifican depósito y administración
+  const puedeEditar = user?.rol === "administrador" || user?.rol === "deposito";
   const [productos, setProductos] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1322,6 +1400,7 @@ export default function Productos() {
     categoria_id: "",
     precio_min: "",
     precio_max: "",
+    stock: "",
     estado: "",
   });
   const [showFiltros, setShowFiltros] = useState(false);
@@ -1412,10 +1491,15 @@ export default function Productos() {
         : p.stock_actual === 0;
       if (!sinStock) return false;
     }
+    if (filtros.stock === "bajo" && sucursalesBajasProducto(p).length === 0) return false;
     if (filtros.estado === "activo" && !p.activo) return false;
     if (filtros.estado === "inactivo" && p.activo) return false;
     return true;
   });
+
+  const productosBajos = productos.filter(
+    (p) => p.activo !== false && sucursalesBajasProducto(p).length > 0,
+  );
 
   const handleExportar = () => {
     if (filtered.length === 0) {
@@ -1438,8 +1522,8 @@ export default function Productos() {
       fecha_creacion: fechaCreacion,
       categoria: (p) => nombreCategoria(p.categoria_id),
       precio: getPrecioVenta,
-      stock_sucursal_1: (p) => stockDeSucursal(p, "sucursal_1"),
-      stock_sucursal_2: (p) => stockDeSucursal(p, "sucursal_2"),
+      stock_total: stockTotalProducto,
+      estado_stock: (p) => (sucursalesBajasProducto(p).length ? 0 : 1),
     },
   });
   const productosPaginados = tabla.filas;
@@ -1448,7 +1532,7 @@ export default function Productos() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">
-          {tab === "categorias" ? "Categorías" : "Productos"}
+          {tab === "categorias" ? "Categorías" : "Productos y stock"}
         </h1>
       </div>
 
@@ -1459,10 +1543,11 @@ export default function Productos() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <p className="text-gray-500 text-sm">
-                {productos.length} productos registrados
+                {productos.length} productos · stock total de las dos sucursales (tocá
+                el número para ver cada sucursal)
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={handleExportar}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition text-sm font-medium"
@@ -1470,18 +1555,49 @@ export default function Productos() {
                 <Download size={18} />
                 Exportar lista
               </button>
-              <button
-                onClick={() => {
-                  setSelectedProducto(null);
-                  setShowModal(true);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
-              >
-                <Plus size={18} />
-                Nuevo Producto
-              </button>
+              {puedeEditar && (
+                <>
+                  <button
+                    onClick={() => navigate("/compras?nuevo=1")}
+                    className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-700 bg-white rounded-xl hover:bg-blue-50 transition text-sm font-medium"
+                  >
+                    <PackagePlus size={18} />
+                    Ingreso de mercadería
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSelectedProducto(null);
+                      setShowModal(true);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
+                  >
+                    <Plus size={18} />
+                    Nuevo producto
+                  </button>
+                </>
+              )}
             </div>
           </div>
+
+          {/* Aviso de stock bajo */}
+          {productosBajos.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setFiltros({ ...filtros, stock: filtros.stock === "bajo" ? "" : "bajo" })}
+              className="w-full text-left bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3 hover:bg-red-100/60 transition"
+            >
+              <AlertTriangle size={20} className="text-red-500 shrink-0" />
+              <span className="text-sm text-red-700">
+                <span className="font-semibold">
+                  {productosBajos.length} {productosBajos.length === 1 ? "producto" : "productos"}
+                </span>{" "}
+                con stock en el mínimo o por debajo.{" "}
+                <span className="underline">
+                  {filtros.stock === "bajo" ? "Ver todos" : "Ver solo esos"}
+                </span>
+              </span>
+            </button>
+          )}
 
           {/* Filtros */}
           <div className="space-y-3">
@@ -1573,6 +1689,7 @@ export default function Productos() {
                     <option value="">Todos</option>
                     <option value="con_stock">Con stock</option>
                     <option value="sin_stock">Sin stock</option>
+                    <option value="bajo">En el mínimo o por debajo</option>
                   </select>
                 </div>
                 <div>
@@ -1626,9 +1743,8 @@ export default function Productos() {
                       <ThOrdenable campo="nombre" tabla={tabla} align="center" className="px-6 py-3">Producto</ThOrdenable>
                       <ThOrdenable campo="categoria" tabla={tabla} align="center" className="px-6 py-3">Categoría</ThOrdenable>
                       <ThOrdenable campo="precio" tabla={tabla} align="center" className="px-6 py-3">Precio Venta</ThOrdenable>
-                      <ThOrdenable campo="stock_sucursal_1" tabla={tabla} align="center" className="px-6 py-3">Stock Suc. 1</ThOrdenable>
-                      <ThOrdenable campo="stock_sucursal_2" tabla={tabla} align="center" className="px-6 py-3">Stock Suc. 2</ThOrdenable>
-                      <ThOrdenable campo="fecha_creacion" tabla={tabla} align="center" className="px-6 py-3">Creado</ThOrdenable>
+                      <ThOrdenable campo="stock_total" tabla={tabla} align="center" className="px-6 py-3">Stock total</ThOrdenable>
+                      <ThOrdenable campo="estado_stock" tabla={tabla} align="center" className="px-6 py-3">Estado</ThOrdenable>
                       <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                         Acciones
                       </th>
@@ -1645,6 +1761,7 @@ export default function Productos() {
                           setShowModal(true);
                         }}
                         onDelete={handleDelete}
+                        puedeEditar={puedeEditar}
                       />
                     ))}
                   </tbody>
@@ -1683,16 +1800,18 @@ export default function Productos() {
                           )}
                         </div>
                       </div>
-                      <MenuAcciones
-                        acciones={accionesProducto({
-                          producto,
-                          onEdit: (p) => {
-                            setSelectedProducto(p);
-                            setShowModal(true);
-                          },
-                          onDelete: handleDelete,
-                        })}
-                      />
+                      {puedeEditar && (
+                        <MenuAcciones
+                          acciones={accionesProducto({
+                            producto,
+                            onEdit: (p) => {
+                              setSelectedProducto(p);
+                              setShowModal(true);
+                            },
+                            onDelete: handleDelete,
+                          })}
+                        />
+                      )}
                     </div>
                     {producto.tiene_variantes ? (
                       <div className="mt-2 space-y-1">

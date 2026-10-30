@@ -1,3 +1,4 @@
+import re
 from fastapi import APIRouter, HTTPException, Depends
 from app.database import get_db
 from app.models.supplier import SupplierCreate, SupplierUpdate
@@ -43,7 +44,7 @@ async def create_supplier(supplier: SupplierCreate, current_user: dict = Depends
     check_permission(current_user["role"], "proveedores:create")
     db = get_db()
     existing = await db.proveedores.find_one({
-        "nombre": {"$regex": f"^{supplier.nombre}$", "$options": "i"}
+        "nombre": {"$regex": f"^{re.escape(supplier.nombre.strip())}$", "$options": "i"}
     })
     if existing:
         raise HTTPException(status_code=400, detail=f"Ya existe un proveedor con el nombre '{supplier.nombre}'")
@@ -62,7 +63,7 @@ async def update_supplier(supplier_id: str, supplier: SupplierUpdate, current_us
     db = get_db()
     if supplier.nombre:
         existing = await db.proveedores.find_one({
-            "nombre": {"$regex": f"^{supplier.nombre}$", "$options": "i"},
+            "nombre": {"$regex": f"^{re.escape(supplier.nombre.strip())}$", "$options": "i"},
             "_id": {"$ne": ObjectId(supplier_id)}
         })
         if existing:

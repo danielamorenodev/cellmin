@@ -30,6 +30,9 @@ import { formatCurrency, formatDateTime, nombreSucursal } from "../utils/helpers
 import MenuAcciones from "../components/ui/MenuAcciones";
 import { useSucursales } from "../hooks/useSucursales";
 import DetalleCompra from "../components/ui/DetalleCompra";
+import BuscadorProducto from "../components/ui/BuscadorProducto";
+import { ProductoModal } from "./Productos";
+import { categoriasService } from "../services/categorias.service";
 
 function ProveedorModal({ proveedor, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -50,12 +53,14 @@ function ProveedorModal({ proveedor, onClose, onSave }) {
         await proveedoresService.update(proveedor.id, form);
         toast.success("Proveedor actualizado");
       } else {
-        await proveedoresService.create(form);
-        toast.success("Proveedor creado");
+        const creado = await proveedoresService.create(form);
+        toast.success(`Proveedor «${form.nombre}» creado`);
+        onSave(creado);
+        return;
       }
       onSave();
     } catch (error) {
-      toast.error("Error al guardar el proveedor");
+      toast.error(error.response?.data?.detail || "Error al guardar el proveedor");
     } finally {
       setLoading(false);
     }
@@ -162,9 +167,12 @@ function ProveedorModal({ proveedor, onClose, onSave }) {
   );
 }
 
+// Ingreso de mercadería: lo que llega del proveedor suma stock en la sucursal
+// que lo recibe. Se eligen productos existentes o se crean en el momento.
 function NuevaCompraModal({ onClose, onSave }) {
   const [proveedores, setProveedores] = useState([]);
   const [productos, setProductos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const { opciones: sucursalesOpc, unica: sucursalUnica, porDefecto } =
     useSucursales();
   const [form, setForm] = useState({
@@ -175,69 +183,75 @@ function NuevaCompraModal({ onClose, onSave }) {
     items: [],
   });
   const [loading, setLoading] = useState(false);
+  const [nuevoProducto, setNuevoProducto] = useState(false);
+  const [nuevoProveedor, setNuevoProveedor] = useState(false);
 
   useEffect(() => {
-    Promise.all([proveedoresService.getAll(), productosService.getAll()]).then(
-      ([provs, prods]) => {
-        setProveedores(provs);
-        setProductos(prods);
-      },
-    );
+    Promise.all([
+      proveedoresService.getAll(),
+      productosService.getAll(),
+      categoriasService.getAll(),
+    ]).then(([provs, prods, cats]) => {
+      setProveedores(provs.filter((p) => p.activo !== false));
+      setProductos(prods);
+      setCategorias(cats);
+    });
   }, []);
 
-  const agregarItem = () => {
-    setForm({
-      ...form,
-      items: [
-        ...form.items,
-        {
-          producto_id: "",
+  const lineasDe = (producto) =>
+    producto.tiene_variantes
+      ? [{
+          producto_id: producto.id,
           variante_nombre: "",
-          nombre_producto: "",
+          nombre_producto: producto.nombre,
           cantidad: 1,
           precio_unitario: 0,
-          subtotal: 0,
-        },
-      ],
-    });
+        }]
+      : [{
+          producto_id: producto.id,
+          variante_nombre: "",
+          nombre_producto: producto.nombre,
+          cantidad: 1,
+          precio_unitario: producto.precio_costo || 0,
+        }];
+
+  const agregarProducto = (producto) =>
+    setForm((f) => ({ ...f, items: [...f.items, ...lineasDe(producto)] }));
+
+  // Producto recién creado: se suma a la lista y entra al ingreso (una
+  // línea por variante, con su costo)
+  const productoCreado = (p) => {
+    setNuevoProducto(false);
+    if (!p) return;
+    setProductos((lista) => [...lista, p]);
+    const lineas = p.tiene_variantes
+      ? p.variantes.map((v) => ({
+          producto_id: p.id,
+          variante_nombre: v.nombre,
+          nombre_producto: p.nombre,
+          cantidad: 1,
+          precio_unitario: v.precio_costo || 0,
+        }))
+      : lineasDe(p);
+    setForm((f) => ({ ...f, items: [...f.items, ...lineas] }));
   };
 
-  const eliminarItem = (index) => {
+  const eliminarItem = (index) =>
     setForm({ ...form, items: form.items.filter((_, i) => i !== index) });
-  };
 
   const updateItem = (index, field, value) => {
-    const newItems = [...form.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-
-    if (field === "producto_id") {
-      const producto = productos.find((p) => p.id === value);
-      newItems[index].nombre_producto = producto?.nombre || "";
-      newItems[index].variante_nombre = "";
-      if (!producto?.tiene_variantes) {
-        newItems[index].precio_unitario = producto?.precio_costo || 0;
-      }
-    }
-
+    const items = [...form.items];
+    items[index] = { ...items[index], [field]: value };
     if (field === "variante_nombre") {
-      const producto = productos.find(
-        (p) => p.id === newItems[index].producto_id,
-      );
+      const producto = productos.find((p) => p.id === items[index].producto_id);
       const variante = producto?.variantes?.find((v) => v.nombre === value);
-      if (variante)
-        newItems[index].precio_unitario = variante.precio_costo || 0;
+      if (variante) items[index].precio_unitario = variante.precio_costo || 0;
     }
-
-    if (field === "cantidad" || field === "precio_unitario") {
-      newItems[index].subtotal =
-        newItems[index].cantidad * newItems[index].precio_unitario;
-    }
-
-    setForm({ ...form, items: newItems });
+    setForm({ ...form, items });
   };
 
   const total = form.items.reduce(
-    (acc, item) => acc + item.cantidad * item.precio_unitario,
+    (acc, item) => acc + (Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0),
     0,
   );
 
@@ -256,263 +270,253 @@ function NuevaCompraModal({ onClose, onSave }) {
         items: form.items.map((item) => ({
           ...item,
           cantidad: parseInt(item.cantidad),
-          precio_unitario: parseFloat(item.precio_unitario),
-          subtotal: parseInt(item.cantidad) * parseFloat(item.precio_unitario),
+          precio_unitario: parseFloat(item.precio_unitario) || 0,
+          subtotal: parseInt(item.cantidad) * (parseFloat(item.precio_unitario) || 0),
           variante_nombre: item.variante_nombre || null,
         })),
       };
+      const unidades = data.items.reduce((a, i) => a + i.cantidad, 0);
       await comprasService.create(data);
-      toast.success("Compra registrada correctamente");
+      toast.success(
+        `Ingreso registrado: ${unidades} ${unidades === 1 ? "unidad sumada" : "unidades sumadas"} al stock de ${nombreSucursal(data.sucursal)}`,
+      );
       onSave();
     } catch (error) {
-      toast.error(
-        error.response?.data?.detail || "Error al registrar la compra",
-      );
+      toast.error(error.response?.data?.detail || "Error al registrar el ingreso");
     } finally {
       setLoading(false);
     }
   };
 
+  const CAMPO =
+    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const ETIQUETA = "block text-xs font-medium text-gray-600 mb-1";
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-100 sticky top-0 bg-white">
-          <h2 className="text-lg font-semibold text-gray-800">Nueva Compra</h2>
+      <div className="bg-white rounded-2xl w-full max-w-4xl shadow-xl max-h-[92vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-100 shrink-0">
+          <h2 className="text-lg font-semibold text-gray-800">Ingreso de mercadería</h2>
+          <p className="text-xs text-gray-500">Lo que se carga acá se suma al stock de la sucursal que lo recibe.</p>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Proveedor *
-              </label>
-              <select
-                required
-                value={form.proveedor_id}
-                onChange={(e) =>
-                  setForm({ ...form, proveedor_id: e.target.value })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Seleccionar proveedor</option>
-                {proveedores.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sucursal que recibe la mercadería *
-              </label>
-              {sucursalUnica ? (
-                <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-700">
-                  {nombreSucursal(sucursalUnica)}
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+          <div className="overflow-y-auto px-6 py-5 space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="ing-proveedor" className={ETIQUETA}>Proveedor *</label>
+                  <button
+                    type="button"
+                    onClick={() => setNuevoProveedor(true)}
+                    className="text-xs text-blue-600 hover:underline mb-1"
+                  >
+                    + Nuevo proveedor
+                  </button>
                 </div>
-              ) : (
                 <select
+                  id="ing-proveedor"
                   required
-                  value={form.sucursal}
-                  onChange={(e) =>
-                    setForm({ ...form, sucursal: e.target.value })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={form.proveedor_id}
+                  onChange={(e) => setForm({ ...form, proveedor_id: e.target.value })}
+                  className={CAMPO}
                 >
-                  <option value="">Seleccionar sucursal</option>
-                  {sucursalesOpc.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
+                  <option value="">Elegí el proveedor</option>
+                  {proveedores.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
                     </option>
                   ))}
                 </select>
-              )}
+              </div>
+              <div>
+                <label htmlFor="ing-sucursal" className={ETIQUETA}>Sucursal que recibe *</label>
+                {sucursalUnica ? (
+                  <div className="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-sm text-gray-700">
+                    {nombreSucursal(sucursalUnica)}
+                  </div>
+                ) : (
+                  <select
+                    id="ing-sucursal"
+                    required
+                    value={form.sucursal}
+                    onChange={(e) => setForm({ ...form, sucursal: e.target.value })}
+                    className={CAMPO}
+                  >
+                    <option value="">Elegí la sucursal</option>
+                    {sucursalesOpc.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div>
+                <label htmlFor="ing-remito" className={ETIQUETA}>N° de remito o factura</label>
+                <input
+                  id="ing-remito"
+                  type="text"
+                  value={form.numero_remito}
+                  onChange={(e) => setForm({ ...form, numero_remito: e.target.value })}
+                  placeholder="Del comprobante del proveedor"
+                  className={CAMPO}
+                />
+              </div>
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Número de remito
-              </label>
-              <input
-                type="text"
-                value={form.numero_remito}
-                onChange={(e) =>
-                  setForm({ ...form, numero_remito: e.target.value })
-                }
-                placeholder="ej: R-0001"
-                className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+            <section className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Productos</h3>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1">
+                  <BuscadorProducto
+                    productos={productos}
+                    onElegir={agregarProducto}
+                    placeholder="Producto existente: buscar por nombre o código..."
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNuevoProducto(true)}
+                  className="inline-flex items-center justify-center gap-1 px-3 py-2 border border-blue-600 text-blue-700 rounded-lg text-sm hover:bg-blue-50 whitespace-nowrap"
+                >
+                  <Plus size={15} /> Producto nuevo
+                </button>
+              </div>
+
+              {form.items.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-6 border border-dashed border-gray-300 rounded-lg">
+                  Buscá un producto que ya existe o creá uno nuevo.
+                </p>
+              ) : (
+                <div className="border border-gray-200 rounded-lg overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 text-xs text-gray-500">
+                      <tr>
+                        <th className="text-left font-medium px-3 py-2">Producto</th>
+                        <th className="text-left font-medium px-2 py-2 w-24">Cantidad</th>
+                        <th className="text-left font-medium px-2 py-2 w-36">Costo unitario</th>
+                        <th className="text-right font-medium px-3 py-2 w-32">Subtotal</th>
+                        <th className="w-8" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {form.items.map((item, index) => {
+                        const producto = productos.find((p) => p.id === item.producto_id);
+                        return (
+                          <tr key={index}>
+                            <td className="px-3 py-1.5">
+                              <p className="text-gray-800">{item.nombre_producto}</p>
+                              {producto?.tiene_variantes && (
+                                <select
+                                  required
+                                  value={item.variante_nombre}
+                                  onChange={(e) => updateItem(index, "variante_nombre", e.target.value)}
+                                  aria-label="Variante"
+                                  className={`${CAMPO} mt-1 py-1.5`}
+                                >
+                                  <option value="">Elegí la variante</option>
+                                  {producto.variantes.map((v) => (
+                                    <option key={v.nombre} value={v.nombre}>
+                                      {v.nombre}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <InputNumero
+                                value={item.cantidad}
+                                onChange={(v) => updateItem(index, "cantidad", v)}
+                                decimales={0}
+                                required
+                                aria-label="Cantidad"
+                                className={CAMPO}
+                              />
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <InputNumero
+                                value={item.precio_unitario}
+                                onChange={(v) => updateItem(index, "precio_unitario", v)}
+                                aria-label="Costo unitario"
+                                className={CAMPO}
+                              />
+                            </td>
+                            <td className="px-3 py-1.5 text-right text-gray-700 whitespace-nowrap">
+                              {formatCurrency((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}
+                            </td>
+                            <td className="pr-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => eliminarItem(index)}
+                                aria-label="Quitar producto"
+                                className="p-1 text-gray-400 hover:text-red-600"
+                              >
+                                <X size={15} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            <div>
+              <label htmlFor="ing-notas" className={ETIQUETA}>Notas</label>
+              <textarea
+                id="ing-notas"
+                value={form.notas}
+                onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                rows={2}
+                className={`${CAMPO} resize-none`}
               />
             </div>
           </div>
 
-          {/* Items */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">
-                Productos
-              </span>
-              <button
-                type="button"
-                onClick={agregarItem}
-                className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
-              >
-                <Plus size={16} />
-                Agregar producto
-              </button>
-            </div>
-
-            {form.items.length === 0 && (
-              <p className="text-sm text-gray-500 text-center py-4 border-2 border-dashed border-gray-200 rounded-xl">
-                No hay productos. Hacé click en "Agregar producto".
-              </p>
-            )}
-
-            {form.items.map((item, index) => {
-              const productoSel = productos.find(
-                (p) => p.id === item.producto_id,
-              );
-              return (
-                <div
-                  key={index}
-                  className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50"
-                >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Producto *
-                      </label>
-                      <select
-                        required
-                        value={item.producto_id}
-                        onChange={(e) =>
-                          updateItem(index, "producto_id", e.target.value)
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
-                        <option value="">Seleccionar</option>
-                        {productos.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {productoSel?.tiene_variantes && (
-                      <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Variante *
-                        </label>
-                        <select
-                          required
-                          value={item.variante_nombre}
-                          onChange={(e) =>
-                            updateItem(index, "variante_nombre", e.target.value)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="">Seleccionar variante</option>
-                          {productoSel.variantes.map((v) => (
-                            <option key={v.nombre} value={v.nombre}>
-                              {v.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Cantidad *
-                      </label>
-                      <InputNumero
-                        value={item.cantidad}
-                        onChange={(v) =>
-                          updateItem(
-                            index,
-                            "cantidad",
-                            v,
-                          )}
-                        decimales={0}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">
-                        Precio unitario *
-                      </label>
-                      <InputNumero
-                        value={item.precio_unitario}
-                        onChange={(v) =>
-                          updateItem(
-                            index,
-                            "precio_unitario",
-                            v,
-                          )}
-                        required
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      Subtotal:{" "}
-                      {formatCurrency(item.cantidad * item.precio_unitario)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => eliminarItem(index)}
-                      className="text-sm text-red-500 hover:text-red-700"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notas
-            </label>
-            <textarea
-              value={form.notas}
-              onChange={(e) => setForm({ ...form, notas: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-            />
-          </div>
-
-          {/* Total */}
-          <div className="bg-blue-50 rounded-xl p-4 flex items-center justify-between">
-            <span className="font-semibold text-gray-700">
-              Total de la compra
-            </span>
-            <span className="text-xl font-bold text-blue-700">
-              {formatCurrency(total)}
-            </span>
-          </div>
-
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-6 py-3 border-t border-gray-100 shrink-0">
+            <p className="flex-1 text-sm text-gray-600">
+              Total del ingreso: <span className="text-lg font-bold text-gray-800">{formatCurrency(total)}</span>
+            </p>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
+              className="sm:w-40 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 disabled:bg-blue-400 transition"
+              className="sm:w-48 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:bg-blue-400 transition"
             >
-              {loading ? "Registrando..." : "Registrar Compra"}
+              {loading ? "Registrando..." : "Registrar ingreso"}
             </button>
           </div>
         </form>
       </div>
+
+      {nuevoProducto && (
+        <ProductoModal
+          categorias={categorias}
+          sinStockInicial
+          onClose={() => setNuevoProducto(false)}
+          onSave={productoCreado}
+        />
+      )}
+      {nuevoProveedor && (
+        <ProveedorModal
+          onClose={() => setNuevoProveedor(false)}
+          onSave={(creado) => {
+            setNuevoProveedor(false);
+            if (creado?.id) {
+              setProveedores((l) => [...l, creado]);
+              setForm((f) => ({ ...f, proveedor_id: creado.id }));
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -587,7 +591,7 @@ function accionesCompra({ compra, onCancel, onVerDetalle }) {
         window.open(`/compras/${compra._id}`, "_blank", "noopener"),
     },
     !cancelada && onCancel && {
-      label: "Cancelar compra",
+      label: "Anular ingreso",
       icono: <XCircle size={14} />,
       peligro: true,
       onClick: () => onCancel(compra._id, compra.numero_compra),
@@ -1078,7 +1082,8 @@ export default function Compras() {
   const [proveedores, setProveedores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [showModal, setShowModal] = useState(false);
+  // "?nuevo=1" abre directamente el ingreso (botón de Productos y stock)
+  const [showModal, setShowModal] = useState(() => params.get("nuevo") === "1");
   const [compraCancelar, setCompraCancelar] = useState(null);
   const [compraDetalle, setCompraDetalle] = useState(null);
 
@@ -1091,7 +1096,7 @@ export default function Compras() {
       setCompras(comps);
       setProveedores(provs);
     } catch (error) {
-      toast.error("Error al cargar compras");
+      toast.error("Error al cargar los ingresos");
     } finally {
       setLoading(false);
     }
@@ -1113,12 +1118,12 @@ export default function Compras() {
   const handleCancelar = async () => {
     try {
       await comprasService.cancelar(compraCancelar.id);
-      toast.success("Compra cancelada y stock revertido");
+      toast.success("Ingreso anulado: se restó el stock que había sumado");
       setCompraCancelar(null);
       fetchData();
     } catch (error) {
       toast.error(
-        error.response?.data?.detail || "Error al cancelar la compra",
+        error.response?.data?.detail || "Error al anular el ingreso",
       );
       setCompraCancelar(null);
     }
@@ -1140,7 +1145,7 @@ export default function Compras() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-800">
-          {tab === "proveedores" ? "Proveedores" : "Compras"}
+          {tab === "proveedores" ? "Proveedores" : "Ingresos de mercadería"}
         </h1>
       </div>
 
@@ -1150,14 +1155,14 @@ export default function Compras() {
         <div className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <p className="text-gray-500 text-sm">
-              {compras.length} compras registradas
+              {compras.length} ingresos registrados · lo que llega de los proveedores
             </p>
             <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
             >
               <Plus size={18} />
-              Nueva Compra
+              Nuevo ingreso
             </button>
           </div>
 
@@ -1180,7 +1185,7 @@ export default function Compras() {
           ) : filtered.length === 0 ? (
             <div className="text-center py-12">
               <Truck size={48} className="mx-auto text-gray-300 mb-3" />
-              <p className="text-gray-500">No hay compras registradas</p>
+              <p className="text-gray-500">No hay ingresos registrados</p>
             </div>
           ) : (
             <>
@@ -1273,7 +1278,7 @@ export default function Compras() {
 
       {compraCancelar && (
         <ModalConfirmar
-          mensaje={`¿Cancelar la compra ${compraCancelar.numero}? Se va a restar el stock que había sumado.`}
+          mensaje={`¿Anular el ingreso ${compraCancelar.numero}? Se va a restar el stock que había sumado.`}
           onConfirmar={handleCancelar}
           onCancelar={() => setCompraCancelar(null)}
         />

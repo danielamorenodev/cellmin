@@ -8,6 +8,7 @@ import Clientes from "./pages/Clientes";
 import NotFound from "./pages/NotFound";
 import Productos from "./pages/Productos";
 import Stock from "./pages/Stock";
+import Remitos from "./pages/Remitos";
 import Compras from "./pages/Compras";
 import CompraDetalle from "./pages/CompraDetalle";
 import Ventas from "./pages/Ventas";
@@ -72,11 +73,20 @@ export default function App() {
         }
       />
       <Route path="/proveedores" element={<Navigate to="/compras?vista=proveedores" replace />} />
+      <Route path="/stock" element={<Navigate to="/productos" replace />} />
       <Route
-        path="/stock"
+        path="/movimientos"
         element={
           <PrivateLayout>
             <Stock />
+          </PrivateLayout>
+        }
+      />
+      <Route
+        path="/remitos"
+        element={
+          <PrivateLayout>
+            <Remitos />
           </PrivateLayout>
         }
       />
