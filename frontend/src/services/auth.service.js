@@ -16,6 +16,12 @@ export const authService = {
     return response.data;
   },
 
+  // El usuario conectado cambia su propia contraseña
+  cambiarClave: async (actual, nueva) => {
+    const response = await api.put("/auth/password", { actual, nueva });
+    return response.data;
+  },
+
   logout: () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");

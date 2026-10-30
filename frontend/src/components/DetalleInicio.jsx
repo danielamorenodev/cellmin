@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, ArrowRight } from "lucide-react";
-import api from "../services/api";
 import {
   ESTADOS_REP,
   formatCurrency,
@@ -13,26 +11,19 @@ import {
 
 const TITULOS = {
   reparaciones: "Reparaciones activas",
+  listas: "Listas para entregar",
+  mias: "Asignadas a mí",
+  atrasadas: "Reparaciones atrasadas",
   ventas: "Ventas de hoy",
   stock: "Productos con stock bajo",
 };
 const DESTINO = { reparaciones: "/reparaciones", ventas: "/ventas", stock: "/productos" };
 
-// Lo que hay detrás de cada número del Inicio: se abre debajo de las tarjetas
-export default function DetalleInicio({ tipo, onClose }) {
-  const [filas, setFilas] = useState(null);
+// Lo que hay detrás de cada número del Inicio: se abre debajo de las
+// tarjetas, ya con los datos cargados (así aparece de una sola vez).
+// tipo: reparaciones | ventas | stock; filtro: listas | mias | atrasadas
+export default function DetalleInicio({ tipo, filtro, filas, onClose }) {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    let vigente = true;
-    api
-      .get(`/reports/dashboard/detalle/${tipo}`)
-      .then((r) => vigente && setFilas(r.data))
-      .catch(() => vigente && setFilas([]));
-    return () => {
-      vigente = false;
-    };
-  }, [tipo]);
 
   const th = "text-left font-medium px-3 py-2 whitespace-nowrap";
   const td = "px-3 py-2";
@@ -41,7 +32,7 @@ export default function DetalleInicio({ tipo, onClose }) {
     <section className="bg-white rounded-2xl shadow-sm border border-gray-100">
       <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
         <h2 className="font-semibold text-gray-800">
-          {TITULOS[tipo]} {filas && <span className="text-gray-400 font-normal">({filas.length})</span>}
+          {TITULOS[filtro || tipo]} <span className="text-gray-400 font-normal">({filas.length})</span>
         </h2>
         <div className="flex items-center gap-2">
           <button
@@ -55,9 +46,7 @@ export default function DetalleInicio({ tipo, onClose }) {
           </button>
         </div>
       </div>
-      {!filas ? (
-        <p className="px-5 py-6 text-sm text-gray-500">Cargando...</p>
-      ) : filas.length === 0 ? (
+      {filas.length === 0 ? (
         <p className="px-5 py-6 text-sm text-gray-500">No hay nada para mostrar.</p>
       ) : (
         <div className="overflow-x-auto max-h-[28rem]">

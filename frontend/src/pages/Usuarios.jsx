@@ -7,7 +7,9 @@ import {
   Shield,
   UserCheck,
   Search,
+  KeyRound,
 } from "lucide-react";
+import CambiarClaveModal from "../components/CambiarClaveModal";
 import { usuariosService } from "../services/usuarios.service";
 import toast from "react-hot-toast";
 import MenuAcciones from "../components/ui/MenuAcciones";
@@ -207,6 +209,8 @@ export default function Usuarios() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selected, setSelected] = useState(null);
+  // Usuario al que el administrador le cambia la contraseña
+  const [claveDe, setClaveDe] = useState(null);
   const [filtros, setFiltros] = useState({
     busqueda: "",
     estado: "",
@@ -268,6 +272,11 @@ export default function Usuarios() {
         setSelected(usuario);
         setShowModal(true);
       },
+    },
+    {
+      label: "Cambiar contraseña",
+      icono: <KeyRound size={15} />,
+      onClick: () => setClaveDe(usuario),
     },
     {
       label: usuario.activo ? "Desactivar" : "Activar",
@@ -523,6 +532,8 @@ export default function Usuarios() {
           }}
         />
       )}
+
+      {claveDe && <CambiarClaveModal usuario={claveDe} onClose={() => setClaveDe(null)} />}
     </div>
   );
 }
