@@ -2377,7 +2377,7 @@ export default function Reparaciones() {
       setTiposDisponibles(tipos);
 
       // Solo verificar caja si el rol lo permite
-      if (user?.rol !== "tecnico" && user?.rol !== "deposito") {
+      if (!["tecnico", "deposito", "vendedor"].includes(user?.rol)) {
         try {
           const cajaActual = await cajaService.getActual();
           setCajaAbierta(cajaActual?.estado === "abierta");
