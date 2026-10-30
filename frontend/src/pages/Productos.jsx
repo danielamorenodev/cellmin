@@ -963,93 +963,61 @@ function FilaProducto({ producto, categorias, onEdit, onDelete, puedeEditar }) {
         <tr>
           <td colSpan={6} className="px-6 pb-4 bg-gray-50">
             <div className="rounded-xl border border-gray-200 overflow-hidden">
-              {producto.tiene_variantes ? (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    {producto.tiene_variantes ? (
                       <th className={thSub}>Variante</th>
-                      <th className={thSub}>Cód. Barras</th>
-                      <th className={thSub}>P. Costo</th>
-                      <th className={thSub}>P. Venta</th>
-                      <th className={thSub}>Stock Suc. 1</th>
-                      <th className={thSub}>Stock Suc. 2</th>
-                      <th className={thSub}>Mín. Suc. 1</th>
-                      <th className={thSub}>Mín. Suc. 2</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {producto.variantes.map((v, i) => (
-                      <tr key={i} className="bg-white">
-                        <td className="px-4 py-2 font-medium text-gray-700">
-                          {v.nombre}
+                    ) : (
+                      <th className={thSub}>Descripción</th>
+                    )}
+                    <th className={thSub}>Cód. Barras</th>
+                    <th className={thSub}>P. Costo</th>
+                    <th className={thSub}>P. Venta</th>
+                    <th className={thSub}>Sucursal</th>
+                    <th className={thSub}>Stock</th>
+                    <th className={thSub}>Stock mínimo</th>
+                  </tr>
+                </thead>
+                {(producto.tiene_variantes ? producto.variantes : [producto]).map((item, i) => (
+                  <tbody key={i} className="bg-white border-t border-gray-200 first-of-type:border-t-0">
+                    {SUCURSALES.map((suc, j) => (
+                      <tr key={suc.value} className={j > 0 ? "border-t border-gray-100" : ""}>
+                        {j === 0 && (
+                          <>
+                            <td rowSpan={SUCURSALES.length} className="px-4 py-2 align-middle">
+                              {producto.tiene_variantes ? (
+                                <span className="font-medium text-gray-700">{item.nombre}</span>
+                              ) : (
+                                <span className="text-gray-600">{item.descripcion || "-"}</span>
+                              )}
+                            </td>
+                            <td rowSpan={SUCURSALES.length} className="col-centro px-4 py-2 text-gray-500 text-xs align-middle">
+                              {item.codigo_barras || "-"}
+                            </td>
+                            <td rowSpan={SUCURSALES.length} className="col-num px-4 py-2 text-gray-600 align-middle">
+                              {formatCurrency(item.precio_costo)}
+                            </td>
+                            <td rowSpan={SUCURSALES.length} className="col-num px-4 py-2 text-gray-600 align-middle">
+                              {formatCurrency(item.precio_venta)}
+                              <PrecioUSD pesos={item.precio_venta} className="block" />
+                            </td>
+                          </>
+                        )}
+                        <td className="px-4 py-2 text-gray-700 whitespace-nowrap border-l border-gray-100">
+                          {suc.label}
                         </td>
-                        <td className="col-centro px-4 py-2 text-gray-500 text-xs">
-                          {v.codigo_barras || "-"}
+                        <td className="col-num px-4 py-2">
+                          <CeldaStock producto={item} sucursal={suc.value} />
                         </td>
-                        <td className="col-num px-4 py-2 text-gray-600">
-                          {formatCurrency(v.precio_costo)}
+                        <td className="col-num px-4 py-2 text-gray-500">
+                          {minimoEn(item, suc.value)}
                         </td>
-                        <td className="col-num px-4 py-2 text-gray-600">
-                          {formatCurrency(v.precio_venta)}
-                          <PrecioUSD pesos={v.precio_venta} className="block" />
-                        </td>
-                        {SUCURSALES.map((suc) => (
-                          <td key={suc.value} className="col-num px-4 py-2">
-                            <CeldaStock producto={v} sucursal={suc.value} />
-                          </td>
-                        ))}
-                        {SUCURSALES.map((suc) => (
-                          <td key={`min-${suc.value}`} className="col-num px-4 py-2 text-gray-500">
-                            {minimoEn(v, suc.value)}
-                          </td>
-                        ))}
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className={thSub}>Cód. Barras</th>
-                      <th className={thSub}>Descripción</th>
-                      <th className={thSub}>P. Costo</th>
-                      <th className={thSub}>P. Venta</th>
-                      <th className={thSub}>Stock Suc. 1</th>
-                      <th className={thSub}>Stock Suc. 2</th>
-                      <th className={thSub}>Mín. Suc. 1</th>
-                      <th className={thSub}>Mín. Suc. 2</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="bg-white">
-                      <td className="col-centro px-4 py-2 text-gray-500 text-xs">
-                        {producto.codigo_barras || "-"}
-                      </td>
-                      <td className="px-4 py-2 text-gray-600">
-                        {producto.descripcion || "-"}
-                      </td>
-                      <td className="col-num px-4 py-2 text-gray-600">
-                        {formatCurrency(producto.precio_costo)}
-                      </td>
-                      <td className="col-num px-4 py-2 text-gray-600">
-                        {formatCurrency(producto.precio_venta)}
-                        <PrecioUSD pesos={producto.precio_venta} className="block" />
-                      </td>
-                      {SUCURSALES.map((suc) => (
-                        <td key={suc.value} className="col-num px-4 py-2">
-                          <CeldaStock producto={producto} sucursal={suc.value} />
-                        </td>
-                      ))}
-                      {SUCURSALES.map((suc) => (
-                        <td key={`min-${suc.value}`} className="col-num px-4 py-2 text-gray-500">
-                          {minimoEn(producto, suc.value)}
-                        </td>
-                      ))}
-                    </tr>
-                  </tbody>
-                </table>
-              )}
+                ))}
+              </table>
             </div>
           </td>
         </tr>
