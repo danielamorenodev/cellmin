@@ -41,7 +41,12 @@ async def lifespan(app: FastAPI):
     await migrar_stock_por_sucursal(get_db())
     from app.utils.migraciones import aplicar_migraciones
     await aplicar_migraciones(get_db())
+    # Actualización automática del dólar (solo actúa si el administrador la activó)
+    import asyncio
+    from app.utils.cotizacion import ciclo_automatico
+    tarea_dolar = asyncio.create_task(ciclo_automatico(get_db))
     yield
+    tarea_dolar.cancel()
     await close_db()
 
 # En producción no se publica la documentación interactiva de la API

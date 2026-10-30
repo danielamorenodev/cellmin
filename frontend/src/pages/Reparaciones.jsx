@@ -309,7 +309,10 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
   const { user } = useAuth();
   // La orden queda en la sucursal de la caja del usuario (el servidor lo define);
   // si no tiene caja abierta, en su primera sucursal.
-  const { porDefecto: sucursalUsuario } = useSucursales();
+  const { porDefecto: sucursalUsuario, opciones: sucursalesOpc } = useSucursales();
+  // Con caja abierta, la orden ingresa en la sucursal de esa caja; si no, se
+  // elige entre las sucursales del usuario (el administrador, cualquiera)
+  const [sucursalCaja, setSucursalCaja] = useState(null);
   const [clientes, setClientes] = useState([]);
   const [tiposDisponibles, setTiposDisponibles] = useState([]);
   const [showNuevoCliente, setShowNuevoCliente] = useState(false);
@@ -350,6 +353,20 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
     });
     marcasService.getAll().then(setMarcas).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (cajaAbierta) {
+      cajaService
+        .getActual()
+        .then((c) => {
+          if (c?.estado === "abierta" && c.sucursal) {
+            setSucursalCaja(c.sucursal);
+            setForm((f) => ({ ...f, sucursal: c.sucursal }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [cajaAbierta]);
 
   // Marca y modelo: se eligen del catálogo o se crean en el momento
   const marcaElegida = marcas.find(
@@ -543,10 +560,30 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                 </select>
               </div>
               <div>
-                <span className="block text-xs text-gray-600 mb-1">Sucursal de ingreso</span>
-                <div className="px-3 py-2 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-700">
-                  {nombreSucursal(form.sucursal)}
-                </div>
+                <label htmlFor="rep-sucursal" className="block text-xs text-gray-600 mb-1">
+                  Sucursal de ingreso
+                </label>
+                {sucursalCaja || sucursalesOpc.length < 2 ? (
+                  <div
+                    title={sucursalCaja ? "Es la sucursal de tu caja abierta" : undefined}
+                    className="px-3 py-2 border border-gray-200 bg-gray-50 rounded-xl text-sm text-gray-700"
+                  >
+                    {nombreSucursal(form.sucursal)}
+                  </div>
+                ) : (
+                  <select
+                    id="rep-sucursal"
+                    value={form.sucursal}
+                    onChange={(e) => setForm({ ...form, sucursal: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {sucursalesOpc.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label htmlFor="rep-estimada" className="block text-xs text-gray-600 mb-1">
