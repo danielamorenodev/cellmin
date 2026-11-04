@@ -244,7 +244,7 @@ export default function Sidebar() {
       </aside>
 
       {/* Barra superior del celular */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-30 bg-gray-900 flex items-center gap-3 px-4 py-3">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-30 h-14 bg-gray-900 flex items-center gap-3 px-4">
         <button
           onClick={() => {
             setDesplegado(null);

@@ -1,8 +1,9 @@
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
-import { LogOut, User, DollarSign, ChevronDown, KeyRound } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LogOut, User, DollarSign, ChevronDown, KeyRound, HelpCircle } from "lucide-react";
 import CambiarClaveModal from "../CambiarClaveModal";
+import Ayuda from "../ayuda/Ayuda";
 import { useCotizacion } from "../../hooks/useCotizacion";
 import { formatCurrency } from "../../utils/helpers";
 import toast from "react-hot-toast";
@@ -14,6 +15,19 @@ export default function Header() {
   const esAdmin = user?.rol === "administrador";
   const [menuUsuario, setMenuUsuario] = useState(false);
   const [cambiarClave, setCambiarClave] = useState(false);
+  const [ayuda, setAyuda] = useState(false);
+
+  // La tecla ? abre la ayuda (salvo mientras se escribe en un campo)
+  useEffect(() => {
+    const tecla = (e) => {
+      if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.target.closest?.("input, textarea, select, [contenteditable]")) return;
+      e.preventDefault();
+      setAyuda(true);
+    };
+    document.addEventListener("keydown", tecla);
+    return () => document.removeEventListener("keydown", tecla);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -30,7 +44,7 @@ export default function Header() {
   };
 
   return (
-    <header className="h-16 shrink-0 bg-white border-b border-gray-200 px-4 md:px-6 flex items-center justify-between">
+    <header className="h-16 shrink-0 mt-14 md:mt-0 bg-white border-b border-gray-200 px-4 md:px-6 flex items-center justify-between">
       <div className="flex items-center gap-2">
         <span className="text-gray-500 text-sm hidden md:block">
           Sistema de Gestión — Cellmin
@@ -70,6 +84,15 @@ export default function Header() {
             )}
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => setAyuda(true)}
+          title="Ayuda: cómo usar el sistema (?)"
+          aria-label="Abrir la ayuda"
+          className="w-9 h-9 flex items-center justify-center rounded-full text-gray-500 hover:text-blue-700 hover:bg-blue-50 transition"
+        >
+          <HelpCircle size={20} />
+        </button>
         <div className="relative">
           <button
             type="button"
@@ -114,6 +137,7 @@ export default function Header() {
         </button>
       </div>
       {cambiarClave && <CambiarClaveModal onClose={() => setCambiarClave(false)} />}
+      {ayuda && <Ayuda onClose={() => setAyuda(false)} />}
     </header>
   );
 }
