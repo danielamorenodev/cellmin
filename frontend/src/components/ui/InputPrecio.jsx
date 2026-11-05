@@ -65,19 +65,21 @@ export default function InputPrecio({
   );
 }
 
-// Selector de la moneda en la que se cargan los precios, con la cotización
-// que se usa para convertir entre pesos y dólares
+// Moneda del precio del producto:
+// - Pesos: el precio queda fijo aunque cambie el dólar (fundas, vidrios...).
+// - Dólares: se guarda en US$ y el precio en pesos se actualiza solo cada vez
+//   que se carga un valor nuevo del dólar.
 export function SelectorMoneda({ moneda, onChange }) {
   const { disponible, venta } = useCotizacion();
   const opciones = [
-    { v: "ars", t: "Pesos ($)" },
-    { v: "usd", t: "Dólares (US$)" },
+    { v: "ars", t: "Pesos (fijo)" },
+    { v: "usd", t: "Dólares (sigue al dólar)" },
   ];
   return (
     <div className="flex flex-col items-end gap-0.5 text-xs">
       <div className="flex items-center gap-2">
-        <span className="text-gray-500">Cargar en</span>
-        <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden" role="group" aria-label="Moneda de los precios">
+        <span className="text-gray-500">Precio en</span>
+        <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden" role="group" aria-label="Moneda del precio">
           {opciones.map((o) => (
             <button
               key={o.v}
@@ -96,13 +98,17 @@ export function SelectorMoneda({ moneda, onChange }) {
           ))}
         </div>
       </div>
-      {disponible ? (
-        <span className="text-gray-500">
-          Cotización utilizada: $ {new Intl.NumberFormat("es-AR").format(venta)} por USD
-        </span>
-      ) : (
+      {!disponible ? (
         <span className="text-red-600">
           Sin cotización cargada: solo se puede cargar en pesos
+        </span>
+      ) : moneda === "usd" ? (
+        <span className="text-gray-500">
+          El precio en pesos se recalcula con el dólar (hoy $ {new Intl.NumberFormat("es-AR").format(venta)})
+        </span>
+      ) : (
+        <span className="text-gray-500">
+          El precio no cambia cuando sube el dólar
         </span>
       )}
     </div>

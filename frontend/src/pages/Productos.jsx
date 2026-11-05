@@ -28,6 +28,7 @@ import MenuAcciones from "../components/ui/MenuAcciones";
 import { productosService } from "../services/productos.service";
 import toast from "react-hot-toast";
 import PrecioUSD from "../components/ui/PrecioUSD";
+import { useCotizacion } from "../hooks/useCotizacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
 import {
@@ -404,11 +405,21 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
     })),
     precio_costo: producto?.precio_costo || "",
     precio_venta: producto?.precio_venta || "",
+    // Precio en dólares: el precio en pesos se actualiza con el dólar
+    precio_en_usd: producto?.precio_en_usd || false,
     stock_sucursal: producto ? mapaDe(producto, "stock") : mapaVacio(""),
     stock_minimo_sucursal: producto ? mapaDe(producto, "minimo") : mapaVacio(0),
   });
   const [precioGlobal, setPrecioGlobal] = useState(false);
-  const [moneda, setMoneda] = useState("ars");
+  const moneda = form.precio_en_usd ? "usd" : "ars";
+  const setMoneda = (m) => setForm((f) => ({ ...f, precio_en_usd: m === "usd" }));
+  const cotizacion = useCotizacion();
+  // Pesos -> dólares para guardar el precio en US$ (2 decimales)
+  const enUSD = (pesos) => {
+    if (pesos === "" || pesos == null || Number.isNaN(Number(pesos))) return null;
+    const v = cotizacion.aUSD(Number(pesos));
+    return v === null ? null : Math.round(v * 100) / 100;
+  };
   const [precioCostoGlobal, setPrecioCostoGlobal] = useState("");
   const [precioVentaGlobal, setPrecioVentaGlobal] = useState("");
   const [loading, setLoading] = useState(false);
@@ -494,6 +505,13 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
           stock_minimo_sucursal: mapaAEnteros(v.stock_minimo_sucursal),
         };
         // El stock de variantes existentes no se envía: solo cambia por movimientos
+        if (form.precio_en_usd) {
+          base.precio_costo_usd = enUSD(v.precio_costo);
+          base.precio_venta_usd = enUSD(v.precio_venta);
+        } else {
+          base.precio_costo_usd = null;
+          base.precio_venta_usd = null;
+        }
         return v.id
           ? base
           : { ...base, stock_sucursal: mapaAEnteros(stock_sucursal) };
@@ -514,6 +532,10 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
           : mapaAEnteros(stock_minimo_sucursal),
         codigo_barras: form.codigo_barras || generarCodigoBarras(),
       };
+      if (form.precio_en_usd && !form.tiene_variantes) {
+        data.precio_costo_usd = enUSD(form.precio_costo);
+        data.precio_venta_usd = enUSD(form.precio_venta);
+      }
       // En la creación el stock inicial va en el producto o en cada variante;
       // en la edición el backend ignora el stock existente.
       if (!producto) {
@@ -897,6 +919,14 @@ function FilaProducto({ producto, categorias, onEdit, onDelete, puedeEditar }) {
               >
                 {producto.variantes.length} variantes
               </button>
+            )}
+            {producto.precio_en_usd && (
+              <span
+                title="Precio en dólares: se actualiza con el dólar"
+                className="px-1.5 py-0.5 bg-green-50 text-green-700 text-xs rounded-md whitespace-nowrap"
+              >
+                US$
+              </span>
             )}
             {!producto.activo && (
               <span className="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded-md">

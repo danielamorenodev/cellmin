@@ -91,6 +91,10 @@ async def guardar_cotizacion(db, valor: float, user_id: str, fuente: str = "Carg
         "fuente": fuente,
         "fecha": ahora,
     })
+    # Los productos con precio en dólares pasan a valer en pesos según el
+    # valor nuevo; los que tienen precio en pesos (fundas, etc.) no cambian.
+    from app.utils.precios import actualizar_precios_en_usd
+    await actualizar_precios_en_usd(db, valor)
     return await obtener_cotizacion(db)
 
 

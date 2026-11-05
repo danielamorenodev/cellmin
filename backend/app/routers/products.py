@@ -8,6 +8,8 @@ from bson import ObjectId
 from datetime import datetime
 from app.utils.stock import completar, mapa, SUCURSALES
 from app.utils.logger import registrar_auditoria
+from app.utils.precios import normalizar_moneda
+from app.utils.cotizacion import cotizacion_venta
 
 router = APIRouter()
 
@@ -41,6 +43,9 @@ def format_product(p):
         "variantes": p.get("variantes", []),
         "precio_costo": p.get("precio_costo"),
         "precio_venta": p.get("precio_venta"),
+        "precio_en_usd": p.get("precio_en_usd", False),
+        "precio_costo_usd": p.get("precio_costo_usd"),
+        "precio_venta_usd": p.get("precio_venta_usd"),
         "stock_actual": p.get("stock_actual", 0),
         "stock_minimo": p.get("stock_minimo", 0),
         "stock_sucursal": p["stock_sucursal"],
@@ -61,6 +66,8 @@ async def get_products(current_user: dict = Depends(get_current_user)):
 @router.get("/{product_id}")
 async def get_product(product_id: str, current_user: dict = Depends(get_current_user)):
     db = get_db()
+    if not ObjectId.is_valid(product_id):
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
     product = await db.productos.find_one({"_id": ObjectId(product_id)})
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -73,7 +80,8 @@ async def create_product(product: ProductCreate, current_user: dict = Depends(ge
     existing = await db.productos.find_one({"nombre": {"$regex": f"^{re.escape(product.nombre.strip())}$", "$options": "i"}})
     if existing:
         raise HTTPException(status_code=400, detail=f"Ya existe un producto con el nombre '{product.nombre}'")
-    datos = product.dict()
+    datos = product.model_dump()
+    datos = normalizar_moneda(datos, await cotizacion_venta(db) if datos.get("precio_en_usd") else None)
     _validar_mapas(datos, "Producto")
     for v in datos["variantes"]:
         _validar_mapas(v, f"Variante '{v['nombre']}'")
@@ -94,6 +102,8 @@ async def create_product(product: ProductCreate, current_user: dict = Depends(ge
 async def update_product(product_id: str, product: ProductUpdate, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "productos:update")
     db = get_db()
+    if not ObjectId.is_valid(product_id):
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
     if product.nombre:
         existing = await db.productos.find_one({
             "nombre": {"$regex": f"^{re.escape(product.nombre.strip())}$", "$options": "i"},
@@ -101,11 +111,13 @@ async def update_product(product_id: str, product: ProductUpdate, current_user: 
         })
         if existing:
             raise HTTPException(status_code=400, detail=f"Ya existe un producto con el nombre '{product.nombre}'")
-    update_data = {k: v for k, v in product.dict().items() if v is not None}
+    update_data = {k: v for k, v in product.model_dump().items() if v is not None}
     actual = await db.productos.find_one({"_id": ObjectId(product_id)})
     if not actual:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     actual = _con_stock(actual)
+    sigue_dolar = update_data.get("precio_en_usd", actual.get("precio_en_usd", False))
+    update_data = normalizar_moneda(update_data, await cotizacion_venta(db) if sigue_dolar else None, actual)
 
     # El stock se modifica solo con movimientos, compras y ventas. Desde acá
     # se editan los mínimos; las variantes nuevas entran con su stock inicial.
@@ -158,16 +170,11 @@ async def _registrar_cambios_de_precio(antes, despues, user):
 async def delete_product(product_id: str, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
+    if not ObjectId.is_valid(product_id):
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
     producto = await db.productos.find_one({"_id": ObjectId(product_id)})
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     nuevo_estado = not producto.get("activo", True)
     await db.productos.update_one({"_id": ObjectId(product_id)}, {"$set": {"activo": nuevo_estado}})
     return {"message": f"Producto {'activado' if nuevo_estado else 'desactivado'} correctamente"}
-
-@router.delete("/{product_id}")
-async def delete_product(product_id: str, current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "*")
-    db = get_db()
-    await db.productos.update_one({"_id": ObjectId(product_id)}, {"$set": {"activo": False}})
-    return {"message": "Producto eliminado correctamente"}

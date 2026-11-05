@@ -89,7 +89,7 @@ export const GUIAS = [
           "En **Inventario → Productos y stock**, presioná **Nuevo producto**. El formulario está dividido en cuatro partes: información del producto, características, precios e inventario.",
           "En **Información del producto** cargá nombre y categoría. En **Código de barras**, escaneá el código del empaque o escribilo; si el producto no tiene, presioná **Generar interno** (si lo dejás vacío, el sistema lo genera al guardar).",
           "En **Características**, si el producto tiene colores o capacidades, marcá **Tiene variantes**. Si es un celular, dejá marcada **Pedir el IMEI al venderlo** (se marca sola si la categoría es de celulares). El IMEI no se carga acá: se pide en cada venta, uno por unidad.",
-          "En **Precios**, elegí si cargás en pesos o en dólares: el sistema muestra la cotización utilizada y calcula el otro valor. Con variantes, podés marcar **Mismo precio para todas las variantes** y presionar **Aplicar**.",
+          "En **Precios**, elegí la moneda del precio. **Pesos (fijo)**: el precio no cambia cuando sube el dólar (fundas, vidrios, cargadores). **Dólares (sigue al dólar)**: se carga en US$ y el precio en pesos se actualiza solo cada vez que se carga un valor nuevo del dólar; en el listado esos productos llevan la etiqueta **US$**. Con variantes, podés marcar **Mismo precio para todas las variantes** y presionar **Aplicar**.",
           "En **Inventario**, completá la tabla de cada sucursal: el **stock inicial** es la cantidad con la que empieza el producto y el **stock mínimo** es el número en el que el sistema avisa que hay que reponer (0 = sin aviso). Con variantes, cada una tiene su propia tabla.",
           "Presioná **Guardar**."
         ]

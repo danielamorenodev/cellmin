@@ -8,6 +8,9 @@ class Variante(BaseModel):
     codigo_barras: Optional[str] = None
     precio_costo: float
     precio_venta: float
+    # Si el producto tiene el precio en dólares: los valores en US$
+    precio_costo_usd: Optional[float] = None
+    precio_venta_usd: Optional[float] = None
     stock_actual: int = 0
     stock_minimo: int = 0
     # Stock y mínimo de cada sucursal: {"sucursal_1": 5, "sucursal_2": 0}
@@ -24,6 +27,11 @@ class ProductCreate(BaseModel):
     variantes: List[Variante] = []
     precio_costo: Optional[float] = None
     precio_venta: Optional[float] = None
+    # Precio en dólares: el precio en pesos se recalcula cada vez que cambia
+    # el dólar. En pesos (False) queda fijo, por ejemplo en fundas.
+    precio_en_usd: bool = False
+    precio_costo_usd: Optional[float] = None
+    precio_venta_usd: Optional[float] = None
     stock_actual: Optional[int] = 0
     stock_minimo: Optional[int] = 0
     stock_sucursal: Optional[Dict[str, int]] = None
@@ -42,6 +50,9 @@ class ProductUpdate(BaseModel):
     variantes: Optional[List[Variante]] = None
     precio_costo: Optional[float] = None
     precio_venta: Optional[float] = None
+    precio_en_usd: Optional[bool] = None
+    precio_costo_usd: Optional[float] = None
+    precio_venta_usd: Optional[float] = None
     stock_minimo: Optional[int] = None
     stock_minimo_sucursal: Optional[Dict[str, int]] = None
     activo: Optional[bool] = None
