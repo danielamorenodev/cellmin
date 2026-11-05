@@ -29,7 +29,9 @@ async def get_repair_types(current_user: dict = Depends(get_current_user)):
 
 @router.post("/")
 async def create_repair_type(tipo: RepairTypeCreate, current_user: dict = Depends(get_current_user)):
-    check_permission(current_user["role"], "*")
+    # Además del administrador, quien define el problema de una orden (técnico,
+    # vendedor, cajero) puede crear el tipo en el momento
+    check_permission(current_user["role"], "tipos_reparacion:create")
     db = get_db()
     existing = await db.tipos_reparacion.find_one({
         "nombre": {"$regex": f"^{re.escape(tipo.nombre.strip())}$", "$options": "i"}
@@ -37,7 +39,8 @@ async def create_repair_type(tipo: RepairTypeCreate, current_user: dict = Depend
     if existing:
         raise HTTPException(status_code=400, detail=f"Ya existe un tipo de reparación con el nombre '{tipo.nombre}'")
     new_tipo = {
-        **tipo.dict(),
+        **tipo.model_dump(),
+        "creado_por": current_user["user_id"],
         "fecha_creacion": datetime.utcnow()
     }
     result = await db.tipos_reparacion.insert_one(new_tipo)
@@ -48,6 +51,8 @@ async def create_repair_type(tipo: RepairTypeCreate, current_user: dict = Depend
 async def update_repair_type(tipo_id: str, tipo: RepairTypeUpdate, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
+    if not ObjectId.is_valid(tipo_id) or not await db.tipos_reparacion.find_one({"_id": ObjectId(tipo_id)}):
+        raise HTTPException(status_code=404, detail="Tipo de reparación no encontrado")
     if tipo.nombre:
         existing = await db.tipos_reparacion.find_one({
             "nombre": {"$regex": f"^{re.escape(tipo.nombre.strip())}$", "$options": "i"},
@@ -64,6 +69,8 @@ async def update_repair_type(tipo_id: str, tipo: RepairTypeUpdate, current_user:
 async def delete_repair_type(tipo_id: str, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
+    if not ObjectId.is_valid(tipo_id):
+        raise HTTPException(status_code=404, detail="Tipo de reparación no encontrado")
     tipo = await db.tipos_reparacion.find_one({"_id": ObjectId(tipo_id)})
     if not tipo:
         raise HTTPException(status_code=404, detail="Tipo de reparación no encontrado")

@@ -11,6 +11,7 @@ PERMISSIONS = {
         "reparaciones:read", "reparaciones:create",
         "reparaciones:update_estado", "reparaciones:presupuesto",
         "reparaciones:pago", "reparaciones:entregar",
+        "tipos_reparacion:read", "tipos_reparacion:create",
     ],
     "vendedor": [
         "dashboard:read",
@@ -20,6 +21,7 @@ PERMISSIONS = {
         "reparaciones:read", "reparaciones:create",
         "reparaciones:update_estado", "reparaciones:presupuesto",
         "reparaciones:entregar",
+        "tipos_reparacion:read", "tipos_reparacion:create",
     ],
     "deposito": [
         "dashboard:read",

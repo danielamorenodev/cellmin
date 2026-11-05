@@ -184,16 +184,59 @@ function NuevoClienteModal({ onClose, onSave }) {
   );
 }
 
-function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle }) {
+// Crea un tipo de reparación en el momento (al definir el problema) y lo
+// agrega a la lista. Devuelve el tipo creado o null si no se pudo.
+async function crearTipoEnElMomento(nombre, precio, setTipos) {
+  try {
+    const tipo = await tiposReparacionService.create({ nombre, precio });
+    setTipos((l) => [...l, tipo]);
+    toast.success(`Tipo «${tipo.nombre}» creado`);
+    return tipo;
+  } catch (error) {
+    toast.error(mensajeError(error, "No se pudo crear el tipo de reparación"));
+    return null;
+  }
+}
+
+function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle, onCrear }) {
   const [busqueda, setBusqueda] = useState("");
   const [pagina, setPagina] = useState(1);
+  // Alta rápida: nombre (lo buscado) y precio
+  const [creando, setCreando] = useState(false);
+  const [precioNuevo, setPrecioNuevo] = useState("");
+  const [guardando, setGuardando] = useState(false);
   const POR_PAGINA = 6;
 
-  const tiposFiltrados = tiposDisponibles.filter((t) =>
-    `${t.nombre} ${t.descripcion || ""}`
-      .toLowerCase()
-      .includes(busqueda.toLowerCase()),
+  // Los tipos desactivados no se ofrecen (sí se muestran los ya elegidos)
+  const tiposFiltrados = tiposDisponibles.filter(
+    (t) =>
+      t.activo !== false &&
+      `${t.nombre} ${t.descripcion || ""}`
+        .toLowerCase()
+        .includes(busqueda.toLowerCase()),
   );
+  const nombreNuevo = busqueda.trim();
+  const existeIgual = tiposDisponibles.some(
+    (t) => t.nombre.trim().toLowerCase() === nombreNuevo.toLowerCase(),
+  );
+  const puedeCrear = !!onCrear && nombreNuevo.length > 0 && !existeIgual;
+
+  const confirmarCreacion = async () => {
+    const precio = parseFloat(String(precioNuevo).replace(",", "."));
+    if (!(precio >= 0) || precioNuevo === "") {
+      toast.error("Ingresá el precio de la reparación");
+      return;
+    }
+    setGuardando(true);
+    const tipo = await onCrear(nombreNuevo, precio);
+    setGuardando(false);
+    if (tipo) {
+      onToggle(tipo);
+      setCreando(false);
+      setPrecioNuevo("");
+      setBusqueda("");
+    }
+  };
   const tiposPagina = tiposFiltrados.slice(
     (pagina - 1) * POR_PAGINA,
     pagina * POR_PAGINA,
@@ -210,7 +253,7 @@ function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle }) {
         />
         <input
           type="text"
-          placeholder="Buscar tipo de reparación..."
+          placeholder={onCrear ? "Buscar o crear tipo de reparación..." : "Buscar tipo de reparación..."}
           value={busqueda}
           onChange={(e) => {
             setBusqueda(e.target.value);
@@ -219,10 +262,62 @@ function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle }) {
           className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
+      {puedeCrear &&
+        (creando ? (
+          <div className="p-3 rounded-xl border border-blue-300 bg-blue-50 space-y-2">
+            <p className="text-sm text-blue-800">
+              Nuevo tipo: <span className="font-semibold">{nombreNuevo}</span>
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                autoFocus
+                placeholder="Precio en $"
+                value={precioNuevo}
+                onChange={(e) => setPrecioNuevo(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    confirmarCreacion();
+                  }
+                }}
+                className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="button"
+                disabled={guardando}
+                onClick={confirmarCreacion}
+                className="px-3 py-2 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 disabled:bg-blue-400"
+              >
+                {guardando ? "Creando..." : "Crear y elegir"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCreando(false)}
+                className="px-3 py-2 border border-gray-300 text-gray-600 rounded-xl text-sm bg-white hover:bg-gray-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCreando(true)}
+            className="w-full flex items-center gap-2 p-3 rounded-xl border border-dashed border-blue-300 text-sm text-blue-700 hover:bg-blue-50 text-left"
+          >
+            <PlusCircle size={16} />
+            Crear tipo de reparación «{nombreNuevo}»
+          </button>
+        ))}
       <div className="space-y-1">
         {tiposFiltrados.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">
-            No se encontraron tipos
+            {onCrear
+              ? "No hay tipos con ese nombre. Escribí el problema para crearlo."
+              : "No se encontraron tipos"}
           </p>
         ) : (
           tiposPagina.map((tipo) => {
@@ -816,17 +911,12 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                   (opcional si no se conoce el problema)
                 </span>
               </p>
-              {tiposDisponibles.length === 0 ? (
-                <p className="text-sm text-gray-500 text-center py-4 border-2 border-dashed border-gray-200 rounded-xl">
-                  No hay tipos cargados. Cargalos desde "Tipos de Reparación".
-                </p>
-              ) : (
-                <SelectorTipos
-                  tiposDisponibles={tiposDisponibles}
-                  tiposSeleccionados={tiposSeleccionados}
-                  onToggle={toggleTipo}
-                />
-              )}
+              <SelectorTipos
+                tiposDisponibles={tiposDisponibles}
+                tiposSeleccionados={tiposSeleccionados}
+                onToggle={toggleTipo}
+                onCrear={(nombre, precio) => crearTipoEnElMomento(nombre, precio, setTiposDisponibles)}
+              />
             </div>
 
             {/* Estado automático */}
@@ -1042,6 +1132,8 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
 }
 
 function EditarTiposModal({ reparacion, tiposDisponibles, onClose, onSave }) {
+  // Copia local: los tipos creados en el momento se suman a la lista
+  const [tipos, setTipos] = useState(tiposDisponibles);
   const [tiposSeleccionados, setTiposSeleccionados] = useState(
     reparacion.tipos_reparacion || [],
   );
@@ -1081,7 +1173,7 @@ function EditarTiposModal({ reparacion, tiposDisponibles, onClose, onSave }) {
       toast.success("Reparación actualizada");
       onSave();
     } catch (error) {
-      toast.error("Error al actualizar");
+      toast.error(mensajeError(error, "Error al actualizar"));
     } finally {
       setLoading(false);
     }
@@ -1097,9 +1189,10 @@ function EditarTiposModal({ reparacion, tiposDisponibles, onClose, onSave }) {
         </div>
         <div className="p-6 space-y-4">
           <SelectorTipos
-            tiposDisponibles={tiposDisponibles}
+            tiposDisponibles={tipos}
             tiposSeleccionados={tiposSeleccionados}
             onToggle={toggleTipo}
+            onCrear={(nombre, precio) => crearTipoEnElMomento(nombre, precio, setTipos)}
           />
 
           <div className="flex gap-3">
@@ -2237,7 +2330,7 @@ function GestionTiposReparacion() {
           />
           <input
             type="text"
-            placeholder="Buscar tipo de reparación..."
+            placeholder={onCrear ? "Buscar o crear tipo de reparación..." : "Buscar tipo de reparación..."}
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
