@@ -123,6 +123,29 @@ export const GUIAS = [
     ]
   },
   {
+    "id": "4b-deuda-con-proveedores",
+    "capitulo": "Depósito",
+    "titulo": "Registrar lo que se le debe a un proveedor",
+    "perfiles": [
+      "deposito",
+      "administrador"
+    ],
+    "ruta": "/compras?vista=proveedores",
+    "bloques": [
+      {
+        "texto": "Cada proveedor tiene su **cuenta corriente**: lo que se le debe, con sus deudas y pagos. En **Proveedores** se ve la columna **Deuda** y arriba el **total que se les debe**; tocándolo se filtran los proveedores con deuda."
+      },
+      {
+        "pasos": [
+          "Al registrar un ingreso de mercadería, en **Pago al proveedor** elegí **Queda debiendo todo** o **Queda debiendo una parte** (y cuánto). Ese monto se suma solo a su cuenta.",
+          "Para cargar una deuda a mano o registrar un pago, abrí las acciones del proveedor y elegí **Cuenta corriente** (o tocá su deuda). Elegí **Se le debe** o **Le pagamos**, cargá el monto y el concepto y guardá.",
+          "Si se paga de más, queda **a favor** del negocio.",
+          "Un movimiento cargado por error lo anula el administrador. La deuda de un ingreso se anula cancelando ese ingreso."
+        ]
+      }
+    ]
+  },
+  {
     "id": "4-ver-el-stock-y-que-hay-que-reponer",
     "capitulo": "Depósito",
     "titulo": "Ver el stock y qué hay que reponer",

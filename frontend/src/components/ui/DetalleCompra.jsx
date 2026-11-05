@@ -93,6 +93,12 @@ export default function DetalleCompra({ compra, proveedor }) {
             <span>Total</span>
             <span>{formatCurrency(compra.total)}</span>
           </div>
+          {compra.monto_adeudado > 0 && (
+            <div className={`flex justify-between text-sm mt-1 ${cancelada ? "text-gray-500" : "text-red-700"}`}>
+              <span>Quedó debiendo al proveedor</span>
+              <span>{formatCurrency(compra.monto_adeudado)}</span>
+            </div>
+          )}
         </div>
       </div>
 

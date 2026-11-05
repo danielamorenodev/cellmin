@@ -17,6 +17,8 @@ class PurchaseCreate(BaseModel):
     sucursal: str = "sucursal_1"  # sucursal que recibe la mercadería
     numero_remito: Optional[str] = None
     notas: Optional[str] = None
+    # Cuánto de esta compra queda debiéndose al proveedor (0 = pagada)
+    monto_adeudado: float = 0
 
 class PurchaseResponse(BaseModel):
     id: str

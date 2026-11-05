@@ -18,6 +18,7 @@ import {
   Eye,
   XCircle,
   X,
+  Wallet,
 } from "lucide-react";
 import { comprasService } from "../services/compras.service";
 import { proveedoresService } from "../services/proveedores.service";
@@ -26,13 +27,14 @@ import toast from "react-hot-toast";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
-import { formatCurrency, formatDateTime, nombreSucursal } from "../utils/helpers";
+import { formatCurrency, formatDateTime, nombreSucursal, textoSaldo } from "../utils/helpers";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import { useSucursales } from "../hooks/useSucursales";
 import DetalleCompra from "../components/ui/DetalleCompra";
 import BuscadorProducto from "../components/ui/BuscadorProducto";
 import { ProductoModal } from "./Productos";
 import { categoriasService } from "../services/categorias.service";
+import CuentaProveedor from "../components/CuentaProveedor";
 
 function ProveedorModal({ proveedor, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -185,6 +187,9 @@ function NuevaCompraModal({ onClose, onSave }) {
   const [loading, setLoading] = useState(false);
   const [nuevoProducto, setNuevoProducto] = useState(false);
   const [nuevoProveedor, setNuevoProveedor] = useState(false);
+  // Pago al proveedor: todo pagado, todo adeudado o una parte
+  const [pagoProveedor, setPagoProveedor] = useState("pagado"); // pagado | debe_todo | debe_parte
+  const [montoAdeudado, setMontoAdeudado] = useState("");
 
   useEffect(() => {
     Promise.all([
@@ -261,12 +266,19 @@ function NuevaCompraModal({ onClose, onSave }) {
       toast.error("Agregá al menos un producto");
       return;
     }
+    const adeudado =
+      pagoProveedor === "debe_todo" ? total : pagoProveedor === "debe_parte" ? Number(montoAdeudado) || 0 : 0;
+    if (pagoProveedor === "debe_parte" && (adeudado <= 0 || adeudado > total + 0.01)) {
+      toast.error("Lo que queda debiendo tiene que ser mayor a 0 y no superar el total");
+      return;
+    }
     setLoading(true);
     try {
       const data = {
         ...form,
         sucursal: form.sucursal || porDefecto,
         total,
+        monto_adeudado: Math.round(adeudado * 100) / 100,
         items: form.items.map((item) => ({
           ...item,
           cantidad: parseInt(item.cantidad),
@@ -278,7 +290,8 @@ function NuevaCompraModal({ onClose, onSave }) {
       const unidades = data.items.reduce((a, i) => a + i.cantidad, 0);
       await comprasService.create(data);
       toast.success(
-        `Ingreso registrado: ${unidades} ${unidades === 1 ? "unidad sumada" : "unidades sumadas"} al stock de ${nombreSucursal(data.sucursal)}`,
+        `Ingreso registrado: ${unidades} ${unidades === 1 ? "unidad sumada" : "unidades sumadas"} al stock de ${nombreSucursal(data.sucursal)}` +
+          (adeudado > 0 ? `. Queda debiendo ${formatCurrency(adeudado)} al proveedor` : ""),
       );
       onSave();
     } catch (error) {
@@ -460,6 +473,44 @@ function NuevaCompraModal({ onClose, onSave }) {
                     </tbody>
                   </table>
                 </div>
+              )}
+            </section>
+
+            <section className="space-y-2">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Pago al proveedor</h3>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Pago al proveedor">
+                {[
+                  { v: "pagado", t: "Pagado" },
+                  { v: "debe_todo", t: "Queda debiendo todo" },
+                  { v: "debe_parte", t: "Queda debiendo una parte" },
+                ].map((o) => (
+                  <label
+                    key={o.v}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm cursor-pointer ${
+                      pagoProveedor === o.v ? "border-blue-500 bg-blue-50 text-blue-800" : "border-gray-300 text-gray-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="pago-proveedor"
+                      checked={pagoProveedor === o.v}
+                      onChange={() => setPagoProveedor(o.v)}
+                      className="w-3.5 h-3.5"
+                    />
+                    {o.t}
+                  </label>
+                ))}
+              </div>
+              {pagoProveedor === "debe_parte" && (
+                <div className="max-w-xs">
+                  <label className={ETIQUETA}>Cuánto queda debiendo ($)</label>
+                  <InputNumero value={montoAdeudado} onChange={setMontoAdeudado} className={CAMPO} />
+                </div>
+              )}
+              {pagoProveedor !== "pagado" && (
+                <p className="text-xs text-gray-500">
+                  Se suma a la cuenta del proveedor ({formatCurrency(pagoProveedor === "debe_todo" ? total : Number(montoAdeudado) || 0)}). Los pagos se registran en Proveedores → Cuenta corriente.
+                </p>
               )}
             </section>
 
@@ -802,7 +853,10 @@ function CardCompraMobile({ compra, proveedor, onCancel, onVerDetalle }) {
 }
 
 function GestionProveedores() {
+  const { user } = useAuth();
   const [proveedores, setProveedores] = useState([]);
+  // Proveedor cuya cuenta corriente (deudas y pagos) está abierta
+  const [cuentaDe, setCuentaDe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [selected, setSelected] = useState(null);
@@ -819,8 +873,11 @@ function GestionProveedores() {
       return false;
     if (filtroEstado === "activo" && !p.activo) return false;
     if (filtroEstado === "inactivo" && p.activo) return false;
+    if (filtroEstado === "deuda" && !((p.saldo_deuda || 0) > 0.009)) return false;
     return true;
   });
+  const totalAdeudado = proveedores.reduce((acc, p) => acc + Math.max(p.saldo_deuda || 0, 0), 0);
+  const conDeuda = proveedores.filter((p) => (p.saldo_deuda || 0) > 0.009).length;
 
   const fetchProveedores = async () => {
     try {
@@ -859,6 +916,11 @@ function GestionProveedores() {
 
   const accionesProveedor = (proveedor) => [
     {
+      label: "Cuenta corriente (deudas y pagos)",
+      icono: <Wallet size={14} />,
+      onClick: () => setCuentaDe(proveedor),
+    },
+    {
       label: "Editar",
       icono: <Edit size={14} />,
       onClick: () => {
@@ -878,13 +940,28 @@ function GestionProveedores() {
     porPagina: 20,
     ordenInicial: { campo: "nombre", dir: "asc" },
     accessors: {
-
+      deuda: (p) => p.saldo_deuda || 0,
     },
   });
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setFiltroEstado(filtroEstado === "deuda" ? "" : "deuda")}
+          className={`text-left rounded-xl border px-4 py-2.5 transition ${
+            filtroEstado === "deuda" ? "border-red-300 bg-red-50" : "border-gray-200 bg-white hover:bg-gray-50"
+          }`}
+        >
+          <p className="text-xs text-gray-500">Total que se les debe</p>
+          <p className={`text-lg font-bold ${totalAdeudado > 0 ? "text-red-700" : "text-gray-700"}`}>
+            {formatCurrency(totalAdeudado)}
+          </p>
+          <p className="text-xs text-gray-500">
+            {conDeuda === 0 ? "Sin deudas" : `${conDeuda} proveedor${conDeuda > 1 ? "es" : ""} con deuda`}
+          </p>
+        </button>
         <button
           onClick={() => {
             setSelected(null);
@@ -918,6 +995,7 @@ function GestionProveedores() {
           <option value="">Todos</option>
           <option value="activo">Activos</option>
           <option value="inactivo">Inactivos</option>
+          <option value="deuda">Con deuda</option>
         </select>
       </div>
 
@@ -939,6 +1017,7 @@ function GestionProveedores() {
                   <ThOrdenable campo="cuit" tabla={tabla} className="px-6 py-3">CUIT</ThOrdenable>
                   <ThOrdenable campo="contacto" tabla={tabla} className="px-6 py-3">Contacto</ThOrdenable>
                   <ThOrdenable campo="telefono" tabla={tabla} className="px-6 py-3">Teléfono</ThOrdenable>
+                  <ThOrdenable campo="deuda" tabla={tabla} className="px-6 py-3">Deuda</ThOrdenable>
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                     Acciones
                   </th>
@@ -983,6 +1062,18 @@ function GestionProveedores() {
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {proveedor.telefono || "-"}
                     </td>
+                    <td className="col-num px-6 py-4 text-sm whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setCuentaDe(proveedor)}
+                        title="Ver cuenta corriente"
+                        className={`font-medium hover:underline ${textoSaldo(proveedor.saldo_deuda || 0).color}`}
+                      >
+                        {(proveedor.saldo_deuda || 0) > 0.009
+                          ? formatCurrency(proveedor.saldo_deuda)
+                          : textoSaldo(proveedor.saldo_deuda || 0).texto}
+                      </button>
+                    </td>
                     <td className="col-acc px-6 py-4 ">
                       <div className="flex items-center justify-center gap-2">
                         <MenuAcciones acciones={accionesProveedor(proveedor)} />
@@ -1025,6 +1116,14 @@ function GestionProveedores() {
                   <MenuAcciones acciones={accionesProveedor(proveedor)} />
                 </div>
                 <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => setCuentaDe(proveedor)}
+                    className={`flex items-center gap-2 text-sm font-medium ${textoSaldo(proveedor.saldo_deuda || 0).color}`}
+                  >
+                    <Wallet size={14} />
+                    {textoSaldo(proveedor.saldo_deuda || 0).texto}
+                  </button>
                   {proveedor.contacto && (
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <User size={14} />
@@ -1065,6 +1164,15 @@ function GestionProveedores() {
             setShowModal(false);
             fetchProveedores();
           }}
+        />
+      )}
+
+      {cuentaDe && (
+        <CuentaProveedor
+          proveedor={cuentaDe}
+          esAdmin={user?.rol === "administrador"}
+          onClose={() => setCuentaDe(null)}
+          onCambio={fetchProveedores}
         />
       )}
     </div>

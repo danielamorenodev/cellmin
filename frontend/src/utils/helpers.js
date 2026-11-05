@@ -281,3 +281,10 @@ export const mensajeError = (error, porDefecto = "Ocurrió un error") => {
   if (!error?.response) return "No hay conexión con el servidor";
   return porDefecto;
 };
+
+// Texto del saldo de un proveedor: deuda, a favor o al día
+export const textoSaldo = (saldo) => {
+  if (saldo > 0.009) return { texto: `Se le debe ${formatCurrency(saldo)}`, color: "text-red-700" };
+  if (saldo < -0.009) return { texto: `A favor ${formatCurrency(-saldo)}`, color: "text-green-700" };
+  return { texto: "Al día", color: "text-gray-500" };
+};

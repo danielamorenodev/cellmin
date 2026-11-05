@@ -7,6 +7,7 @@ from bson import ObjectId
 from datetime import datetime
 from app.models.purchase import PurchaseCreate
 from app.utils.stock import validar_sucursal, stock_en, aplicar_delta, descontar_varios
+from app.utils.cuenta_proveedor import registrar_movimiento, anular_movimiento, redondear
 
 
 router = APIRouter()
@@ -43,14 +44,44 @@ async def create_purchase(purchase: PurchaseCreate, current_user: dict = Depends
     check_permission(current_user["role"], "compras:create")
     db = get_db()
     validar_sucursal(purchase.sucursal)
+    # Validar todo ANTES de registrar: proveedor, productos y cantidades
+    if not ObjectId.is_valid(purchase.proveedor_id) or not await db.proveedores.find_one({"_id": ObjectId(purchase.proveedor_id)}):
+        raise HTTPException(status_code=400, detail="Elegí un proveedor válido")
+    if not purchase.items:
+        raise HTTPException(status_code=400, detail="El ingreso no tiene productos")
+    datos = purchase.model_dump()
+    for item in datos["items"]:
+        if item["cantidad"] < 1:
+            raise HTTPException(status_code=400, detail=f"'{item['nombre_producto']}': la cantidad debe ser al menos 1")
+        if item["precio_unitario"] < 0:
+            raise HTTPException(status_code=400, detail=f"'{item['nombre_producto']}': el costo no puede ser negativo")
+        producto = await db.productos.find_one({"_id": ObjectId(item["producto_id"])}) if ObjectId.is_valid(item["producto_id"]) else None
+        if not producto:
+            raise HTTPException(status_code=400, detail=f"El producto '{item['nombre_producto']}' no existe")
+        if item.get("variante_nombre") and not any(v["nombre"] == item["variante_nombre"] for v in producto.get("variantes", [])):
+            raise HTTPException(status_code=400, detail=f"La variante '{item['variante_nombre']}' no existe")
+        # El subtotal y el total se calculan acá (no se toman del navegador)
+        item["subtotal"] = redondear(item["cantidad"] * item["precio_unitario"])
+    datos["total"] = redondear(sum(i["subtotal"] for i in datos["items"]))
+    adeudado = redondear(datos.pop("monto_adeudado", 0) or 0)
+    if adeudado < 0 or adeudado > datos["total"] + 0.01:
+        raise HTTPException(status_code=400, detail="Lo que queda debiendo no puede ser negativo ni mayor al total de la compra")
+
     numero = await get_next_number(db, "compras", "C-")
     new_purchase = {
-        **purchase.dict(),
+        **datos,
+        "monto_adeudado": adeudado,
         "numero_compra": numero,
         "usuario_id": current_user["user_id"],
         "fecha": datetime.utcnow()
     }
     result = await db.compras.insert_one(new_purchase)
+    new_purchase["_id"] = result.inserted_id
+    # Lo que no se pagó queda en la cuenta del proveedor
+    if adeudado > 0:
+        await registrar_movimiento(db, purchase.proveedor_id, "deuda", adeudado, current_user,
+                                   concepto=f"Ingreso {numero}" + (f" — remito {purchase.numero_remito}" if purchase.numero_remito else ""),
+                                   compra=new_purchase)
     # Actualizar stock por cada item
     for item in purchase.items:
         await db.stock_movimientos.insert_one({
@@ -65,7 +96,8 @@ async def create_purchase(purchase: PurchaseCreate, current_user: dict = Depends
             "fecha": datetime.utcnow()
         })
         await aplicar_delta(db, item.producto_id, item.variante_nombre, purchase.sucursal, item.cantidad)
-    return {"message": "Compra registrada", "numero_compra": numero, "id": str(result.inserted_id)}
+    return {"message": "Compra registrada", "numero_compra": numero, "id": str(result.inserted_id),
+            "total": datos["total"], "monto_adeudado": adeudado}
 
 @router.put("/{purchase_id}/cancelar")
 async def cancel_purchase(purchase_id: str, current_user: dict = Depends(get_current_user)):
@@ -73,6 +105,8 @@ async def cancel_purchase(purchase_id: str, current_user: dict = Depends(get_cur
     check_permission(current_user["role"], "compras:cancel")
     db = get_db()
 
+    if not ObjectId.is_valid(purchase_id):
+        raise HTTPException(status_code=404, detail="Compra no encontrada")
     compra = await db.compras.find_one({"_id": ObjectId(purchase_id)})
     if not compra:
         raise HTTPException(status_code=404, detail="Compra no encontrada")
@@ -130,6 +164,11 @@ async def cancel_purchase(purchase_id: str, current_user: dict = Depends(get_cur
         {"_id": ObjectId(purchase_id)},
         {"$set": {"estado": "cancelada", "fecha_cancelacion": datetime.utcnow()}},
     )
+    # La deuda que generó esta compra deja de existir
+    deudas = await db.proveedor_movimientos.find(
+        {"compra_id": purchase_id, "tipo": "deuda", "anulado": {"$ne": True}}).to_list(100)
+    for mov in deudas:
+        await anular_movimiento(db, mov)
 
     await registrar_auditoria(
         db=db,
