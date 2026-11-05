@@ -1,0 +1,6 @@
+# Dependencias para correr las pruebas automáticas (pytest)
+-r requirements.txt
+pytest==8.3.3
+pytest-asyncio==0.24.0
+mongomock-motor==0.0.36
+mongomock==4.3.0

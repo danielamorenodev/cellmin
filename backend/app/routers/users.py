@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.database import get_db
-from app.models.user import UserCreate, UserUpdate
+from app.models.user import UserCreate, UserUpdate, ROLES
+from app.routers.auth import filtro_email
 from app.utils.auth import get_current_user, hash_password
 from app.utils.permissions import check_permission
 from bson import ObjectId
@@ -8,6 +9,17 @@ from datetime import datetime
 from app.utils.logger import registrar_auditoria
 
 router = APIRouter()
+
+
+def _oid(user_id: str) -> ObjectId:
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return ObjectId(user_id)
+
+
+def _validar_rol(rol):
+    if rol is not None and rol not in ROLES:
+        raise HTTPException(status_code=400, detail=f"Rol inválido: {rol}")
 
 def format_user(user):
     return {
@@ -44,7 +56,8 @@ async def get_users(current_user: dict = Depends(get_current_user)):
 async def create_user(user: UserCreate, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
-    existing = await db.usuarios.find_one({"email": user.email})
+    _validar_rol(user.rol)
+    existing = await db.usuarios.find_one({"email": filtro_email(user.email)})
     if existing:
         raise HTTPException(status_code=400, detail="El email ya está registrado")
     if len(user.password) < 8:
@@ -54,6 +67,8 @@ async def create_user(user: UserCreate, current_user: dict = Depends(get_current
         "email": user.email,
         "password": hash_password(user.password),
         "rol": user.rol,
+        # Antes no se guardaban: todo usuario nuevo quedaba en la sucursal 1
+        "sucursales": user.sucursales,
         "activo": True,
         "fecha_creacion": datetime.utcnow()
     }
@@ -76,16 +91,30 @@ async def create_user(user: UserCreate, current_user: dict = Depends(get_current
 async def update_user(user_id: str, user: UserUpdate, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
-    update_data = {k: v for k, v in user.dict().items() if v is not None}
-    if not ObjectId.is_valid(user_id) or not await db.usuarios.find_one({"_id": ObjectId(user_id)}):
+    update_data = {k: v for k, v in user.model_dump().items() if v is not None}
+    _id = _oid(user_id)
+    actual = await db.usuarios.find_one({"_id": _id})
+    if not actual:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    _validar_rol(update_data.get("rol"))
+    if "email" in update_data:
+        repetido = await db.usuarios.find_one({"email": filtro_email(update_data["email"]), "_id": {"$ne": _id}})
+        if repetido:
+            raise HTTPException(status_code=400, detail="El email ya está registrado")
+    # El administrador no puede quitarse a sí mismo el rol ni desactivarse
+    if user_id == current_user["user_id"]:
+        if update_data.get("rol", "administrador") != "administrador" or update_data.get("activo") is False:
+            raise HTTPException(status_code=400, detail="No podés quitarte el rol de administrador ni desactivarte")
+    if "sucursales" in update_data:
+        # Se deja de usar el campo viejo "sucursal" (texto) para que no confunda
+        await db.usuarios.update_one({"_id": _id}, {"$unset": {"sucursal": ""}})
     cambia_clave = "password" in update_data
     if cambia_clave:
         if len(update_data["password"]) < 8:
             raise HTTPException(status_code=400, detail="La contraseña tiene que tener al menos 8 caracteres")
         update_data["password"] = hash_password(update_data["password"])
-    await db.usuarios.update_one({"_id": ObjectId(user_id)}, {"$set": update_data})
-    updated = await db.usuarios.find_one({"_id": ObjectId(user_id)})
+    await db.usuarios.update_one({"_id": _id}, {"$set": update_data})
+    updated = await db.usuarios.find_one({"_id": _id})
 
     await registrar_auditoria(
     db=db,
@@ -105,11 +134,13 @@ async def update_user(user_id: str, user: UserUpdate, current_user: dict = Depen
 async def delete_user(user_id: str, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
-    usuario = await db.usuarios.find_one({"_id": ObjectId(user_id)})
+    usuario = await db.usuarios.find_one({"_id": _oid(user_id)})
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if user_id == current_user["user_id"]:
+        raise HTTPException(status_code=400, detail="No podés desactivar tu propio usuario")
     nuevo_estado = not usuario.get("activo", True)
-    await db.usuarios.update_one({"_id": ObjectId(user_id)}, {"$set": {"activo": nuevo_estado}})
+    await db.usuarios.update_one({"_id": usuario["_id"]}, {"$set": {"activo": nuevo_estado}})
 
     await registrar_auditoria(
     db=db,
@@ -118,7 +149,7 @@ async def delete_user(user_id: str, current_user: dict = Depends(get_current_use
     rol=current_user["role"],
     accion="activar_desactivar",
     modulo="usuarios",
-    descripcion=f"Usuario {'desactivado' if not nuevo_estado else 'activado'}: {user_id}"
+    descripcion=f"Usuario {'desactivado' if not nuevo_estado else 'activado'}: {usuario['nombre']}"
     )
 
     return {"message": f"Usuario {'activado' if nuevo_estado else 'desactivado'} correctamente"}

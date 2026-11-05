@@ -16,6 +16,7 @@ import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
+import { mensajeError } from "../utils/helpers";
 
 const ROLES = [
   {
@@ -71,7 +72,7 @@ function UsuarioModal({ usuario, onClose, onSave }) {
       }
       onSave();
     } catch (error) {
-      toast.error("Error al guardar el usuario");
+      toast.error(mensajeError(error, "Error al guardar el usuario"));
     } finally {
       setLoading(false);
     }
@@ -260,7 +261,7 @@ export default function Usuarios() {
       );
       fetchUsuarios();
     } catch (error) {
-      toast.error("Error al actualizar usuario");
+      toast.error(mensajeError(error, "Error al actualizar usuario"));
     }
   };
 

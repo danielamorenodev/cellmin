@@ -209,8 +209,12 @@ async def create_repair(repair: RepairCreate, current_user: dict = Depends(get_c
     check_permission(current_user["role"], "reparaciones:create")
     db = get_db()
 
-    data = repair.dict()
+    data = repair.model_dump()
     sena = data.pop("sena", None)
+    if not ObjectId.is_valid(data["cliente_id"]) or not await db.clientes.find_one({"_id": ObjectId(data["cliente_id"])}):
+        raise HTTPException(status_code=400, detail="El cliente elegido no existe. Volvé a seleccionarlo.")
+    if not data["equipo"].get("marca", "").strip() or not data["equipo"].get("modelo", "").strip():
+        raise HTTPException(status_code=400, detail="Completá la marca y el modelo del equipo")
     data["equipo"] = validar_bloqueo(data["equipo"])
     data["equipo"]["marca"] = (data["equipo"].get("marca") or "").strip()
     data["equipo"]["modelo"] = (data["equipo"].get("modelo") or "").strip()

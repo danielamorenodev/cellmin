@@ -255,3 +255,29 @@ export const recargoTarjeta = (pago, tarjetas, base) => {
 // Efectivo y dólares van una sola vez por cobro; tarjetas y transferencias
 // se pueden repetir (por ejemplo, dos tarjetas distintas)
 export const MEDIOS_UNICOS = ["efectivo", "usd"];
+
+// Nombre de los campos para los errores de validación del servidor
+const CAMPOS_ERROR = {
+  email: "El email",
+  nombre: "El nombre",
+  password: "La contraseña",
+  sucursales: "Las sucursales",
+  precio: "El precio",
+  telefono: "El teléfono",
+};
+
+// Texto claro para mostrar el error de una llamada a la API. El servidor
+// manda "detail" como texto, o como lista cuando un dato no es válido (422).
+export const mensajeError = (error, porDefecto = "Ocurrió un error") => {
+  const detail = error?.response?.data?.detail;
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail) && detail.length) {
+    const d = detail[0];
+    const campo = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "";
+    if (campo === "email") return "El email no es válido";
+    const msg = String(d.msg || "").replace(/^Value error, /, "");
+    return CAMPOS_ERROR[campo] ? `${CAMPOS_ERROR[campo]}: ${msg}` : msg || porDefecto;
+  }
+  if (!error?.response) return "No hay conexión con el servidor";
+  return porDefecto;
+};

@@ -15,3 +15,4 @@ frontend/dist/
 backend/logs/
 # Respaldos locales (tienen datos personales)
 respaldos/
+.pytest_cache/

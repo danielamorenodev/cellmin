@@ -43,6 +43,7 @@ import {
   fechaLocalISO,
   formatFechaISO,
   diasAtraso,
+  mensajeError,
 } from "../utils/helpers";
 import ComboCrear from "../components/ui/ComboCrear";
 import { marcasService } from "../services/marcas.service";
@@ -79,7 +80,7 @@ function NuevoClienteModal({ onClose, onSave }) {
       toast.success("Cliente creado");
       onSave(cliente);
     } catch (error) {
-      toast.error("Error al crear cliente");
+      toast.error(mensajeError(error, "Error al crear el cliente"));
     } finally {
       setLoading(false);
     }

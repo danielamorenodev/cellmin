@@ -15,6 +15,7 @@ import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
+import { mensajeError } from "../utils/helpers";
 
 function ClienteModal({ cliente, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -40,7 +41,7 @@ function ClienteModal({ cliente, onClose, onSave }) {
       }
       onSave();
     } catch (error) {
-      toast.error("Error al guardar el cliente");
+      toast.error(mensajeError(error, "Error al guardar el cliente"));
     } finally {
       setLoading(false);
     }

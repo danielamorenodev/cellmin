@@ -5,16 +5,22 @@ from app.utils.auth import verify_password, create_access_token, get_current_use
 from pydantic import BaseModel
 from bson import ObjectId
 from app.utils.logger import registrar_auditoria, guardar_evento
+import re
 
 router = APIRouter()
+
+
+def filtro_email(email: str) -> dict:
+    """El email se compara sin distinguir mayúsculas ni espacios."""
+    return {"$regex": f"^{re.escape((email or '').strip())}$", "$options": "i"}
 
 @router.post("/login")
 async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
     db = get_db()
-    user = await db.usuarios.find_one({"email": form_data.username, "activo": True})
+    user = await db.usuarios.find_one({"email": filtro_email(form_data.username), "activo": True})
     if not user or not verify_password(form_data.password, user["password"]):
         # Se registra el intento (email y dirección), nunca la contraseña
-        existe = await db.usuarios.find_one({"email": form_data.username}, {"nombre": 1, "activo": 1})
+        existe = await db.usuarios.find_one({"email": filtro_email(form_data.username)}, {"nombre": 1, "activo": 1})
         motivo = (
             "contraseña incorrecta" if existe and existe.get("activo", True)
             else "usuario desactivado" if existe
