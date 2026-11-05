@@ -34,6 +34,9 @@ class SaleCreate(BaseModel):
     notas: Optional[str] = None
     vendedor_id: Optional[str] = None  # quién vendió (si no viene, el usuario conectado)
     clave_idempotencia: Optional[str] = None  # evita duplicar la venta por doble envio
+    # Enviar el ticket por email al registrar la venta
+    enviar_email: bool = False
+    email_destino: Optional[str] = None
 
 class SaleResponse(BaseModel):
     id: str

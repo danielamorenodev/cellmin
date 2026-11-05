@@ -18,6 +18,15 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173,http://127.0.0.1:5174"
     )
 
+    # Envío de órdenes y tickets por email (SMTP). Si smtp_host está vacío,
+    # la opción de enviar por email no aparece.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_usuario: str = ""
+    smtp_clave: str = ""
+    smtp_remitente: str = ""  # "Cellmin <ventas@cellmin.com>"; si falta, se usa smtp_usuario
+    smtp_seguridad: str = "starttls"  # starttls (puerto 587), ssl (puerto 465) o ninguna
+
     class Config:
         env_file = ".env"
 

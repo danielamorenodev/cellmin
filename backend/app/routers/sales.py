@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.database import get_db
 from app.models.sale import SaleCreate
+from app.models.repair import EnvioEmail
+from app.utils.envio_comprobantes import preparar_destino, enviar_ticket
 from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
 from bson import ObjectId
@@ -282,18 +284,29 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
     # 4c. Vendedor: el elegido o, si no se eligió, quien registra la venta
     vendedor = await persona(db, sale.vendedor_id or current_user["user_id"], ROLES_VENDEDOR, "vendedor")
 
+    # 4d. Ticket por email: el destino se valida antes de registrar la venta
+    destino = cliente_email = None
+    if sale.enviar_email:
+        destino, cliente_email = await preparar_destino(db, sale.cliente_id, sale.email_destino)
+
     # 5. Registrar la venta (una sola vez por clave: un doble click no duplica)
     previa = await reclamar_clave(db, sale.clave_idempotencia, "venta")
     if previa:
         return previa["resultado"]
     try:
-        return await _registrar_venta(
+        respuesta = await _registrar_venta(
             db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
             interes, total, metodo_pago, pagos_venta, vuelto, cotizacion, caja_cobro, sucursal, vendedor,
         )
     except Exception:
         await liberar_clave(db, sale.clave_idempotencia, "venta")
         raise
+    if sale.enviar_email:
+        # La venta ya quedó registrada: si el email falla, se avisa pero no se deshace
+        venta = await db.ventas.find_one({"_id": ObjectId(respuesta["id"])})
+        respuesta = {**respuesta, "envio_email": await enviar_ticket(
+            db, venta, destino, cliente_email, current_user["user_id"])}
+    return respuesta
 
 
 async def _registrar_venta(db, sale, current_user, items_finales, subtotal, porcentaje, descuento,
@@ -396,6 +409,23 @@ async def _guardar_venta(db, sale, current_user, items_finales, subtotal, porcen
     respuesta = {"message": "Venta registrada", "numero_venta": numero, "id": str(result.inserted_id), "total": total, "vuelto": vuelto}
     await guardar_resultado(db, sale.clave_idempotencia, "venta", respuesta)
     return respuesta
+
+
+@router.post("/{sale_id}/email")
+async def email_ticket(sale_id: str, datos: EnvioEmail, current_user: dict = Depends(get_current_user)):
+    """Envía (o reenvía) el ticket al email del cliente o al indicado."""
+    check_permission(current_user["role"], "ventas:read")
+    db = get_db()
+    if not ObjectId.is_valid(sale_id):
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    venta = await db.ventas.find_one({"_id": ObjectId(sale_id)})
+    if not venta:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    destino, cliente = await preparar_destino(db, venta.get("cliente_id"), datos.email)
+    resultado = await enviar_ticket(db, venta, destino, cliente, current_user["user_id"])
+    if not resultado["enviado"]:
+        raise HTTPException(status_code=502, detail=resultado["error"])
+    return resultado
 
 
 @router.put("/{sale_id}/cancel")

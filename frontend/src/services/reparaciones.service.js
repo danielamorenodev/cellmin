@@ -31,6 +31,12 @@ export const reparacionesService = {
     return response.data;
   },
 
+  // Envía la orden por email (al email indicado o al del cliente)
+  enviarEmail: async (id, email) => {
+    const response = await api.post(`/repairs/${id}/email`, { email: email || null });
+    return response.data;
+  },
+
   getByCliente: async (clienteId) => {
     const response = await api.get(`/repairs/cliente/${clienteId}`);
     return response.data;

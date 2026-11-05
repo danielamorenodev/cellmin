@@ -16,6 +16,7 @@ import {
   Eye,
   Ban,
   Minus,
+  Mail,
 } from "lucide-react";
 import { ventasService } from "../services/ventas.service";
 import { productosService } from "../services/productos.service";
@@ -48,6 +49,8 @@ import SelectorCliente from "../components/ui/SelectorCliente";
 import { useTabla } from "../hooks/useTabla";
 import TicketVenta from "../components/ui/TicketVenta";
 import DetalleVenta from "../components/ui/DetalleVenta";
+import { useEmailConfigurado, preferenciaEmail, avisarEnvio } from "../hooks/useEmail";
+import { CampoEnviarEmail, EnviarEmailModal } from "../components/ui/EnvioEmail";
 
 function estadoStock(stock, minimo) {
   if (stock <= 0) return "agotado";
@@ -142,6 +145,10 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
   const [pagoMixto, setPagoMixto] = useState(false);
   const [pagos, setPagos] = useState([{ metodo: "efectivo", monto: 0 }]);
   const tarjetas = useTarjetas();
+  // Ticket por email (opcional, recuerda la última elección)
+  const emailConfigurado = useEmailConfigurado();
+  const [enviarEmail, setEnviarEmail] = useState(() => preferenciaEmail.leer("venta"));
+  const [emailDestino, setEmailDestino] = useState("");
   // Quién vendió: por defecto el usuario conectado; se puede elegir otro
   // vendedor de la sucursal (por ejemplo, si cobra el cajero)
   const personal = usePersonal();
@@ -522,7 +529,13 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
       toast.error("Revisá el pago: no coincide con el total a cobrar");
       return;
     }
+    const conEmail = emailConfigurado && enviarEmail;
+    if (conEmail && !emailDestino.trim()) {
+      toast.error("Escribí el email al que se envía el ticket");
+      return;
+    }
     if (enviando.current) return;
+    preferenciaEmail.guardar("venta", enviarEmail);
     enviando.current = true;
     setLoading(true);
     try {
@@ -539,6 +552,8 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
         ...form,
         cliente_id: form.cliente_id || null,
         clave_idempotencia: claveVenta.current,
+        enviar_email: conEmail,
+        email_destino: conEmail ? emailDestino.trim() : null,
         vendedor_id: vendedorId || null,
         descuento: tipoAjuste === "descuento" ? montoAjuste : 0,
         total,
@@ -567,6 +582,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
           ? `Venta ${result.numero_venta} registrada. Vuelto: ${formatCurrency(result.vuelto)}`
           : `Venta ${result.numero_venta} registrada`,
       );
+      avisarEnvio(result.envio_email);
       onSave();
     } catch (error) {
       toast.error(
@@ -830,7 +846,10 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                 <SelectorCliente
                   clientes={clientes}
                   value={form.cliente_id}
-                  onChange={(id) => setForm({ ...form, cliente_id: id })}
+                  onChange={(id) => {
+                    setForm({ ...form, cliente_id: id });
+                    setEmailDestino(clientes.find((c) => c.id === id)?.email || "");
+                  }}
                 />
               </div>
               <div>
@@ -853,6 +872,17 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                 </select>
               </div>
             </div>
+
+            {emailConfigurado && (
+              <CampoEnviarEmail
+                activo={enviarEmail}
+                onActivo={setEnviarEmail}
+                email={emailDestino}
+                onEmail={setEmailDestino}
+                emailCliente={clientes.find((c) => c.id === form.cliente_id)?.email}
+                que="el ticket"
+              />
+            )}
 
             {/* Ajuste */}
             <div className="bg-gray-50 rounded-xl p-4 space-y-3">
@@ -1157,6 +1187,7 @@ function construirAcciones({
   onCancel,
   onImprimir,
   onVerDetalle,
+  onEnviarEmail,
 }) {
   return [
     {
@@ -1174,6 +1205,11 @@ function construirAcciones({
       icono: <Printer size={15} />,
       onClick: () => onImprimir(venta),
     },
+    onEnviarEmail && {
+      label: "Enviar ticket por email",
+      icono: <Mail size={15} />,
+      onClick: () => onEnviarEmail(venta),
+    },
     venta.estado === "completada" &&
       puedeCancelar && {
         label: "Cancelar venta",
@@ -1190,6 +1226,7 @@ function FilaVenta({
   puedeCancelar,
   onCancel,
   onImprimir,
+  onEnviarEmail,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -1257,6 +1294,7 @@ function FilaVenta({
                 onCancel,
                 onImprimir,
                 onVerDetalle,
+                onEnviarEmail,
               })}
             />
           </div>
@@ -1344,6 +1382,7 @@ function CardVentaMobile({
   puedeCancelar,
   onCancel,
   onImprimir,
+  onEnviarEmail,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -1403,6 +1442,7 @@ function CardVentaMobile({
                 onCancel,
                 onImprimir,
                 onVerDetalle,
+                onEnviarEmail,
               })}
             />
           </div>
@@ -1540,6 +1580,9 @@ export default function Ventas() {
   const [showTicket, setShowTicket] = useState(false);
   const [ventaImprimir, setVentaImprimir] = useState(null);
   const [ventaDetalle, setVentaDetalle] = useState(null);
+  const emailConfigurado = useEmailConfigurado();
+  // Venta cuyo ticket se envía (o reenvía) por email
+  const [emailDe, setEmailDe] = useState(null);
   const [showConfirmar, setShowConfirmar] = useState(false);
   const [ventaCancelarId, setVentaCancelarId] = useState(null);
   const [ventaCancelarNumero, setVentaCancelarNumero] = useState(null);
@@ -2000,6 +2043,7 @@ export default function Ventas() {
                       setVentaImprimir(v);
                       setShowTicket(true);
                     }}
+                    onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
                   />
                 ))}
               </tbody>
@@ -2024,6 +2068,7 @@ export default function Ventas() {
                   setVentaImprimir(v);
                   setShowTicket(true);
                 }}
+                onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
               />
             ))}
           </div>
@@ -2045,6 +2090,15 @@ export default function Ventas() {
             setShowModal(false);
             fetchData();
           }}
+        />
+      )}
+
+      {emailDe && (
+        <EnviarEmailModal
+          titulo={`Enviar ticket ${emailDe.numero_venta}`}
+          emailInicial={clientes.find((c) => c.id === emailDe.cliente_id)?.email}
+          onEnviar={(email) => ventasService.enviarEmail(emailDe._id, email)}
+          onClose={() => setEmailDe(null)}
         />
       )}
 

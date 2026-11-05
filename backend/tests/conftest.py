@@ -99,3 +99,15 @@ def nuevo_usuario(client):
 
 def oid():
     return str(ObjectId())
+
+
+@pytest.fixture()
+def smtp(monkeypatch):
+    """Simula un servidor de correo configurado: los emails quedan en ENVIADOS."""
+    from app.config import settings
+    from app.utils import email as email_util
+    monkeypatch.setattr(settings, "smtp_host", "smtp.prueba.local")
+    monkeypatch.setattr(settings, "smtp_remitente", "Cellmin <ventas@cellmin.test>")
+    monkeypatch.setattr(email_util, "_enviar_smtp", lambda mensaje: None)
+    email_util.ENVIADOS.clear()
+    return email_util.ENVIADOS

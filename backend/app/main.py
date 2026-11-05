@@ -15,6 +15,7 @@ from app.routers import tarjetas
 from app.routers import remitos
 from app.routers import marcas
 from app.routers import actividad
+from app.routers import email as email_router
 import traceback
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -86,6 +87,7 @@ app.include_router(tarjetas.router,      prefix="/api/tarjetas",    tags=["Tarje
 app.include_router(remitos.router,       prefix="/api/remitos",     tags=["Remitos"])
 app.include_router(marcas.router,        prefix="/api/marcas",      tags=["Marcas y modelos"])
 app.include_router(actividad.router,     prefix="/api/actividad",   tags=["Registro de actividad"])
+app.include_router(email_router.router,  prefix="/api/email",       tags=["Email"])
 
 
 @app.middleware("http")

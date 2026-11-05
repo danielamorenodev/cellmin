@@ -21,6 +21,7 @@ import {
   ToggleLeft,
   Trash2,
   Wrench,
+  Mail,
   X,
   AlertTriangle,
   PlusCircle,
@@ -60,6 +61,8 @@ import Paginacion from "../components/ui/Paginacion";
 import PatronBloqueo from "../components/ui/PatronBloqueo";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
+import { useEmailConfigurado, preferenciaEmail, avisarEnvio } from "../hooks/useEmail";
+import { CampoEnviarEmail, EnviarEmailModal } from "../components/ui/EnvioEmail";
 
 function NuevoClienteModal({ onClose, onSave }) {
   const [form, setForm] = useState({
@@ -435,6 +438,14 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
   const [marcas, setMarcas] = useState([]);
   const personal = usePersonal();
   const [cobrarSena, setCobrarSena] = useState(false);
+  // Enviar la orden por email al crearla (opcional, recuerda la última elección)
+  const emailConfigurado = useEmailConfigurado();
+  const [enviarEmail, setEnviarEmail] = useState(() => preferenciaEmail.leer("orden"));
+  const [emailDestino, setEmailDestino] = useState("");
+  const elegirCliente = (id, lista = clientes) => {
+    setForm((f) => ({ ...f, cliente_id: id }));
+    setEmailDestino(lista.find((c) => c.id === id)?.email || "");
+  };
   const [sena, setSena] = useState({ monto: "", metodo: "efectivo", tarjeta_id: "", cuotas: 1 });
   const cotizacion = useCotizacion();
   const tarjetas = useTarjetas();
@@ -575,12 +586,20 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
         return;
       }
     }
+    const conEmail = emailConfigurado && enviarEmail;
+    if (conEmail && !emailDestino.trim()) {
+      toast.error("Escribí el email al que se envía la orden");
+      return;
+    }
+    preferenciaEmail.guardar("orden", enviarEmail);
     setLoading(true);
     try {
       const creada = await reparacionesService.create({
         ...form,
         tipos_reparacion: tiposSeleccionados,
         estado: estadoFinal,
+        enviar_email: conEmail,
+        email_destino: conEmail ? emailDestino.trim() : null,
         ...(senaActiva
           ? {
               sena: {
@@ -599,6 +618,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
             : "Orden creada y seña registrada en caja"
           : "Orden creada correctamente",
       );
+      avisarEnvio(creada?.envio_email);
       onSave();
       if (imprimir && creada) {
         imprimirOrden(
@@ -713,9 +733,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
               <select
                 required
                 value={form.cliente_id}
-                onChange={(e) =>
-                  setForm({ ...form, cliente_id: e.target.value })
-                }
+                onChange={(e) => elegirCliente(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Seleccionar cliente</option>
@@ -1070,6 +1088,17 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
               </div>
             )}
 
+            {emailConfigurado && (
+              <CampoEnviarEmail
+                activo={enviarEmail}
+                onActivo={setEnviarEmail}
+                email={emailDestino}
+                onEmail={setEmailDestino}
+                emailCliente={clientes.find((c) => c.id === form.cliente_id)?.email}
+                que="la orden"
+              />
+            )}
+
             {/* Notas */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1121,7 +1150,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
           onClose={() => setShowNuevoCliente(false)}
           onSave={(nuevoCliente) => {
             setClientes((prev) => [...prev, nuevoCliente]);
-            setForm((f) => ({ ...f, cliente_id: nuevoCliente.id }));
+            elegirCliente(nuevoCliente.id, [nuevoCliente]);
             setShowNuevoCliente(false);
             toast.success("Cliente agregado y seleccionado");
           }}
@@ -1531,6 +1560,7 @@ function construirAcciones({
   onVerDetalle,
   puedeCobrar,
   onCobrar,
+  onEnviarEmail,
 }) {
   return [
     {
@@ -1564,6 +1594,11 @@ function construirAcciones({
       icono: <Printer size={15} />,
       onClick: () => onImprimir(reparacion),
     },
+    onEnviarEmail && {
+      label: "Enviar orden por email",
+      icono: <Mail size={15} />,
+      onClick: () => onEnviarEmail(reparacion),
+    },
     reparacion.estado !== "entregada" &&
       reparacion.estado !== "cancelada" && {
         label: "Cancelar orden",
@@ -1574,7 +1609,7 @@ function construirAcciones({
   ];
 }
 
-function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir }) {
+function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir, onEnviarEmail }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4">
       <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl max-h-[90vh] flex flex-col">
@@ -1601,6 +1636,15 @@ function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir }) {
           >
             Cerrar
           </button>
+          {onEnviarEmail && (
+            <button
+              onClick={() => onEnviarEmail(reparacion)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
+            >
+              <Mail size={16} />
+              Enviar por email
+            </button>
+          )}
           <button
             onClick={() => onImprimir(reparacion)}
             className="flex items-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-xl text-sm hover:bg-gray-900 transition"
@@ -1712,6 +1756,7 @@ function FilaReparacion({
   userRol,
   onCancelar,
   onImprimir,
+  onEnviarEmail,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -1823,6 +1868,7 @@ function FilaReparacion({
                 onVerDetalle,
                 puedeCobrar,
                 onCobrar,
+                onEnviarEmail,
               })}
             />
           </div>
@@ -1958,6 +2004,7 @@ function CardReparacionMobile({
   userRol,
   onCancelar,
   onImprimir,
+  onEnviarEmail,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -2069,6 +2116,7 @@ function CardReparacionMobile({
               onVerDetalle,
               puedeCobrar,
               onCobrar,
+              onEnviarEmail,
             })}
           />
         </div>
@@ -2330,7 +2378,7 @@ function GestionTiposReparacion() {
           />
           <input
             type="text"
-            placeholder={onCrear ? "Buscar o crear tipo de reparación..." : "Buscar tipo de reparación..."}
+            placeholder="Buscar tipo de reparación..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -2495,6 +2543,9 @@ export default function Reparaciones() {
   const { user } = useAuth();
   const [showOrden, setShowOrden] = useState(null);
   const [reparacionDetalle, setReparacionDetalle] = useState(null);
+  // Orden que se envía (o reenvía) por email
+  const emailConfigurado = useEmailConfigurado();
+  const [emailDe, setEmailDe] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -2823,6 +2874,7 @@ export default function Reparaciones() {
                         userRol={user?.rol}
                         onCancelar={handleCancelar}
                         onImprimir={(r) => setShowOrden(r)}
+                    onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
                         onVerDetalle={setReparacionDetalle}
                       />
                     ))}
@@ -2845,6 +2897,7 @@ export default function Reparaciones() {
                     userRol={user?.rol}
                     onCancelar={handleCancelar}
                     onImprimir={(r) => setShowOrden(r)}
+                    onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
                         onVerDetalle={setReparacionDetalle}
                   />
                 ))}
@@ -2868,6 +2921,14 @@ export default function Reparaciones() {
                 setShowModal(false);
                 fetchData();
               }}
+            />
+          )}
+          {emailDe && (
+            <EnviarEmailModal
+              titulo={`Enviar orden ${emailDe.numero_orden}`}
+              emailInicial={clientes.find((c) => c.id === emailDe.cliente_id)?.email}
+              onEnviar={(email) => reparacionesService.enviarEmail(emailDe.id, email)}
+              onClose={() => setEmailDe(null)}
             />
           )}
           {showEditarTipos && (
@@ -2911,6 +2972,7 @@ export default function Reparaciones() {
           cliente={clientes.find((c) => c.id === reparacionDetalle.cliente_id)}
           onClose={() => setReparacionDetalle(null)}
           onImprimir={(r) => setShowOrden(r)}
+                    onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
         />
       )}
       {showOrden && (

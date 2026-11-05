@@ -127,6 +127,21 @@ Cuidá que `ENTORNO=produccion` y `CORS_ORIGINS=https://cellmin.jybora.com`. Gua
 sudo chmod 600 /opt/cellmin/backend/.env
 ```
 
+### Envío de órdenes y tickets por email (opcional)
+
+Para que aparezca la opción **Enviar por email** al crear una orden de reparación o una venta, completá en el mismo `.env` los datos del correo que envía (SMTP):
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USUARIO=cellmin.local@gmail.com
+SMTP_CLAVE=la-contraseña-de-aplicación
+SMTP_REMITENTE=Cellmin <cellmin.local@gmail.com>
+SMTP_SEGURIDAD=starttls
+```
+
+Con Gmail, `SMTP_CLAVE` es una **contraseña de aplicación** (Cuenta de Google → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones), no la contraseña común. Con el puerto 465 usá `SMTP_SEGURIDAD=ssl`. Después reiniciá el backend (`sudo systemctl restart cellmin-backend`). Si `SMTP_HOST` queda vacío, la opción no se muestra. Los envíos fallidos quedan en el registro de errores.
+
 ### Crear el primer administrador
 ```bash
 cd /opt/cellmin/backend

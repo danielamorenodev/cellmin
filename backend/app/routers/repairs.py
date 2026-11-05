@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.database import get_db
-from app.models.repair import RepairCreate, RepairUpdate, Pago
+from app.models.repair import RepairCreate, RepairUpdate, Pago, EnvioEmail
+from app.utils.envio_comprobantes import preparar_destino, enviar_orden, buscar_cliente
 from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
 from bson import ObjectId
@@ -211,10 +212,16 @@ async def create_repair(repair: RepairCreate, current_user: dict = Depends(get_c
 
     data = repair.model_dump()
     sena = data.pop("sena", None)
+    enviar = data.pop("enviar_email", False)
+    email_dado = data.pop("email_destino", None)
     if not ObjectId.is_valid(data["cliente_id"]) or not await db.clientes.find_one({"_id": ObjectId(data["cliente_id"])}):
         raise HTTPException(status_code=400, detail="El cliente elegido no existe. Volvé a seleccionarlo.")
     if not data["equipo"].get("marca", "").strip() or not data["equipo"].get("modelo", "").strip():
         raise HTTPException(status_code=400, detail="Completá la marca y el modelo del equipo")
+    # El email se valida antes de crear la orden
+    destino = cliente_email = None
+    if enviar:
+        destino, cliente_email = await preparar_destino(db, data["cliente_id"], email_dado)
     data["equipo"] = validar_bloqueo(data["equipo"])
     data["equipo"]["marca"] = (data["equipo"].get("marca") or "").strip()
     data["equipo"]["modelo"] = (data["equipo"].get("modelo") or "").strip()
@@ -306,7 +313,13 @@ async def create_repair(repair: RepairCreate, current_user: dict = Depends(get_c
         descripcion=f"Orden de reparación creada: {numero}"
     )
 
-    return format_repair(new_repair)
+    envio = None
+    if enviar:
+        envio = await enviar_orden(db, new_repair, destino, cliente_email, current_user["user_id"])
+    # Sin ocultar el bloqueo: quien crea la orden imprime la copia del técnico
+    respuesta = format_repair(new_repair)
+    respuesta["envio_email"] = envio
+    return respuesta
 
 @router.put("/{repair_id}")
 async def update_repair(repair_id: str, repair: RepairUpdate, current_user: dict = Depends(get_current_user)):
@@ -450,6 +463,23 @@ async def add_payment(repair_id: str, pago: Pago, current_user: dict = Depends(g
     )
 
     return {"message": "Pago registrado", "total_pagado": total_pagado, "saldo_pendiente": saldo, "vuelto": plan["vuelto"]}
+
+@router.post("/{repair_id}/email")
+async def email_orden(repair_id: str, datos: EnvioEmail, current_user: dict = Depends(get_current_user)):
+    """Envía (o reenvía) la orden al email del cliente o al indicado."""
+    check_permission(current_user["role"], "reparaciones:read")
+    db = get_db()
+    if not ObjectId.is_valid(repair_id):
+        raise HTTPException(status_code=404, detail="Reparación no encontrada")
+    repair = await db.reparaciones.find_one({"_id": ObjectId(repair_id)})
+    if not repair:
+        raise HTTPException(status_code=404, detail="Reparación no encontrada")
+    destino, cliente = await preparar_destino(db, repair.get("cliente_id"), datos.email)
+    resultado = await enviar_orden(db, repair, destino, cliente, current_user["user_id"])
+    if not resultado["enviado"]:
+        raise HTTPException(status_code=502, detail=resultado["error"])
+    return resultado
+
 
 @router.get("/cliente/{cliente_id}")
 async def get_repairs_by_client(cliente_id: str, current_user: dict = Depends(get_current_user)):

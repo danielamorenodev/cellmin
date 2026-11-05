@@ -40,6 +40,13 @@ class RepairCreate(BaseModel):
     garantia_dias: int = 90
     estado: str = "en_diagnostico"
     sena: Optional[Sena] = None
+    # Enviar la orden por email al crearla (al email escrito o al del cliente)
+    enviar_email: bool = False
+    email_destino: Optional[str] = None
+
+class EnvioEmail(BaseModel):
+    email: Optional[str] = None  # si no viene, el email del cliente
+
 
 class RepairUpdate(BaseModel):
     estado: Optional[str] = None
