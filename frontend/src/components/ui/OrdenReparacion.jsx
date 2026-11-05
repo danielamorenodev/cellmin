@@ -18,7 +18,9 @@ const escapar = (t) =>
   String(t ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 // Bloqueo de pantalla: solo para la copia del técnico
 function htmlBloqueo(equipo) {
@@ -75,29 +77,29 @@ function generarHTML(reparacion, cliente, tipo) {
       <div style="border-top:1px dashed #000; margin:6px 0;"></div>
 
       <div style="margin-bottom:6px;">
-        <p style="font-weight:bold;">Orden: ${reparacion.numero_orden}</p>
+        <p style="font-weight:bold;">Orden: ${escapar(reparacion.numero_orden)}</p>
         <p>Ingreso: ${formatDateTime(reparacion.fecha_ingreso)}</p>
-        ${reparacion.fecha_estimada_entrega ? `<p>Entrega estimada: ${reparacion.fecha_estimada_entrega.split("-").reverse().join("/")}</p>` : ""}
-        ${reparacion.vendedor_nombre ? `<p>Atendió: ${reparacion.vendedor_nombre}</p>` : ""}
+        ${reparacion.fecha_estimada_entrega ? `<p>Entrega estimada: ${escapar(reparacion.fecha_estimada_entrega.split("-").reverse().join("/"))}</p>` : ""}
+        ${reparacion.vendedor_nombre ? `<p>Atendió: ${escapar(reparacion.vendedor_nombre)}</p>` : ""}
       </div>
 
       <div style="border-top:1px dashed #000; margin:6px 0;"></div>
 
       <div style="margin-bottom:6px;">
         <p style="font-weight:bold;">CLIENTE</p>
-        <p>${cliente?.nombre || ""} ${cliente?.apellido || ""}</p>
-        ${cliente?.telefono ? `<p>Tel: ${cliente.telefono}</p>` : ""}
-        ${cliente?.dni ? `<p>DNI: ${cliente.dni}</p>` : ""}
+        <p>${escapar(cliente?.nombre)} ${escapar(cliente?.apellido)}</p>
+        ${cliente?.telefono ? `<p>Tel: ${escapar(cliente.telefono)}</p>` : ""}
+        ${cliente?.dni ? `<p>DNI: ${escapar(cliente.dni)}</p>` : ""}
       </div>
 
       <div style="border-top:1px dashed #000; margin:6px 0;"></div>
 
       <div style="margin-bottom:6px;">
         <p style="font-weight:bold;">EQUIPO</p>
-        <p>Marca: ${reparacion.equipo?.marca || ""}</p>
-        <p>Modelo: ${reparacion.equipo?.modelo || ""}</p>
-        ${reparacion.equipo?.imei ? `<p>IMEI: ${reparacion.equipo.imei}</p>` : ""}
-        ${reparacion.equipo?.problema_descripcion ? `<p>Problema: ${reparacion.equipo.problema_descripcion}</p>` : ""}
+        <p>Marca: ${escapar(reparacion.equipo?.marca)}</p>
+        <p>Modelo: ${escapar(reparacion.equipo?.modelo)}</p>
+        ${reparacion.equipo?.imei ? `<p>IMEI: ${escapar(reparacion.equipo.imei)}</p>` : ""}
+        ${reparacion.equipo?.problema_descripcion ? `<p>Problema: ${escapar(reparacion.equipo.problema_descripcion)}</p>` : ""}
       </div>
 
       ${esTecnico ? htmlBloqueo(reparacion.equipo) : ""}
@@ -112,7 +114,7 @@ function generarHTML(reparacion, cliente, tipo) {
             .map(
               (t) => `
             <div style="display:flex; justify-content:space-between;">
-              <span>${t.nombre}</span>
+              <span>${escapar(t.nombre)}</span>
               <span>${formatCurrency(t.precio)}</span>
             </div>
           `,
@@ -145,7 +147,7 @@ function generarHTML(reparacion, cliente, tipo) {
           ? `
         <div style="border-top:1px dashed #000; margin:6px 0;"></div>
         <div style="margin-bottom:6px;">
-          <p>Garantía: ${reparacion.garantia_dias} días</p>
+          <p>Garantía: ${escapar(reparacion.garantia_dias)} días</p>
         </div>
       `
           : ""
@@ -157,7 +159,7 @@ function generarHTML(reparacion, cliente, tipo) {
         <div style="border-top:1px dashed #000; margin:6px 0;"></div>
         <div style="margin-bottom:6px;">
           <p style="font-weight:bold;">NOTAS INTERNAS</p>
-          <p>${reparacion.notas_internas}</p>
+          <p>${escapar(reparacion.notas_internas)}</p>
         </div>
       `
           : ""

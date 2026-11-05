@@ -243,6 +243,14 @@ function NuevoRemitoModal({ onClose, onSave }) {
   );
 }
 
+// Los datos se escapan: un nombre con etiquetas HTML no puede ejecutar código
+const escapar = (t) =>
+  String(t ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 // Comprobante del remito para imprimir y mandar con la mercadería
 function imprimirRemito(r, usuario) {
   const v = window.open("", "_blank", "width=720,height=800");
@@ -251,16 +259,16 @@ function imprimirRemito(r, usuario) {
     return;
   }
   const filas = r.items
-    .map((i) => `<tr><td>${i.nombre_producto}</td><td style="text-align:right">${i.cantidad}</td></tr>`)
+    .map((i) => `<tr><td>${escapar(i.nombre_producto)}</td><td style="text-align:right">${escapar(i.cantidad)}</td></tr>`)
     .join("");
-  v.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Remito ${r.numero}</title>
+  v.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Remito ${escapar(r.numero)}</title>
   <style>body{font-family:Calibri,Arial,sans-serif;font-size:12pt;margin:32px;color:#111}
   h1{font-size:16pt;margin:0 0 4px}table{width:100%;border-collapse:collapse;margin-top:16px}
   th,td{border-bottom:1px solid #ddd;padding:6px 4px;text-align:left}.f{margin-top:48px;display:flex;gap:48px}
   .f div{flex:1;border-top:1px solid #333;padding-top:4px;font-size:10pt}</style></head><body>
-  <h1>Cellmin · Remito interno ${r.numero}</h1>
+  <h1>Cellmin · Remito interno ${escapar(r.numero)}</h1>
   <p>${new Date(r.fecha).toLocaleString("es-AR")} · Envía: <b>${nombreSucursal(r.origen)}</b> · Recibe: <b>${nombreSucursal(r.destino)}</b></p>
-  <p>Registró: ${usuario || "-"}${r.notas ? ` · Notas: ${r.notas}` : ""}</p>
+  <p>Registró: ${escapar(usuario || "-")}${r.notas ? ` · Notas: ${escapar(r.notas)}` : ""}</p>
   <table><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th></tr></thead><tbody>${filas}</tbody></table>
   <div class="f"><div>Entregó</div><div>Recibió</div></div>
   <script>window.print()</script></body></html>`);

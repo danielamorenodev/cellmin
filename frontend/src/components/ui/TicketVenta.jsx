@@ -14,6 +14,16 @@ const SUCURSALES = {
   },
 };
 
+// Todo dato que viene de la base se escapa antes de armar el HTML a imprimir
+// (un nombre con etiquetas HTML no puede ejecutar código en la página)
+const escapar = (t) =>
+  String(t ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 export default function TicketVenta({ venta, cliente }) {
   const sucursal = SUCURSALES[venta.sucursal] || SUCURSALES.sucursal_1;
 
@@ -23,7 +33,7 @@ export default function TicketVenta({ venta, cliente }) {
     <html>
     <head>
       <meta charset="utf-8">
-      <title>Ticket Venta ${venta.numero_venta}</title>
+      <title>Ticket Venta ${escapar(venta.numero_venta)}</title>
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: monospace; font-size: 12px; width: 80mm; padding: 8px; }
@@ -48,18 +58,18 @@ export default function TicketVenta({ venta, cliente }) {
       </div>
       <div class="divider"></div>
       <div class="section">
-        <p class="bold">Venta: ${venta.numero_venta}</p>
+        <p class="bold">Venta: ${escapar(venta.numero_venta)}</p>
         <p>Fecha: ${formatDateTime(venta.fecha)}</p>
-        ${venta.vendedor_nombre ? `<p>Lo atendió: ${venta.vendedor_nombre}</p>` : ""}
-        ${cliente ? `<p>Cliente: ${cliente.nombre} ${cliente.apellido || ""}</p>` : ""}
+        ${venta.vendedor_nombre ? `<p>Lo atendió: ${escapar(venta.vendedor_nombre)}</p>` : ""}
+        ${cliente ? `<p>Cliente: ${escapar(cliente.nombre)} ${escapar(cliente.apellido)}</p>` : ""}
       </div>
       <div class="divider"></div>
       <div class="section">
         ${venta.items
           ?.map(
             (item) => `
-          <p class="bold">${item.nombre_producto}</p>
-          ${(item.imeis || []).map((imei) => `<p>IMEI: ${imei}</p>`).join("")}
+          <p class="bold">${escapar(item.nombre_producto)}</p>
+          ${(item.imeis || []).map((imei) => `<p>IMEI: ${escapar(imei)}</p>`).join("")}
           <div class="row">
             <span>${item.cantidad} x ${formatCurrency(item.precio_unitario)}</span>
             <span>${formatCurrency(item.subtotal)}</span>
@@ -86,7 +96,7 @@ export default function TicketVenta({ venta, cliente }) {
         </div>
         <div class="row">
           <span>Método de pago:</span>
-          <span>${describirPago(venta).texto}</span>
+          <span>${escapar(describirPago(venta).texto)}</span>
         </div>
         ${
           describirPago(venta).vuelto > 0

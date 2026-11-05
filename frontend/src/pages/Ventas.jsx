@@ -880,6 +880,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                 email={emailDestino}
                 onEmail={setEmailDestino}
                 emailCliente={clientes.find((c) => c.id === form.cliente_id)?.email}
+                hayCliente={!!form.cliente_id}
                 que="el ticket"
               />
             )}

@@ -5,7 +5,7 @@ import { mensajeError } from "../../utils/helpers";
 
 // Casilla "Enviar por email" con el email a usar (precargado con el del cliente).
 // Si el email se cambia, se envía a ese; si el cliente no tenía, se le guarda.
-export function CampoEnviarEmail({ activo, onActivo, email, onEmail, emailCliente, que = "el comprobante" }) {
+export function CampoEnviarEmail({ activo, onActivo, email, onEmail, emailCliente, hayCliente = true, que = "el comprobante" }) {
   return (
     <div className="rounded-xl border border-gray-200 px-3 py-2.5 space-y-2">
       <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
@@ -28,9 +28,11 @@ export function CampoEnviarEmail({ activo, onActivo, email, onEmail, emailClient
             className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <p className="text-[11px] text-gray-500 mt-1">
-            {emailCliente
-              ? "Precargado con el email del cliente. Podés cambiarlo."
-              : "El cliente no tiene email: el que escribas se le guarda."}
+            {!hayCliente
+              ? "Sin cliente elegido: se envía a este email."
+              : emailCliente
+                ? "Precargado con el email del cliente. Podés cambiarlo."
+                : "El cliente no tiene email: el que escribas se le guarda."}
           </p>
         </div>
       )}

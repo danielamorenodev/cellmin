@@ -6,18 +6,8 @@ export const reportesService = {
     return response.data;
   },
 
-  getVentas: async (periodo) => {
-    const response = await api.get(`/reports/ventas?periodo=${periodo}`);
-    return response.data;
-  },
-
   getProductosVendidos: async () => {
     const response = await api.get("/reports/productos-vendidos");
-    return response.data;
-  },
-
-  getRentabilidad: async (periodo) => {
-    const response = await api.get(`/reports/rentabilidad?periodo=${periodo}`);
     return response.data;
   },
 

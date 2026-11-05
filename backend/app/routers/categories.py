@@ -49,6 +49,10 @@ async def create_category(cat: CategoryCreate, current_user: dict = Depends(get_
 async def update_category(cat_id: str, cat: CategoryUpdate, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "categorias:update")
     db = get_db()
+    if not ObjectId.is_valid(cat_id) or not await db.categorias.find_one({"_id": ObjectId(cat_id)}):
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
+    if cat.nombre is not None and not cat.nombre.strip():
+        raise HTTPException(status_code=400, detail="El nombre es obligatorio")
     if cat.nombre:
         existing = await db.categorias.find_one({
             "nombre": {"$regex": f"^{re.escape(cat.nombre.strip())}$", "$options": "i"},
@@ -61,7 +65,8 @@ async def update_category(cat_id: str, cat: CategoryUpdate, current_user: dict =
     for k, v in cat_dict.items():
         if v is not None:
             update_data[k] = v.strip() if k == "nombre" else v
-    await db.categorias.update_one({"_id": ObjectId(cat_id)}, {"$set": update_data})
+    if update_data:
+        await db.categorias.update_one({"_id": ObjectId(cat_id)}, {"$set": update_data})
     updated = await db.categorias.find_one({"_id": ObjectId(cat_id)})
     return format_cat(updated)
 
@@ -69,6 +74,8 @@ async def update_category(cat_id: str, cat: CategoryUpdate, current_user: dict =
 async def delete_category(cat_id: str, current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
+    if not ObjectId.is_valid(cat_id):
+        raise HTTPException(status_code=404, detail="Categoría no encontrada")
     categoria = await db.categorias.find_one({"_id": ObjectId(cat_id)})
     if not categoria:
         raise HTTPException(status_code=404, detail="Categoría no encontrada")
