@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 
 const CLASES = ["col-num", "col-centro", "col-acc"];
+// Clases de Tailwind que en una celda significan lo mismo
+const EQUIVALENTE = { "col-num": "text-right", "col-centro": "text-center", "col-acc": "col-acc" };
 
 // Copia la alineación de cada columna (clase en las celdas td) a su
 // encabezado (th), para que título y datos queden siempre alineados igual.
@@ -17,7 +19,7 @@ function sincronizar(tabla) {
     const td = celdas[col];
     col += th.colSpan || 1;
     CLASES.forEach((c) => {
-      const debe = !!td && td.classList.contains(c);
+      const debe = !!td && (td.classList.contains(c) || td.classList.contains(EQUIVALENTE[c]));
       if (th.classList.contains(c) !== debe) th.classList.toggle(c, debe);
     });
   });

@@ -1009,8 +1009,10 @@ function FilaProducto({ producto, categorias, onEdit, onDelete, puedeEditar }) {
           {producto.tiene_variantes
             ? `Desde ${formatCurrency(Math.min(...producto.variantes.map((v) => v.precio_venta)))}`
             : formatCurrency(producto.precio_venta)}
+          {/* El equivalente en dólares va debajo: así los precios encolumnan */}
           <PrecioUSD
-            className="ml-2"
+            className="block"
+            prefijo={producto.precio_en_usd ? "=" : "≈"}
             pesos={
               producto.tiene_variantes
                 ? Math.min(...producto.variantes.map((v) => v.precio_venta))
@@ -1092,12 +1094,15 @@ function FilaProducto({ producto, categorias, onEdit, onDelete, puedeEditar }) {
                             <td rowSpan={SUCURSALES.length} className="col-centro px-4 py-2 text-gray-500 text-xs align-middle">
                               {item.codigo_barras || "-"}
                             </td>
-                            <td rowSpan={SUCURSALES.length} className="col-num px-4 py-2 text-gray-600 align-middle">
+                            {/* Costo y venta con el mismo formato (pesos y debajo
+                                dólares): quedan a la misma altura */}
+                            <td rowSpan={SUCURSALES.length} className="col-num px-4 py-2 text-gray-600 align-middle whitespace-nowrap">
                               {formatCurrency(item.precio_costo)}
+                              <PrecioUSD pesos={item.precio_costo} prefijo={producto.precio_en_usd ? "=" : "≈"} className="block" />
                             </td>
-                            <td rowSpan={SUCURSALES.length} className="col-num px-4 py-2 text-gray-600 align-middle">
+                            <td rowSpan={SUCURSALES.length} className="col-num px-4 py-2 text-gray-800 font-medium align-middle whitespace-nowrap">
                               {formatCurrency(item.precio_venta)}
-                              <PrecioUSD pesos={item.precio_venta} className="block" />
+                              <PrecioUSD pesos={item.precio_venta} prefijo={producto.precio_en_usd ? "=" : "≈"} className="block" />
                             </td>
                           </>
                         )}

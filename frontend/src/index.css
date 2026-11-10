@@ -28,7 +28,12 @@ input,
    - Acciones (última columna): derecha -> clase "col-acc".
    Se pone la clase en las celdas (td); el encabezado (th) copia la de su
    columna automáticamente (ver components/ui/AlineacionTablas.jsx), así
-   título y datos siempre quedan alineados igual. */
+   título y datos siempre quedan alineados igual.
+   Las clases text-right / text-center en las celdas valen igual que
+   col-num / col-centro (antes esta regla general las anulaba y quedaban a
+   la izquierda).
+   Un monto con un dato secundario (por ejemplo el equivalente en USD) lo
+   lleva debajo, nunca al costado: así los montos encolumnan. */
 table th {
   text-align: left;
 }
@@ -41,9 +46,18 @@ table th.col-acc,
 table td.col-acc:not([colspan]) {
   text-align: right;
 }
+table td.text-right:not([colspan]) {
+  text-align: right;
+}
 table th.col-centro,
-table td.col-centro:not([colspan]) {
+table td.col-centro:not([colspan]),
+table td.text-center:not([colspan]) {
   text-align: center;
+}
+/* En columnas de números el ícono de ordenar va a la izquierda del título,
+   así el título termina justo donde terminan los números */
+table th.col-num > button {
+  flex-direction: row-reverse;
 }
 table td.col-centro:not([colspan]) > .flex:not(.flex-col) {
   justify-content: center;
