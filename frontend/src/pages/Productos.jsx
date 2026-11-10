@@ -389,6 +389,16 @@ function Opcion({ id, checked, onChange, titulo, ayuda, children }) {
 
 // sinStockInicial: se crea desde un ingreso de mercadería, así que el stock
 // entra con ese ingreso (acá solo se configura el mínimo)
+// Si todas las variantes tienen el mismo precio, lo devuelve ({costo, venta})
+function precioComunDe(producto) {
+  const vs = producto?.tiene_variantes ? producto.variantes || [] : [];
+  if (vs.length === 0) return null;
+  const { precio_costo: costo, precio_venta: venta } = vs[0];
+  if (venta == null) return null;
+  const iguales = vs.every((v) => v.precio_costo === costo && v.precio_venta === venta);
+  return iguales ? { costo: costo ?? "", venta } : null;
+}
+
 export function ProductoModal({ producto, categorias, onClose, onSave, sinStockInicial = false }) {
   const [form, setForm] = useState({
     nombre: producto?.nombre || "",
@@ -410,7 +420,10 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
     stock_sucursal: producto ? mapaDe(producto, "stock") : mapaVacio(""),
     stock_minimo_sucursal: producto ? mapaDe(producto, "minimo") : mapaVacio(0),
   });
-  const [precioGlobal, setPrecioGlobal] = useState(false);
+  // "Mismo precio para todas las variantes": si las variantes ya comparten
+  // precio, arranca marcado y con ese precio (antes aparecía vacío)
+  const preciosIniciales = precioComunDe(producto);
+  const [precioGlobal, setPrecioGlobal] = useState(!!preciosIniciales);
   const moneda = form.precio_en_usd ? "usd" : "ars";
   const setMoneda = (m) => setForm((f) => ({ ...f, precio_en_usd: m === "usd" }));
   const cotizacion = useCotizacion();
@@ -420,8 +433,42 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
     const v = cotizacion.aUSD(Number(pesos));
     return v === null ? null : Math.round(v * 100) / 100;
   };
-  const [precioCostoGlobal, setPrecioCostoGlobal] = useState("");
-  const [precioVentaGlobal, setPrecioVentaGlobal] = useState("");
+  const [precioCostoGlobal, setPrecioCostoGlobal] = useState(preciosIniciales?.costo ?? "");
+  const [precioVentaGlobal, setPrecioVentaGlobal] = useState(preciosIniciales?.venta ?? "");
+
+  // Precio de referencia para una variante nueva: el precio común, el de la
+  // última variante o el del producto (si todavía no tenía variantes)
+  const precioDeReferencia = () => {
+    if (precioGlobal && precioVentaGlobal !== "")
+      return { costo: precioCostoGlobal, venta: precioVentaGlobal };
+    const ultima = [...form.variantes].reverse().find((v) => v.precio_venta !== "" && v.precio_venta != null);
+    if (ultima) return { costo: ultima.precio_costo ?? "", venta: ultima.precio_venta };
+    if (form.precio_venta !== "" && form.precio_venta != null)
+      return { costo: form.precio_costo ?? "", venta: form.precio_venta };
+    return { costo: "", venta: "" };
+  };
+
+  const marcarPrecioGlobal = (marcado) => {
+    if (marcado && precioVentaGlobal === "") {
+      const ref = precioDeReferencia();
+      setPrecioCostoGlobal(ref.costo);
+      setPrecioVentaGlobal(ref.venta);
+    }
+    setPrecioGlobal(marcado);
+  };
+
+  const cambiarTieneVariantes = (marcado) => {
+    if (marcado) {
+      // El precio que ya tenía el producto pasa a ser el de las variantes
+      const tienePrecio = form.precio_venta !== "" && form.precio_venta != null;
+      if (tienePrecio) {
+        setPrecioCostoGlobal(form.precio_costo ?? "");
+        setPrecioVentaGlobal(form.precio_venta);
+        setPrecioGlobal(true);
+      }
+    }
+    setForm({ ...form, tiene_variantes: marcado, variantes: [] });
+  };
   const [loading, setLoading] = useState(false);
 
   const handleVarianteChange = (index, field, value) => {
@@ -438,8 +485,8 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
         {
           nombre: "",
           codigo_barras: "",
-          precio_costo: precioGlobal ? parseFloat(precioCostoGlobal) || 0 : 0,
-          precio_venta: precioGlobal ? parseFloat(precioVentaGlobal) || 0 : 0,
+          precio_costo: precioDeReferencia().costo,
+          precio_venta: precioDeReferencia().venta,
           stock_sucursal: mapaVacio(""),
           stock_minimo_sucursal: mapaVacio(0),
         },
@@ -455,11 +502,11 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
   };
 
   const aplicarPrecioGlobal = () => {
-    if (!precioCostoGlobal && !precioVentaGlobal) return;
+    if (precioCostoGlobal === "" && precioVentaGlobal === "") return;
     const newVariantes = form.variantes.map((v) => ({
       ...v,
-      precio_costo: parseFloat(precioCostoGlobal) || v.precio_costo,
-      precio_venta: parseFloat(precioVentaGlobal) || v.precio_venta,
+      precio_costo: precioCostoGlobal === "" ? v.precio_costo : parseFloat(precioCostoGlobal),
+      precio_venta: precioVentaGlobal === "" ? v.precio_venta : parseFloat(precioVentaGlobal),
     }));
     setForm({ ...form, variantes: newVariantes });
     toast.success("Precios aplicados a todas las variantes");
@@ -474,14 +521,36 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
     setLoading(true);
     try {
       let variantes = form.variantes;
-      if (precioGlobal && (precioCostoGlobal || precioVentaGlobal)) {
+      if (form.tiene_variantes && precioGlobal) {
+        // Con "mismo precio", se guarda ese precio en todas (aunque no se toque "Aplicar")
+        if (precioVentaGlobal === "" || !(parseFloat(precioVentaGlobal) > 0)) {
+          toast.error("Cargá el precio de venta de las variantes");
+          setLoading(false);
+          return;
+        }
         variantes = form.variantes.map((v) => ({
           ...v,
-          precio_costo: parseFloat(precioCostoGlobal) || v.precio_costo,
-          precio_venta: parseFloat(precioVentaGlobal) || v.precio_venta,
+          precio_costo: precioCostoGlobal === "" ? 0 : parseFloat(precioCostoGlobal),
+          precio_venta: parseFloat(precioVentaGlobal),
         }));
       }
       if (form.tiene_variantes) {
+        if (variantes.length === 0) {
+          toast.error("Agregá al menos una variante");
+          setLoading(false);
+          return;
+        }
+        const sinPrecio = variantes.find((v) => !(parseFloat(v.precio_venta) > 0));
+        if (sinPrecio) {
+          toast.error(`Falta el precio de venta de la variante «${sinPrecio.nombre || "sin nombre"}»`);
+          setLoading(false);
+          return;
+        }
+        variantes = variantes.map((v) => ({
+          ...v,
+          precio_costo: parseFloat(v.precio_costo) || 0,
+          precio_venta: parseFloat(v.precio_venta),
+        }));
         const falta = variantes.some(
           (v) =>
             !v.id &&
@@ -641,9 +710,7 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
                 <Opcion
                   id="tiene_variantes"
                   checked={form.tiene_variantes}
-                  onChange={(e) =>
-                    setForm({ ...form, tiene_variantes: e.target.checked, variantes: [] })
-                  }
+                  onChange={(e) => cambiarTieneVariantes(e.target.checked)}
                   titulo="Tiene variantes"
                   ayuda="Colores, capacidades o modelos. Cada variante tiene su código, precio y stock."
                 />
@@ -704,7 +771,7 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
                       type="checkbox"
                       id="precio_global"
                       checked={precioGlobal}
-                      onChange={(e) => setPrecioGlobal(e.target.checked)}
+                      onChange={(e) => marcarPrecioGlobal(e.target.checked)}
                       className="w-4 h-4 text-blue-600"
                     />
                     <span className="text-sm font-medium text-gray-800">

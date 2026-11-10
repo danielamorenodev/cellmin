@@ -17,19 +17,30 @@ export default function InputPrecio({
   className = "",
   ...resto
 }) {
-  const { aUSD, aPesos } = useCotizacion();
+  const { aUSD, aPesos, venta } = useCotizacion();
   const esUSD = moneda === "usd";
-  const [usd, setUsd] = useState(() => {
-    if (!esUSD || pesos === "" || pesos == null) return "";
-    const v = aUSD(Number(pesos));
+  const calcularUSD = (p) => {
+    if (p === "" || p == null) return "";
+    const v = aUSD(Number(p));
     return v === null ? "" : Math.round(v * 100) / 100;
-  });
+  };
+  const [usd, setUsd] = useState(() => (esUSD ? calcularUSD(pesos) : ""));
+  // Si el precio cambia desde afuera (por ejemplo "Aplicar" o recién llega el
+  // valor del dólar), el campo en dólares se recalcula. Lo que escribe la
+  // persona no se pisa.
+  const [previo, setPrevio] = useState({ pesos, venta, propio: pesos });
+  if (pesos !== previo.pesos || venta !== previo.venta) {
+    const externo = pesos !== previo.propio || venta !== previo.venta;
+    setPrevio({ pesos, venta, propio: pesos });
+    if (esUSD && externo) setUsd(calcularUSD(pesos));
+  }
 
   const cambiarUSD = (valor) => {
     setUsd(valor);
-    if (valor === "") return onChange("");
-    const p = aPesos(valor);
-    if (p !== null) onChange(p);
+    const p = valor === "" ? "" : aPesos(valor);
+    if (p === null) return;
+    setPrevio((x) => ({ ...x, propio: p }));
+    onChange(p);
   };
 
   const equivalente = esUSD
