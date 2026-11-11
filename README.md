@@ -7,7 +7,7 @@ Sistema web para **Cellmin**, un comercio con dos sucursales que vende y repara 
 
 **Tecnologías:** React · Vite · Tailwind CSS · Python · FastAPI · MongoDB (Motor, asíncrono) · Nginx
 
-> 🇬🇧 **English summary:** Web management system for a two-branch phone retail and repair business. It covers multi-branch inventory, sales with PDF tickets, daily cash register, repair orders with deposits, status tracking and warranty, purchasing, USD payments with change in pesos (exchange rate set by the administrator), Excel reports and role-based permissions. Built with React, FastAPI and MongoDB.
+> 🇬🇧 **English summary:** Web management system for a two-branch phone retail and repair business. It covers multi-branch inventory, sales with PDF tickets, daily cash register, repair orders with deposits, status tracking and warranty, purchasing, USD payments with change in pesos (exchange rate entered by the administrator or taken from the Córdoba blue dollar published by InfoDolar), Excel reports and role-based permissions. Built with React, FastAPI and MongoDB.
 
 ---
 
@@ -18,7 +18,7 @@ Sistema web para **Cellmin**, un comercio con dos sucursales que vende y repara 
 - **Ventas:** carrito, vendedor, varios medios de pago (efectivo y dólares una vez; tarjetas y transferencias repetibles), tarjeta y cuotas con recargo configurable, ticket en PDF y detalle de cada operación.
 - **Caja:** apertura y cierre diario por sucursal, ingresos y egresos, y al cerrar muestra cuánto debería haber por cada medio de pago.
 - **Reparaciones:** orden imprimible con seña, datos del equipo y **código o patrón de bloqueo**. Los estados avanzan de a un paso: En diagnóstico → Ingresada → En reparación → Lista → Entregada. Cada orden registra quién atendió, la sucursal de ingreso, la entrega estimada (con aviso de atraso) y el técnico que la repara. Marca y modelo se buscan en un catálogo y se crean en el momento. Solo se entrega un equipo pagado por completo, y al entregarlo empieza la garantía (90 días, editable por orden).
-- **Dólar:** el administrador carga el valor del día y queda un historial de cambios. Se puede cobrar en dólares y dar el vuelto en pesos. Cada producto tiene su precio **en pesos (fijo)** o **en dólares**: estos se actualizan solos al cambiar el dólar.
+- **Dólar:** el administrador carga el valor del día a mano o lo toma del dólar blue de Córdoba (valor de venta) que publica InfoDolar, con actualización automática opcional; queda un historial con el origen de cada valor. Se puede cobrar en dólares y dar el vuelto en pesos. Cada producto tiene su precio **en pesos (fijo)** o **en dólares**: estos se actualizan solos al cambiar el dólar.
 - **Proveedores:** cuenta corriente con lo que se le debe a cada uno (deudas y pagos); un ingreso de mercadería puede quedar debiendo todo o una parte.
 - **Email:** la orden de reparación y el ticket de venta se pueden enviar al cliente por email, al crearlos o después (se configura el correo en el `.env`).
 - **Inicio** con tarjetas que se abren con su detalle (reparaciones activas con técnico y demora, ventas del día, stock bajo).
@@ -143,7 +143,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-Cubren usuarios, clientes, órdenes de reparación, tipos de reparación, precios en pesos o dólares, envío por email, proveedores y su deuda, e incluyen un barrido de todas las rutas de la API para detectar errores internos. En GitHub se ejecutan solas en cada cambio (pestaña **Actions**), junto con la compilación del frontend.
+Cubren ventas (descuento de stock por sucursal, stock que nunca queda negativo con dos ventas simultáneas de la última unidad, ventas duplicadas por doble clic, descuentos y recargos, pagos mixtos y cobro en dólares con vuelto en pesos), cancelaciones, apertura y cierre de caja con diferencias por medio de pago, usuarios, clientes, órdenes de reparación, tipos de reparación, precios en pesos o dólares, envío por email, proveedores y su deuda, e incluyen un barrido de todas las rutas de la API para detectar errores internos. En GitHub se ejecutan solas en cada cambio (pestaña **Actions**), junto con la compilación del frontend.
 
 ### Problemas frecuentes
 
@@ -157,4 +157,4 @@ El sitio corre en un VPS Linux (Ubuntu) de Hostinger, con el backend como servic
 
 ---
 
-Desarrollado por **Nodo Sistemas**: **Daniela Moreno** (backend, despliegue y contacto con el cliente) y **Esteban Farias** (análisis funcional, diseño UX/UI y frontend).
+Desarrollado por **Jybora**: **Daniela Moreno** (backend, despliegue y contacto con el cliente) y **Esteban Farias** (análisis funcional, diseño UX/UI y frontend).
