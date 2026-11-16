@@ -29,6 +29,7 @@ import {
 import { reparacionesService } from "../services/reparaciones.service";
 import { clientesService } from "../services/clientes.service";
 import toast from "react-hot-toast";
+import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 import PrecioUSD from "../components/ui/PrecioUSD";
 import {
   formatCurrency,
@@ -2356,8 +2357,8 @@ function GestionTiposReparacion() {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
+    <div className="space-y-6">
+      <EncabezadoPagina titulo="Tipos de reparación" subtitulo={`${tipos.length} tipos registrados`}>
         <button
           onClick={() => {
             setSelected(null);
@@ -2368,7 +2369,7 @@ function GestionTiposReparacion() {
           <Plus size={18} />
           Nuevo Tipo
         </button>
-      </div>
+      </EncabezadoPagina>
 
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-48">
@@ -2669,20 +2670,11 @@ export default function Reparaciones() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">
-          {tab === "tipos" ? "Tipos de reparación" : "Reparaciones"}
-        </h1>
-      </div>
-
       {tab === "tipos" ? (
         <GestionTiposReparacion />
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <p className="text-gray-500 text-sm">
-              {reparaciones.length} órdenes registradas
-            </p>
+          <EncabezadoPagina titulo="Reparaciones" subtitulo={`${reparaciones.length} órdenes registradas`}>
             <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
@@ -2690,7 +2682,7 @@ export default function Reparaciones() {
               <Plus size={18} />
               Nueva Orden
             </button>
-          </div>
+          </EncabezadoPagina>
 
           <div className="space-y-3">
             <div className="flex gap-2">

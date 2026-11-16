@@ -24,7 +24,10 @@ import {
   Legend,
 } from "recharts";
 import toast from "react-hot-toast";
+import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 import ReporteReparaciones from "../components/reportes/ReporteReparaciones";
+import Paginacion from "../components/ui/Paginacion";
+import { useTabla } from "../hooks/useTabla";
 
 const COLORES = [
   "#3b82f6",
@@ -95,6 +98,9 @@ export default function Reportes() {
   const [rentabilidadData, setRentabilidadData] = useState(null);
   const [reparacionesData, setReparacionesData] = useState(null);
   const [stockBajoData, setStockBajoData] = useState([]);
+  // Listas largas, de a una página
+  const tablaVendedores = useTabla(ventasData?.por_vendedor || [], { porPagina: 10 });
+  const tablaStockBajo = useTabla(stockBajoData, { porPagina: 15 });
   const [loading, setLoading] = useState(true);
   const [fechaDesde, setFechaDesde] = useState("");
   const [fechaHasta, setFechaHasta] = useState("");
@@ -136,85 +142,79 @@ export default function Reportes() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Estadísticas y métricas del negocio
-            </p>
-            <button
-              type="button"
-              onClick={descargarRespaldo}
-              disabled={descargando}
-              className="mt-3 inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-60 transition"
-            >
-              <Download size={16} aria-hidden="true" />
-              {descargando ? "Descargando…" : "Descargar respaldo"}
-            </button>
-          </div>
-          <div className="flex flex-wrap gap-2 items-center">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={usandoFechaPersonalizada}
-                onChange={(e) => {
-                  setUsandoFechaPersonalizada(e.target.checked);
-                  if (!e.target.checked) {
-                    setFechaDesde("");
-                    setFechaHasta("");
-                  }
-                }}
-                className="w-4 h-4 text-blue-600"
-              />
-              <span className="text-sm text-gray-600">Rango personalizado</span>
-            </label>
-          </div>
-        </div>
+      <EncabezadoPagina titulo="Reportes" subtitulo="Estadísticas y métricas del negocio">
+        <button
+          type="button"
+          onClick={descargarRespaldo}
+          disabled={descargando}
+          className="flex items-center gap-2 px-4 py-2 border border-gray-300 bg-white text-gray-700 rounded-xl text-sm font-medium hover:bg-gray-50 disabled:opacity-60 transition"
+        >
+          <Download size={16} aria-hidden="true" />
+          {descargando ? "Descargando…" : "Descargar respaldo"}
+        </button>
+      </EncabezadoPagina>
 
+      {/* Período */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
         {usandoFechaPersonalizada ? (
-          <div className="flex flex-wrap gap-3 items-center bg-blue-50 p-4 rounded-xl">
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-blue-700">Desde</label>
-              <input
-                type="date"
-                value={fechaDesde}
-                onChange={(e) => setFechaDesde(e.target.value)}
-                className="px-3 py-2 border border-blue-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+            <div className="flex flex-wrap gap-3 items-center bg-blue-50 p-4 rounded-xl">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-blue-700">Desde</label>
+                <input
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                  className="px-3 py-2 border border-blue-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-blue-700">Hasta</label>
+                <input
+                  type="date"
+                  value={fechaHasta}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                  className="px-3 py-2 border border-blue-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-blue-700">Hasta</label>
-              <input
-                type="date"
-                value={fechaHasta}
-                onChange={(e) => setFechaHasta(e.target.value)}
-                className="px-3 py-2 border border-blue-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+          ) : (
+            <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
+              {PERIODOS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setPeriodo(p.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                    periodo === p.value
+                      ? "bg-white shadow text-gray-800"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
             </div>
-          </div>
-        ) : (
-          <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
-            {PERIODOS.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => setPeriodo(p.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
-                  periodo === p.value
-                    ? "bg-white shadow text-gray-800"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-        )}
+          )}
+            <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={usandoFechaPersonalizada}
+              onChange={(e) => {
+                setUsandoFechaPersonalizada(e.target.checked);
+                if (!e.target.checked) {
+                  setFechaDesde("");
+                  setFechaHasta("");
+                }
+              }}
+              className="w-4 h-4 text-blue-600"
+            />
+            <span className="text-sm text-gray-600">Rango personalizado</span>
+          </label>
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit overflow-x-auto">
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit max-w-full overflow-x-auto">
         {[
           { value: "ventas", label: "Ventas", icon: BarChart2 },
           { value: "rentabilidad", label: "Rentabilidad", icon: TrendingUp },
@@ -389,7 +389,7 @@ export default function Reportes() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {(ventasData.por_vendedor || []).map((f) => (
+                    {tablaVendedores.filas.map((f) => (
                       <tr key={f.vendedor}>
                         <td className="px-6 py-2 text-gray-800">{f.vendedor}</td>
                         <td className="px-4 py-2 text-right">{f.cantidad}</td>
@@ -406,6 +406,14 @@ export default function Reportes() {
                     )}
                   </tbody>
                 </table>
+                <div className="px-4">
+                  <Paginacion
+                    total={tablaVendedores.total}
+                    porPagina={tablaVendedores.porPagina}
+                    paginaActual={tablaVendedores.pagina}
+                    onChange={tablaVendedores.setPagina}
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -680,7 +688,7 @@ export default function Reportes() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {stockBajoData.map((p, i) => (
+                      {tablaStockBajo.filas.map((p, i) => (
                         <tr key={`${p.nombre}-${p.variante}-${p.sucursal}-${i}`} className="hover:bg-gray-50">
                           <td className="px-6 py-3 text-sm font-medium text-gray-800">
                             {p.nombre}
@@ -708,6 +716,14 @@ export default function Reportes() {
                       ))}
                     </tbody>
                   </table>
+                  <div className="px-4">
+                    <Paginacion
+                      total={tablaStockBajo.total}
+                      porPagina={tablaStockBajo.porPagina}
+                      paginaActual={tablaStockBajo.pagina}
+                      onChange={tablaStockBajo.setPagina}
+                    />
+                  </div>
                 </div>
               )}
             </div>

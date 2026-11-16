@@ -4,6 +4,9 @@ import toast from "react-hot-toast";
 import { tarjetasService } from "../services/tarjetas.service";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import InputNumero from "../components/ui/InputNumero";
+import EncabezadoPagina from "../components/ui/EncabezadoPagina";
+import Paginacion from "../components/ui/Paginacion";
+import { useTabla } from "../hooks/useTabla";
 
 const CAMPO =
   "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -192,6 +195,7 @@ function TarjetaModal({ tarjeta, onClose, onSave }) {
 // Configuración → Medios de pago: tarjetas aceptadas y sus planes de cuotas
 export default function MediosPago() {
   const [tarjetas, setTarjetas] = useState([]);
+  const tabla = useTabla(tarjetas, { porPagina: 12, ordenInicial: { campo: "nombre", dir: "asc" } });
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | {} | tarjeta
 
@@ -228,20 +232,17 @@ export default function MediosPago() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Medios de pago</h1>
-          <p className="text-sm text-gray-500">
-            Tarjetas que se aceptan y sus planes de cuotas. Al cobrar con tarjeta se elige cuál y en cuántas cuotas.
-          </p>
-        </div>
+      <EncabezadoPagina
+        titulo="Medios de pago"
+        subtitulo="Tarjetas que se aceptan y sus planes de cuotas. Al cobrar con tarjeta se elige cuál y en cuántas cuotas."
+      >
         <button
           onClick={() => setModal({})}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
         >
-          <Plus size={18} /> Nueva tarjeta
+          <Plus size={18} /> Nueva Tarjeta
         </button>
-      </div>
+      </EncabezadoPagina>
 
       {loading ? (
         <div className="flex justify-center py-12">
@@ -249,7 +250,7 @@ export default function MediosPago() {
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {tarjetas.map((t) => (
+          {tabla.filas.map((t) => (
             <div
               key={t.id}
               className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 ${t.activo ? "" : "opacity-60"}`}
@@ -290,6 +291,12 @@ export default function MediosPago() {
           )}
         </div>
       )}
+      <Paginacion
+        total={tabla.total}
+        porPagina={tabla.porPagina}
+        paginaActual={tabla.pagina}
+        onChange={tabla.setPagina}
+      />
 
       {modal && (
         <TarjetaModal

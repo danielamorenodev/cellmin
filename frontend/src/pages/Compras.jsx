@@ -24,6 +24,7 @@ import { comprasService } from "../services/compras.service";
 import { proveedoresService } from "../services/proveedores.service";
 import { productosService } from "../services/productos.service";
 import toast from "react-hot-toast";
+import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
@@ -946,11 +947,23 @@ function GestionProveedores() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <EncabezadoPagina titulo="Proveedores" subtitulo={`${proveedores.length} proveedores registrados`}>
+        <button
+          onClick={() => {
+            setSelected(null);
+            setShowModal(true);
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
+        >
+          <Plus size={18} />
+          Nuevo Proveedor
+        </button>
+      </EncabezadoPagina>
+      <div className="flex">
         <button
           type="button"
           onClick={() => setFiltroEstado(filtroEstado === "deuda" ? "" : "deuda")}
-          className={`text-left rounded-xl border px-4 py-2.5 transition ${
+          className={`w-full sm:w-auto text-left rounded-xl border px-4 py-2.5 transition ${
             filtroEstado === "deuda" ? "border-red-300 bg-red-50" : "border-gray-200 bg-white hover:bg-gray-50"
           }`}
         >
@@ -961,16 +974,6 @@ function GestionProveedores() {
           <p className="text-xs text-gray-500">
             {conDeuda === 0 ? "Sin deudas" : `${conDeuda} proveedor${conDeuda > 1 ? "es" : ""} con deuda`}
           </p>
-        </button>
-        <button
-          onClick={() => {
-            setSelected(null);
-            setShowModal(true);
-          }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
-        >
-          <Plus size={18} />
-          Nuevo Proveedor
         </button>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -1251,28 +1254,22 @@ export default function Compras() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">
-          {tab === "proveedores" ? "Proveedores" : "Ingresos de mercadería"}
-        </h1>
-      </div>
-
       {tab === "proveedores" ? (
         <GestionProveedores />
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <p className="text-gray-500 text-sm">
-              {compras.length} ingresos registrados · lo que llega de los proveedores
-            </p>
+          <EncabezadoPagina
+            titulo="Ingresos de mercadería"
+            subtitulo={`${compras.length} ingresos registrados · lo que llega de los proveedores`}
+          >
             <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition text-sm font-medium"
             >
               <Plus size={18} />
-              Nuevo ingreso
+              Nuevo Ingreso
             </button>
-          </div>
+          </EncabezadoPagina>
 
           <div className="relative">
             <Search

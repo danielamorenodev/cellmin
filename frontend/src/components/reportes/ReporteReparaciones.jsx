@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Clock, CheckCircle2, Wrench, Search } from "lucide-react";
 import toast from "react-hot-toast";
+import Paginacion from "../ui/Paginacion";
+import { useTabla } from "../../hooks/useTabla";
 import api from "../../services/api";
 import {
   ESTADOS_REP,
@@ -71,6 +73,7 @@ function Tarjeta({ titulo, valor, detalle, icono: Icono, color }) {
 }
 
 function TablaGrupo({ titulo, filas, onElegir, elegido }) {
+  const tabla = useTabla(filas, { porPagina: 10 });
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
       <h3 className="px-4 pt-4 pb-2 font-semibold text-gray-700">{titulo}</h3>
@@ -90,7 +93,7 @@ function TablaGrupo({ titulo, filas, onElegir, elegido }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
-          {filas.map((f) => (
+          {tabla.filas.map((f) => (
             <tr
               key={f.clave}
               onClick={onElegir ? () => onElegir(f.clave) : undefined}
@@ -111,6 +114,9 @@ function TablaGrupo({ titulo, filas, onElegir, elegido }) {
           )}
         </tbody>
       </table>
+      <div className="px-3">
+        <Paginacion total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
+      </div>
     </div>
   );
 }
@@ -150,6 +156,7 @@ export default function ReporteReparaciones({ periodo, desde: desdeP, hasta: has
       (!filtro.atrasadas || f.dias_atraso > 0 || f.dias_diferencia > 0) &&
       (!t || f.cliente.toLowerCase().includes(t) || (f.telefono || "").includes(t) || f.equipo.toLowerCase().includes(t)),
   );
+  const tablaHistorial = useTabla(historial, { porPagina: 15 });
 
   const campo =
     "px-3 py-2 border border-gray-300 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -267,7 +274,7 @@ export default function ReporteReparaciones({ periodo, desde: desdeP, hasta: has
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {historial.map((f) => (
+              {tablaHistorial.filas.map((f) => (
                 <tr key={f.id}>
                   <td className="px-4 py-2">
                     <a href={`/reparaciones/${f.id}`} target="_blank" rel="noopener" className="text-blue-600 hover:underline">
@@ -305,6 +312,14 @@ export default function ReporteReparaciones({ periodo, desde: desdeP, hasta: has
               )}
             </tbody>
           </table>
+        </div>
+        <div className="px-3">
+          <Paginacion
+            total={tablaHistorial.total}
+            porPagina={tablaHistorial.porPagina}
+            paginaActual={tablaHistorial.pagina}
+            onChange={tablaHistorial.setPagina}
+          />
         </div>
       </div>
     </div>

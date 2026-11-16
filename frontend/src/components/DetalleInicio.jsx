@@ -8,6 +8,8 @@ import {
   nombreSucursal,
   parsearMetodoPago,
 } from "../utils/helpers";
+import Paginacion from "./ui/Paginacion";
+import { useTabla } from "../hooks/useTabla";
 
 const TITULOS = {
   reparaciones: "Reparaciones activas",
@@ -22,8 +24,10 @@ const DESTINO = { reparaciones: "/reparaciones", ventas: "/ventas", stock: "/pro
 // Lo que hay detrás de cada número del Inicio: se abre debajo de las
 // tarjetas, ya con los datos cargados (así aparece de una sola vez).
 // tipo: reparaciones | ventas | stock; filtro: listas | mias | atrasadas
-export default function DetalleInicio({ tipo, filtro, filas, onClose }) {
+export default function DetalleInicio({ tipo, filtro, filas: todas, onClose }) {
   const navigate = useNavigate();
+  const tabla = useTabla(todas, { porPagina: 10 });
+  const filas = tabla.filas;
 
   const th = "text-left font-medium px-3 py-2 whitespace-nowrap";
   const td = "px-3 py-2";
@@ -32,7 +36,7 @@ export default function DetalleInicio({ tipo, filtro, filas, onClose }) {
     <section className="bg-white rounded-2xl shadow-sm border border-gray-100">
       <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
         <h2 className="font-semibold text-gray-800">
-          {TITULOS[filtro || tipo]} <span className="text-gray-400 font-normal">({filas.length})</span>
+          {TITULOS[filtro || tipo]} <span className="text-gray-400 font-normal">({todas.length})</span>
         </h2>
         <div className="flex items-center gap-2">
           <button
@@ -46,7 +50,7 @@ export default function DetalleInicio({ tipo, filtro, filas, onClose }) {
           </button>
         </div>
       </div>
-      {filas.length === 0 ? (
+      {todas.length === 0 ? (
         <p className="px-5 py-6 text-sm text-gray-500">No hay nada para mostrar.</p>
       ) : (
         <div className="overflow-x-auto max-h-[28rem]">
@@ -151,6 +155,11 @@ export default function DetalleInicio({ tipo, filtro, filas, onClose }) {
               </>
             )}
           </table>
+        </div>
+      )}
+      {todas.length > 0 && (
+        <div className="px-3">
+          <Paginacion total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
         </div>
       )}
     </section>

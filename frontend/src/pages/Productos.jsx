@@ -45,6 +45,7 @@ import {
 import FiltroCategorias from "../components/ui/FiltroCategorias";
 import { exportarListaPrecios } from "../utils/exportExcel";
 import Paginacion from "../components/ui/Paginacion";
+import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 
 const mapaVacio = (valor = 0) =>
   Object.fromEntries(SUCURSALES.map((s) => [s.value, valor]));
@@ -1292,8 +1293,8 @@ function GestionCategorias({ onCambio }) {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
+    <div className="space-y-6">
+      <EncabezadoPagina titulo="Categorías" subtitulo={`${categorias.length} categorías registradas`}>
         <button
           onClick={() => {
             setSelectedCategoria(null);
@@ -1304,7 +1305,7 @@ function GestionCategorias({ onCambio }) {
           <Plus size={18} />
           Nueva Categoría
         </button>
-      </div>
+      </EncabezadoPagina>
 
       <div className="flex flex-wrap gap-2">
         <div className="relative flex-1 min-w-48">
@@ -1314,7 +1315,7 @@ function GestionCategorias({ onCambio }) {
           />
           <input
             type="text"
-            placeholder="Buscar tipo de reparación..."
+            placeholder="Buscar categoría..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1600,24 +1601,14 @@ export default function Productos() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800">
-          {tab === "categorias" ? "Categorías" : "Productos y stock"}
-        </h1>
-      </div>
-
       {tab === "categorias" ? (
         <GestionCategorias onCambio={setCategorias} />
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <p className="text-gray-500 text-sm">
-                {productos.length} productos · stock total de las dos sucursales (tocá
-                el número para ver cada sucursal)
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2">
+          <EncabezadoPagina
+            titulo="Productos y stock"
+            subtitulo={`${productos.length} productos · stock total de las dos sucursales (tocá el número para ver cada sucursal)`}
+          >
               <button
                 onClick={handleExportar}
                 className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition text-sm font-medium"
@@ -1646,8 +1637,7 @@ export default function Productos() {
                   </button>
                 </>
               )}
-            </div>
-          </div>
+          </EncabezadoPagina>
 
           {/* Aviso de stock bajo */}
           {productosBajos.length > 0 && (

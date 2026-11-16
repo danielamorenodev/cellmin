@@ -7,6 +7,8 @@ import { cotizacionService } from "../services/cotizacion.service";
 import { useCotizacion, refrescarCotizacion } from "../hooks/useCotizacion";
 import InputNumero from "../components/ui/InputNumero";
 import { formatCurrency, formatDateTime } from "../utils/helpers";
+import { useTabla } from "../hooks/useTabla";
+import Paginacion from "../components/ui/Paginacion";
 
 export default function Dolar() {
   const { user } = useAuth();
@@ -14,6 +16,7 @@ export default function Dolar() {
   const [valor, setValor] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [historial, setHistorial] = useState([]);
+  const tabla = useTabla(historial, { porPagina: 15 });
   // InfoDolar (dólar blue en Córdoba): consulta en el momento y modo automático
   const [externa, setExterna] = useState(null); // { compra, venta } o { error }
   const [consultando, setConsultando] = useState(false);
@@ -287,10 +290,10 @@ export default function Dolar() {
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                   Cargado por
                 </th>
-                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                <th className="hidden sm:table-cell px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                   Origen
                 </th>
-                <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                <th className="hidden sm:table-cell px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                   Valor anterior
                 </th>
                 <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
@@ -299,7 +302,7 @@ export default function Dolar() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {historial.map((h) => (
+              {tabla.filas.map((h) => (
                 <tr key={h.id} className="hover:bg-gray-50 transition-[background-color]">
                   <td className="col-centro px-6 py-3 text-sm text-gray-600">
                     {formatDateTime(h.fecha)}
@@ -307,8 +310,8 @@ export default function Dolar() {
                   <td className="px-6 py-3 text-sm text-gray-700">
                     {h.usuario}
                   </td>
-                  <td className="px-6 py-3 text-xs text-gray-500">{h.fuente}</td>
-                  <td className="col-num px-6 py-3 text-sm text-gray-500">
+                  <td className="hidden sm:table-cell px-6 py-3 text-xs text-gray-500">{h.fuente}</td>
+                  <td className="hidden sm:table-cell col-num px-6 py-3 text-sm text-gray-500">
                     {h.anterior != null ? formatCurrency(h.anterior) : "-"}
                   </td>
                   <td className="col-num px-6 py-3 text-sm font-semibold text-gray-800">
@@ -319,6 +322,14 @@ export default function Dolar() {
             </tbody>
           </table>
         )}
+        <div className="px-4">
+          <Paginacion
+            total={tabla.total}
+            porPagina={tabla.porPagina}
+            paginaActual={tabla.pagina}
+            onChange={tabla.setPagina}
+          />
+        </div>
       </div>
     </div>
   );

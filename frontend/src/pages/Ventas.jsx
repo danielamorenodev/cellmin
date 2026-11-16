@@ -1753,7 +1753,7 @@ export default function Ventas() {
             {ventas.length} ventas registradas
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
         {esVendedor && user?.sucursales?.length > 1 && (
           <select
             value={sucursalVendedor}
