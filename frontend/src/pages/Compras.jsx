@@ -670,10 +670,10 @@ function FilaCompra({ compra, proveedores, onCancel, onVerDetalle }) {
         <td className="px-6 py-4 text-sm text-gray-700">
           {proveedor?.nombre || "-"}
         </td>
-        <td className="px-6 py-4 text-sm text-gray-600">
+        <td className="hidden xl:table-cell px-6 py-4 text-sm text-gray-600">
           {nombreSucursal(compra.sucursal || "sucursal_1")}
         </td>
-        <td className="col-num px-6 py-4 text-sm text-gray-600 ">
+        <td className="hidden xl:table-cell col-num px-6 py-4 text-sm text-gray-600 ">
           {compra.items?.length || 0}
         </td>
         <td
@@ -1295,14 +1295,14 @@ export default function Compras() {
           ) : (
             <>
               {/* Desktop */}
-              <div className="hidden xl:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
                       <ThOrdenable campo="numero_compra" tabla={tabla} className="px-6 py-3">Número</ThOrdenable>
                       <ThOrdenable campo="proveedor" tabla={tabla} className="px-6 py-3">Proveedor</ThOrdenable>
-                      <ThOrdenable campo="sucursal" tabla={tabla} className="px-6 py-3">Sucursal</ThOrdenable>
-                      <ThOrdenable campo="cantidad" tabla={tabla} className="px-6 py-3">Cant.</ThOrdenable>
+                      <ThOrdenable campo="sucursal" tabla={tabla} className="hidden xl:table-cell px-6 py-3">Sucursal</ThOrdenable>
+                      <ThOrdenable campo="cantidad" tabla={tabla} className="hidden xl:table-cell px-6 py-3">Cant.</ThOrdenable>
                       <ThOrdenable campo="total" tabla={tabla} className="px-6 py-3">Total</ThOrdenable>
                       <ThOrdenable campo="fecha" tabla={tabla} className="px-6 py-3">Fecha</ThOrdenable>
                       <ThOrdenable campo="estado" tabla={tabla} className="px-6 py-3">Estado</ThOrdenable>
@@ -1330,7 +1330,7 @@ export default function Compras() {
               </div>
 
               {/* Mobile */}
-              <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+              <div className="md:hidden space-y-3">
                 {tabla.filas.map((compra) => {
                   const proveedor = proveedores.find(
                     (p) => p.id === compra.proveedor_id,

@@ -1802,7 +1802,7 @@ function FilaReparacion({
           </button>
           <span className="block text-xs text-gray-500">{nombreSucursal(reparacion.sucursal)}</span>
         </td>
-        <td className="col-centro px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+        <td className="hidden xl:table-cell col-centro px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
           {formatDateTime(reparacion.fecha_ingreso)}
         </td>
         <td className="px-6 py-4 text-sm text-gray-700">
@@ -2822,14 +2822,14 @@ export default function Reparaciones() {
           ) : (
             <>
               {/* Desktop */}
-              <div className="hidden xl:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
+              <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
                       <ThOrdenable campo="orden" tabla={tabla}>
                         Orden
                       </ThOrdenable>
-                      <ThOrdenable campo="fecha" tabla={tabla}>
+                      <ThOrdenable campo="fecha" tabla={tabla} className="hidden xl:table-cell px-6 py-3">
                         Fecha
                       </ThOrdenable>
                       <ThOrdenable campo="cliente" tabla={tabla}>
@@ -2875,7 +2875,7 @@ export default function Reparaciones() {
               </div>
 
               {/* Mobile */}
-              <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+              <div className="md:hidden space-y-3">
                 {tabla.filas.map((r) => (
                   <CardReparacionMobile
                     key={r.id}

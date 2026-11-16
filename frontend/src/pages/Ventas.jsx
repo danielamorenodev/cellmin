@@ -1254,13 +1254,13 @@ function FilaVenta({
             ? `${cliente.nombre} ${cliente.apellido || ""}`
             : "Consumidor final"}
         </td>
-        <td className="px-6 py-4 text-sm  text-gray-600">
+        <td className="hidden xl:table-cell px-6 py-4 text-sm  text-gray-600">
           {venta.sucursal === "sucursal_1" ? "Sucursal 1" : "Sucursal 2"}
           {venta.vendedor_nombre && (
             <span className="block text-xs text-gray-500">Vendió: {venta.vendedor_nombre}</span>
           )}
         </td>
-        <td className="col-num px-6 py-4 text-sm text-gray-600">
+        <td className="hidden xl:table-cell col-num px-6 py-4 text-sm text-gray-600">
           {venta.items?.length || 0}
         </td>
         <td className="col-centro px-6 py-4 ">
@@ -1994,7 +1994,7 @@ export default function Ventas() {
       ) : (
         <>
           {/* Desktop */}
-          <div className="hidden xl:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
@@ -2007,10 +2007,10 @@ export default function Ventas() {
                   <ThOrdenable campo="cliente" tabla={tabla} align="center">
                     Cliente
                   </ThOrdenable>
-                  <ThOrdenable campo="sucursal" tabla={tabla} align="center">
+                  <ThOrdenable campo="sucursal" tabla={tabla} align="center" className="hidden xl:table-cell px-6 py-3">
                     Sucursal
                   </ThOrdenable>
-                  <ThOrdenable campo="productos" tabla={tabla} align="center">
+                  <ThOrdenable campo="productos" tabla={tabla} align="center" className="hidden xl:table-cell px-6 py-3">
                     Productos
                   </ThOrdenable>
                   <ThOrdenable campo="pago" tabla={tabla} align="center">
@@ -2052,7 +2052,7 @@ export default function Ventas() {
           </div>
 
           {/* Mobile */}
-          <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+          <div className="md:hidden space-y-3">
             {ventasPaginadas.map((venta) => (
               <CardVentaMobile
                 key={venta._id}
