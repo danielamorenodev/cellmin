@@ -1298,7 +1298,7 @@ export default function Compras() {
           ) : (
             <>
               {/* Desktop */}
-              <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="hidden xl:block bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
@@ -1333,7 +1333,7 @@ export default function Compras() {
               </div>
 
               {/* Mobile */}
-              <div className="md:hidden space-y-3">
+              <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
                 {tabla.filas.map((compra) => {
                   const proveedor = proveedores.find(
                     (p) => p.id === compra.proveedor_id,

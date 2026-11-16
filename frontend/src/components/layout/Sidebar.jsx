@@ -1,19 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { Menu, X, PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { Menu, X, ChevronDown, ChevronRight } from "lucide-react";
 import { modulosPara, itemActivo, moduloActual } from "./modulos";
 
 const ANCHO_ABIERTO = 240;
 const ANCHO_CERRADO = 64;
-
-const leerPreferencia = () => {
-  try {
-    return localStorage.getItem("cellmin.menu") !== "cerrado";
-  } catch {
-    return true;
-  }
-};
+// Demoras para abrir y cerrar el menú con el mouse: evitan que se abra al
+// pasar el cursor de casualidad y que se cierre al moverlo un poco de más
+const DEMORA_ABRIR = 120;
+const DEMORA_CERRAR = 250;
 
 // Logo con el nombre del sistema; lleva al inicio
 function Logo({ chico, onClick }) {
@@ -37,9 +33,10 @@ function Logo({ chico, onClick }) {
 
 export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  // En la computadora el menú ocupa su lugar: abierto o solo íconos, y la
-  // página se acomoda al lado (nunca queda tapada)
-  const [abierto, setAbierto] = useState(leerPreferencia);
+  // En la computadora el menú se abre al apoyar el mouse y se cierra al
+  // sacarlo. Ocupa su lugar: la página se acomoda al lado (nunca queda tapada)
+  const [abierto, setAbierto] = useState(false);
+  const timerMenu = useRef(null);
   // Submódulos que se ven al apoyar el mouse sobre un módulo
   const [flotante, setFlotante] = useState(null); // { id, top }
   // En el celular, módulo desplegado al tocarlo
@@ -52,13 +49,22 @@ export default function Sidebar() {
   const modulos = modulosPara(user?.rol);
   const activo = moduloActual(modulos, location);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem("cellmin.menu", abierto ? "abierto" : "cerrado");
-    } catch {
-      /* sin almacenamiento: no se recuerda */
-    }
-  }, [abierto]);
+  useEffect(() => () => {
+    clearTimeout(timerMenu.current);
+    clearTimeout(cerrarFlotante.current);
+  }, []);
+
+  const entrarMenu = () => {
+    clearTimeout(timerMenu.current);
+    if (!abierto) timerMenu.current = setTimeout(() => setAbierto(true), DEMORA_ABRIR);
+  };
+  const salirMenu = () => {
+    clearTimeout(timerMenu.current);
+    timerMenu.current = setTimeout(() => {
+      setAbierto(false);
+      setFlotante(null);
+    }, DEMORA_CERRAR);
+  };
 
   // Al ir a otra pantalla se cierran el menú del celular y los flotantes
   const ir = (path) => {
@@ -67,9 +73,16 @@ export default function Sidebar() {
     setFlotante(null);
   };
 
+  // Al elegir una pantalla el menú se cierra solo
+  const irYCerrar = (path) => {
+    clearTimeout(timerMenu.current);
+    setAbierto(false);
+    ir(path);
+  };
+
   const mostrarFlotante = (m, e) => {
     clearTimeout(cerrarFlotante.current);
-    if (m.items.length < 2 && abierto) return setFlotante(null);
+    if (m.items.length < 2) return setFlotante(null);
     const r = e.currentTarget.getBoundingClientRect();
     setFlotante({ id: m.id, top: r.top });
   };
@@ -93,22 +106,19 @@ export default function Sidebar() {
       {/* ---------- Computadora: menú fijo al costado ---------- */}
       <aside
         style={{ width: ancho }}
-        className="hidden md:flex shrink-0 bg-gray-900 flex-col transition-[width] duration-200 relative z-40"
+        onMouseEnter={entrarMenu}
+        onMouseLeave={salirMenu}
+        onFocus={() => setAbierto(true)}
+        onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setAbierto(false)}
+        className="hidden md:flex shrink-0 bg-gray-900 flex-col transition-[width] duration-200 relative z-40 overflow-hidden"
       >
+        {/* Cerrado se ve el logo; abierto, el logo con el nombre */}
         <div
           className={`h-16 border-b border-gray-700 flex items-center shrink-0 ${
-            abierto ? "px-3 justify-between" : "justify-center"
+            abierto ? "px-3" : "justify-center"
           }`}
         >
-          {abierto && <Logo onClick={() => ir("/dashboard")} />}
-          <button
-            onClick={() => setAbierto(!abierto)}
-            title={abierto ? "Achicar el menú" : "Agrandar el menú"}
-            aria-label={abierto ? "Achicar el menú" : "Agrandar el menú"}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition"
-          >
-            {abierto ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
-          </button>
+          <Logo chico={!abierto} onClick={() => irYCerrar("/dashboard")} />
         </div>
 
         <nav className="flex-1 p-2 space-y-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -118,10 +128,11 @@ export default function Sidebar() {
             return (
               <button
                 key={m.id}
-                onClick={() => ir(m.items[0].path)}
+                onClick={() => irYCerrar(m.items[0].path)}
                 onMouseEnter={(e) => mostrarFlotante(m, e)}
                 onMouseLeave={ocultarFlotante}
                 aria-label={m.label}
+                title={abierto ? undefined : m.label}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition ${
                   abierto ? "" : "justify-center"
                 } ${
@@ -149,10 +160,17 @@ export default function Sidebar() {
       </aside>
 
       {/* Submódulos al apoyar el mouse */}
-      {moduloFlotante && (
+      {moduloFlotante && abierto && (
         <div
-          onMouseEnter={() => clearTimeout(cerrarFlotante.current)}
-          onMouseLeave={ocultarFlotante}
+          onMouseEnter={() => {
+            // Pasar del menú a los submódulos no cierra el menú
+            clearTimeout(cerrarFlotante.current);
+            clearTimeout(timerMenu.current);
+          }}
+          onMouseLeave={() => {
+            ocultarFlotante();
+            salirMenu();
+          }}
           style={{ top: Math.min(flotante.top, window.innerHeight - 60 - moduloFlotante.items.length * 40), left: ancho - 4 }}
           className="hidden md:block fixed z-50 pl-2"
         >
@@ -163,7 +181,7 @@ export default function Sidebar() {
             {moduloFlotante.items.map((i) => (
               <button
                 key={i.path}
-                onClick={() => ir(i.path)}
+                onClick={() => irYCerrar(i.path)}
                 className={`w-full text-left px-4 py-2 text-sm transition ${
                   itemActivo(i, location)
                     ? "text-blue-700 bg-blue-50 font-medium"

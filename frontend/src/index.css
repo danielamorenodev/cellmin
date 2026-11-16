@@ -66,3 +66,35 @@ table td.col-num:not([colspan]) > .flex:not(.flex-col),
 table td.col-acc:not([colspan]) > .flex:not(.flex-col) {
   justify-content: flex-end;
 }
+
+/* Tablas que se acomodan al espacio disponible (con el menú abierto o en
+   pantallas medianas):
+   - Hasta 1535px de ancho, las celdas usan márgenes más chicos, así entran
+     todas las columnas, incluida "Acciones".
+   - Si igual no entra, la tabla se puede desplazar hacia el costado en vez
+     de quedar cortada. */
+@media (max-width: 1535px) {
+  main table th,
+  main table td {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  main table th:first-child,
+  main table td:first-child {
+    padding-left: 1rem;
+  }
+  main table th:last-child,
+  main table td:last-child {
+    padding-right: 1rem;
+  }
+}
+@media (max-width: 1279px) {
+  main table th,
+  main table td {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+}
+.overflow-hidden:has(> table) {
+  overflow-x: auto;
+}
