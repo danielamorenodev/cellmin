@@ -4,6 +4,8 @@ import toast from "react-hot-toast";
 import { remitosService } from "../services/remitos.service";
 import { productosService } from "../services/productos.service";
 import BuscadorProducto from "../components/ui/BuscadorProducto";
+import CeldaVariante, { EspacioNombre } from "../components/ui/CeldaVariante";
+import { ALTO_FILA, agregarOtraVariante } from "../utils/variantes";
 import InputNumero from "../components/ui/InputNumero";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
@@ -48,6 +50,11 @@ function NuevoRemitoModal({ onClose, onSave }) {
 
   const agregar = (p) =>
     setItems((l) => [...l, { producto_id: p.id, nombre: p.nombre, variante_nombre: "", cantidad: 1 }]);
+  // Suma otra fila del mismo producto para enviar otra variante
+  const otraVariante = (i) =>
+    setItems((l) =>
+      agregarOtraVariante(l, i, { producto_id: l[i].producto_id, nombre: l[i].nombre, variante_nombre: "", cantidad: 1 }),
+    );
   const cambiar = (i, campo, valor) =>
     setItems((l) => l.map((it, j) => (j === i ? { ...it, [campo]: valor } : it)));
 
@@ -143,7 +150,7 @@ function NuevoRemitoModal({ onClose, onSave }) {
                         <th className="text-right font-medium px-2 py-2 w-32">
                           Stock en {nombreSucursal(origen).replace("Sucursal ", "S")}
                         </th>
-                        <th className="text-left font-medium px-2 py-2 w-28">Envía</th>
+                        <th className="text-right font-medium px-2 py-2 w-28">Envía</th>
                         <th className="w-8" />
                       </tr>
                     </thead>
@@ -153,48 +160,50 @@ function NuevoRemitoModal({ onClose, onSave }) {
                         const d = disponible(it);
                         const pasa = d !== null && Number(it.cantidad) > d;
                         return (
-                          <tr key={i}>
-                            <td className="px-3 py-1.5">
-                              <p className="text-gray-800">{it.nombre}</p>
-                              {p?.tiene_variantes && (
-                                <select
-                                  required
-                                  value={it.variante_nombre}
-                                  onChange={(e) => cambiar(i, "variante_nombre", e.target.value)}
-                                  aria-label="Variante"
-                                  className={`${CAMPO} mt-1 py-1.5`}
-                                >
-                                  <option value="">Elegí la variante</option>
-                                  {p.variantes.map((v) => (
-                                    <option key={v.nombre} value={v.nombre}>
-                                      {v.nombre} (stock {stockEn(v, origen)})
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
+                          <tr key={i} className="align-top">
+                            <td className="px-3 py-2">
+                              <CeldaVariante
+                                nombre={it.nombre}
+                                producto={p}
+                                items={items}
+                                index={i}
+                                onElegir={(v) => cambiar(i, "variante_nombre", v)}
+                                onOtra={() => otraVariante(i)}
+                                etiqueta={(v) => `${v.nombre} (stock ${stockEn(v, origen)})`}
+                                claseCampo={CAMPO}
+                              />
                             </td>
-                            <td className={`px-2 py-1.5 text-right ${pasa ? "text-red-600 font-semibold" : "text-gray-600"}`}>
-                              {d ?? "—"}
+                            <td className="col-num px-2 py-2">
+                              <EspacioNombre producto={p} />
+                              <div
+                                className={`${ALTO_FILA} flex items-center justify-end tabular-nums ${pasa ? "text-red-600 font-semibold" : "text-gray-600"}`}
+                              >
+                                {d ?? "—"}
+                              </div>
                             </td>
-                            <td className="px-2 py-1.5">
+                            <td className="col-num px-2 py-2">
+                              <EspacioNombre producto={p} />
                               <InputNumero
                                 value={it.cantidad}
                                 onChange={(v) => cambiar(i, "cantidad", v)}
                                 decimales={0}
                                 required
                                 aria-label="Cantidad que se envía"
-                                className={`${CAMPO} ${pasa ? "border-red-400" : ""}`}
+                                className={`${CAMPO} ${ALTO_FILA} text-right ${pasa ? "border-red-400" : ""}`}
                               />
                             </td>
-                            <td className="pr-2 text-right">
-                              <button
-                                type="button"
-                                onClick={() => setItems(items.filter((_, j) => j !== i))}
-                                aria-label="Quitar producto"
-                                className="p-1 text-gray-400 hover:text-red-600"
-                              >
-                                <X size={15} />
-                              </button>
+                            <td className="pr-2 py-2">
+                              <EspacioNombre producto={p} />
+                              <div className={`${ALTO_FILA} flex items-center justify-end`}>
+                                <button
+                                  type="button"
+                                  onClick={() => setItems(items.filter((_, j) => j !== i))}
+                                  aria-label="Quitar producto"
+                                  className="p-1 text-gray-400 hover:text-red-600"
+                                >
+                                  <X size={15} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );

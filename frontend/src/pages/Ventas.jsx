@@ -17,6 +17,7 @@ import {
   Ban,
   Minus,
   Mail,
+  MessageCircle,
 } from "lucide-react";
 import { ventasService } from "../services/ventas.service";
 import { productosService } from "../services/productos.service";
@@ -51,6 +52,8 @@ import TicketVenta from "../components/ui/TicketVenta";
 import DetalleVenta from "../components/ui/DetalleVenta";
 import { useEmailConfigurado, preferenciaEmail, avisarEnvio } from "../hooks/useEmail";
 import { CampoEnviarEmail, EnviarEmailModal } from "../components/ui/EnvioEmail";
+import EnviarWhatsApp from "../components/ui/EnviarWhatsApp";
+import { mensajeTicket } from "../utils/whatsapp";
 
 function estadoStock(stock, minimo) {
   if (stock <= 0) return "agotado";
@@ -148,6 +151,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
   // Ticket por email (opcional, recuerda la última elección)
   const emailConfigurado = useEmailConfigurado();
   const [enviarEmail, setEnviarEmail] = useState(() => preferenciaEmail.leer("venta"));
+  const [enviarWhatsApp, setEnviarWhatsApp] = useState(() => preferenciaEmail.leer("venta_whatsapp"));
   const [emailDestino, setEmailDestino] = useState("");
   // Quién vendió: por defecto el usuario conectado; se puede elegir otro
   // vendedor de la sucursal (por ejemplo, si cobra el cajero)
@@ -536,6 +540,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
     }
     if (enviando.current) return;
     preferenciaEmail.guardar("venta", enviarEmail);
+    preferenciaEmail.guardar("venta_whatsapp", enviarWhatsApp);
     enviando.current = true;
     setLoading(true);
     try {
@@ -583,7 +588,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
           : `Venta ${result.numero_venta} registrada`,
       );
       avisarEnvio(result.envio_email);
-      onSave();
+      onSave(result.id, enviarWhatsApp, clientes.find((c) => c.id === form.cliente_id));
     } catch (error) {
       toast.error(
         error.response?.data?.detail || "Error al registrar la venta",
@@ -872,6 +877,17 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                 </select>
               </div>
             </div>
+
+            <label className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2.5 cursor-pointer text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={enviarWhatsApp}
+                onChange={(e) => setEnviarWhatsApp(e.target.checked)}
+                className="w-4 h-4 text-green-600"
+              />
+              <MessageCircle size={15} className="text-green-600" />
+              Enviar el ticket por WhatsApp al cliente
+            </label>
 
             {emailConfigurado && (
               <CampoEnviarEmail
@@ -1189,6 +1205,7 @@ function construirAcciones({
   onImprimir,
   onVerDetalle,
   onEnviarEmail,
+  onWhatsApp,
 }) {
   return [
     {
@@ -1211,6 +1228,11 @@ function construirAcciones({
       icono: <Mail size={15} />,
       onClick: () => onEnviarEmail(venta),
     },
+    onWhatsApp && {
+      label: "Enviar ticket por WhatsApp",
+      icono: <MessageCircle size={15} />,
+      onClick: () => onWhatsApp(venta),
+    },
     venta.estado === "completada" &&
       puedeCancelar && {
         label: "Cancelar venta",
@@ -1228,6 +1250,7 @@ function FilaVenta({
   onCancel,
   onImprimir,
   onEnviarEmail,
+  onWhatsApp,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -1296,6 +1319,7 @@ function FilaVenta({
                 onImprimir,
                 onVerDetalle,
                 onEnviarEmail,
+                onWhatsApp,
               })}
             />
           </div>
@@ -1384,6 +1408,7 @@ function CardVentaMobile({
   onCancel,
   onImprimir,
   onEnviarEmail,
+  onWhatsApp,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -1444,6 +1469,7 @@ function CardVentaMobile({
                 onImprimir,
                 onVerDetalle,
                 onEnviarEmail,
+                onWhatsApp,
               })}
             />
           </div>
@@ -1584,6 +1610,8 @@ export default function Ventas() {
   const emailConfigurado = useEmailConfigurado();
   // Venta cuyo ticket se envía (o reenvía) por email
   const [emailDe, setEmailDe] = useState(null);
+  // Venta cuyo ticket se manda por WhatsApp
+  const [whatsAppDe, setWhatsAppDe] = useState(null);
   const [showConfirmar, setShowConfirmar] = useState(false);
   const [ventaCancelarId, setVentaCancelarId] = useState(null);
   const [ventaCancelarNumero, setVentaCancelarNumero] = useState(null);
@@ -2045,6 +2073,7 @@ export default function Ventas() {
                       setShowTicket(true);
                     }}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
+                    onWhatsApp={setWhatsAppDe}
                   />
                 ))}
               </tbody>
@@ -2070,6 +2099,7 @@ export default function Ventas() {
                   setShowTicket(true);
                 }}
                 onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
+                    onWhatsApp={setWhatsAppDe}
               />
             ))}
           </div>
@@ -2087,10 +2117,27 @@ export default function Ventas() {
         <NuevaVentaModal
           sucursal={cajaActual?.sucursal}
           onClose={() => setShowModal(false)}
-          onSave={() => {
+          onSave={async (ventaId, conWhatsApp, cliente) => {
             setShowModal(false);
             fetchData();
+            if (conWhatsApp && ventaId) {
+              try {
+                // Se pasa el cliente: si se creó desde la venta, todavía no está en la lista
+                setWhatsAppDe({ ...(await ventasService.getById(ventaId)), _cliente: cliente });
+              } catch {
+                toast.error("No se pudo preparar el mensaje de WhatsApp");
+              }
+            }
           }}
+        />
+      )}
+
+      {whatsAppDe && (
+        <EnviarWhatsApp
+          titulo={`Enviar ticket ${whatsAppDe.numero_venta}`}
+          telefono={(whatsAppDe._cliente || clientes.find((c) => c.id === whatsAppDe.cliente_id))?.telefono}
+          mensaje={mensajeTicket(whatsAppDe, whatsAppDe._cliente || clientes.find((c) => c.id === whatsAppDe.cliente_id))}
+          onClose={() => setWhatsAppDe(null)}
         />
       )}
 

@@ -22,6 +22,7 @@ import {
   Trash2,
   Wrench,
   Mail,
+  MessageCircle,
   X,
   AlertTriangle,
   PlusCircle,
@@ -64,6 +65,8 @@ import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
 import { useEmailConfigurado, preferenciaEmail, avisarEnvio } from "../hooks/useEmail";
 import { CampoEnviarEmail, EnviarEmailModal } from "../components/ui/EnvioEmail";
+import EnviarWhatsApp from "../components/ui/EnviarWhatsApp";
+import { mensajeOrden } from "../utils/whatsapp";
 
 function NuevoClienteModal({ onClose, onSave }) {
   const [form, setForm] = useState({
@@ -442,6 +445,8 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
   // Enviar la orden por email al crearla (opcional, recuerda la última elección)
   const emailConfigurado = useEmailConfigurado();
   const [enviarEmail, setEnviarEmail] = useState(() => preferenciaEmail.leer("orden"));
+  // Mandar la orden por WhatsApp: se imprime sí o sí la copia del técnico
+  const [enviarWhatsApp, setEnviarWhatsApp] = useState(() => preferenciaEmail.leer("orden_whatsapp"));
   const [emailDestino, setEmailDestino] = useState("");
   const elegirCliente = (id, lista = clientes) => {
     setForm((f) => ({ ...f, cliente_id: id }));
@@ -593,6 +598,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
       return;
     }
     preferenciaEmail.guardar("orden", enviarEmail);
+    preferenciaEmail.guardar("orden_whatsapp", enviarWhatsApp);
     setLoading(true);
     try {
       const creada = await reparacionesService.create({
@@ -620,11 +626,14 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
           : "Orden creada correctamente",
       );
       avisarEnvio(creada?.envio_email);
-      onSave();
-      if (imprimir && creada) {
+      onSave(creada, enviarWhatsApp, clientes.find((c) => c.id === form.cliente_id));
+      if (creada && (imprimir || enviarWhatsApp)) {
+        // Con WhatsApp la copia del cliente va por mensaje: se imprime la del
+        // técnico (o las dos, si se eligió "Crear e imprimir")
         imprimirOrden(
           creada,
           clientes.find((c) => c.id === form.cliente_id),
+          imprimir ? ["cliente", "tecnico"] : ["tecnico"],
         );
       }
     } catch (error) {
@@ -1088,6 +1097,22 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                 )}
               </div>
             )}
+
+            <label className="flex items-start gap-2 rounded-xl border border-gray-200 px-3 py-2.5 cursor-pointer text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={enviarWhatsApp}
+                onChange={(e) => setEnviarWhatsApp(e.target.checked)}
+                className="w-4 h-4 mt-0.5 text-green-600"
+              />
+              <MessageCircle size={15} className="text-green-600 mt-0.5 shrink-0" />
+              <span>
+                Enviar la orden por WhatsApp al cliente
+                <span className="block text-[11px] text-gray-500">
+                  Al crearla se imprime la copia del técnico y se abre WhatsApp con el mensaje listo.
+                </span>
+              </span>
+            </label>
 
             {emailConfigurado && (
               <CampoEnviarEmail
@@ -1562,6 +1587,7 @@ function construirAcciones({
   puedeCobrar,
   onCobrar,
   onEnviarEmail,
+  onWhatsApp,
 }) {
   return [
     {
@@ -1600,6 +1626,11 @@ function construirAcciones({
       icono: <Mail size={15} />,
       onClick: () => onEnviarEmail(reparacion),
     },
+    onWhatsApp && {
+      label: "Enviar orden por WhatsApp",
+      icono: <MessageCircle size={15} />,
+      onClick: () => onWhatsApp(reparacion),
+    },
     reparacion.estado !== "entregada" &&
       reparacion.estado !== "cancelada" && {
         label: "Cancelar orden",
@@ -1610,7 +1641,7 @@ function construirAcciones({
   ];
 }
 
-function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir, onEnviarEmail }) {
+function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir, onEnviarEmail, onWhatsApp }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4">
       <div className="bg-white rounded-2xl w-full max-w-3xl shadow-xl max-h-[90vh] flex flex-col">
@@ -1637,6 +1668,15 @@ function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir, onEn
           >
             Cerrar
           </button>
+          {onWhatsApp && (
+            <button
+              onClick={() => onWhatsApp(reparacion)}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
+            >
+              <MessageCircle size={16} className="text-green-600" />
+              WhatsApp
+            </button>
+          )}
           {onEnviarEmail && (
             <button
               onClick={() => onEnviarEmail(reparacion)}
@@ -1758,6 +1798,7 @@ function FilaReparacion({
   onCancelar,
   onImprimir,
   onEnviarEmail,
+  onWhatsApp,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -1870,6 +1911,7 @@ function FilaReparacion({
                 puedeCobrar,
                 onCobrar,
                 onEnviarEmail,
+                onWhatsApp,
               })}
             />
           </div>
@@ -2006,6 +2048,7 @@ function CardReparacionMobile({
   onCancelar,
   onImprimir,
   onEnviarEmail,
+  onWhatsApp,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -2118,6 +2161,7 @@ function CardReparacionMobile({
               puedeCobrar,
               onCobrar,
               onEnviarEmail,
+              onWhatsApp,
             })}
           />
         </div>
@@ -2547,6 +2591,10 @@ export default function Reparaciones() {
   // Orden que se envía (o reenvía) por email
   const emailConfigurado = useEmailConfigurado();
   const [emailDe, setEmailDe] = useState(null);
+  // Orden que se manda por WhatsApp ({ reparacion, cliente?, copiaTecnico })
+  const [whatsAppDe, setWhatsAppDe] = useState(null);
+  const clienteWhatsApp =
+    whatsAppDe && (whatsAppDe.cliente || clientes.find((c) => c.id === whatsAppDe.reparacion.cliente_id));
 
   const fetchData = async () => {
     try {
@@ -2867,6 +2915,7 @@ export default function Reparaciones() {
                         onCancelar={handleCancelar}
                         onImprimir={(r) => setShowOrden(r)}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
+                    onWhatsApp={(r) => setWhatsAppDe({ reparacion: r, copiaTecnico: "opcional" })}
                         onVerDetalle={setReparacionDetalle}
                       />
                     ))}
@@ -2890,6 +2939,7 @@ export default function Reparaciones() {
                     onCancelar={handleCancelar}
                     onImprimir={(r) => setShowOrden(r)}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
+                    onWhatsApp={(r) => setWhatsAppDe({ reparacion: r, copiaTecnico: "opcional" })}
                         onVerDetalle={setReparacionDetalle}
                   />
                 ))}
@@ -2909,10 +2959,23 @@ export default function Reparaciones() {
               cajaAbierta={cajaAbierta}
               userRol={user?.rol}
               onClose={() => setShowModal(false)}
-              onSave={() => {
+              onSave={(creada, conWhatsApp, cliente) => {
                 setShowModal(false);
                 fetchData();
+                // La copia del técnico ya se imprimió al crear la orden. Se pasa el
+                // cliente: si se creó desde la orden, todavía no está en la lista
+                if (conWhatsApp && creada) setWhatsAppDe({ reparacion: creada, cliente, copiaTecnico: "impresa" });
               }}
+            />
+          )}
+          {whatsAppDe && (
+            <EnviarWhatsApp
+              titulo={`Enviar orden ${whatsAppDe.reparacion.numero_orden}`}
+              telefono={clienteWhatsApp?.telefono}
+              mensaje={mensajeOrden(whatsAppDe.reparacion, clienteWhatsApp)}
+              copiaTecnico={whatsAppDe.copiaTecnico}
+              onImprimirTecnico={() => imprimirOrden(whatsAppDe.reparacion, clienteWhatsApp, ["tecnico"])}
+              onClose={() => setWhatsAppDe(null)}
             />
           )}
           {emailDe && (
@@ -2965,6 +3028,7 @@ export default function Reparaciones() {
           onClose={() => setReparacionDetalle(null)}
           onImprimir={(r) => setShowOrden(r)}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
+                    onWhatsApp={(r) => setWhatsAppDe({ reparacion: r, copiaTecnico: "opcional" })}
         />
       )}
       {showOrden && (

@@ -25,6 +25,8 @@ import { proveedoresService } from "../services/proveedores.service";
 import { productosService } from "../services/productos.service";
 import toast from "react-hot-toast";
 import EncabezadoPagina from "../components/ui/EncabezadoPagina";
+import CeldaVariante, { EspacioNombre } from "../components/ui/CeldaVariante";
+import { ALTO_FILA, agregarOtraVariante } from "../utils/variantes";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
@@ -242,6 +244,19 @@ function NuevaCompraModal({ onClose, onSave }) {
     setForm((f) => ({ ...f, items: [...f.items, ...lineas] }));
   };
 
+  // Suma otra fila del mismo producto para cargar otra variante
+  const otraVariante = (index) =>
+    setForm((f) => ({
+      ...f,
+      items: agregarOtraVariante(f.items, index, {
+        producto_id: f.items[index].producto_id,
+        variante_nombre: "",
+        nombre_producto: f.items[index].nombre_producto,
+        cantidad: 1,
+        precio_unitario: 0,
+      }),
+    }));
+
   const eliminarItem = (index) =>
     setForm({ ...form, items: form.items.filter((_, i) => i !== index) });
 
@@ -407,8 +422,8 @@ function NuevaCompraModal({ onClose, onSave }) {
                     <thead className="bg-gray-50 text-xs text-gray-500">
                       <tr>
                         <th className="text-left font-medium px-3 py-2">Producto</th>
-                        <th className="text-left font-medium px-2 py-2 w-24">Cantidad</th>
-                        <th className="text-left font-medium px-2 py-2 w-36">Costo unitario</th>
+                        <th className="text-right font-medium px-2 py-2 w-24">Cantidad</th>
+                        <th className="text-right font-medium px-2 py-2 w-36">Costo unitario</th>
                         <th className="text-right font-medium px-3 py-2 w-32">Subtotal</th>
                         <th className="w-8" />
                       </tr>
@@ -417,56 +432,56 @@ function NuevaCompraModal({ onClose, onSave }) {
                       {form.items.map((item, index) => {
                         const producto = productos.find((p) => p.id === item.producto_id);
                         return (
-                          <tr key={index}>
-                            <td className="px-3 py-1.5">
-                              <p className="text-gray-800">{item.nombre_producto}</p>
-                              {producto?.tiene_variantes && (
-                                <select
-                                  required
-                                  value={item.variante_nombre}
-                                  onChange={(e) => updateItem(index, "variante_nombre", e.target.value)}
-                                  aria-label="Variante"
-                                  className={`${CAMPO} mt-1 py-1.5`}
-                                >
-                                  <option value="">Elegí la variante</option>
-                                  {producto.variantes.map((v) => (
-                                    <option key={v.nombre} value={v.nombre}>
-                                      {v.nombre}
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
+                          <tr key={index} className="align-top">
+                            <td className="px-3 py-2">
+                              <CeldaVariante
+                                nombre={item.nombre_producto}
+                                producto={producto}
+                                items={form.items}
+                                index={index}
+                                onElegir={(v) => updateItem(index, "variante_nombre", v)}
+                                onOtra={() => otraVariante(index)}
+                                claseCampo={CAMPO}
+                              />
                             </td>
-                            <td className="px-2 py-1.5">
+                            <td className="col-num px-2 py-2">
+                              <EspacioNombre producto={producto} />
                               <InputNumero
                                 value={item.cantidad}
                                 onChange={(v) => updateItem(index, "cantidad", v)}
                                 decimales={0}
                                 required
                                 aria-label="Cantidad"
-                                className={CAMPO}
+                                className={`${CAMPO} ${ALTO_FILA} text-right`}
                               />
                             </td>
-                            <td className="px-2 py-1.5">
+                            <td className="col-num px-2 py-2">
+                              <EspacioNombre producto={producto} />
                               <InputNumero
                                 value={item.precio_unitario}
                                 onChange={(v) => updateItem(index, "precio_unitario", v)}
                                 aria-label="Costo unitario"
-                                className={CAMPO}
+                                className={`${CAMPO} ${ALTO_FILA} text-right`}
                               />
                             </td>
-                            <td className="px-3 py-1.5 text-right text-gray-700 whitespace-nowrap">
-                              {formatCurrency((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}
+                            <td className="col-num px-3 py-2">
+                              <EspacioNombre producto={producto} />
+                              <div className={`${ALTO_FILA} flex items-center justify-end text-gray-700 whitespace-nowrap tabular-nums`}>
+                                {formatCurrency((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}
+                              </div>
                             </td>
-                            <td className="pr-2 text-right">
-                              <button
-                                type="button"
-                                onClick={() => eliminarItem(index)}
-                                aria-label="Quitar producto"
-                                className="p-1 text-gray-400 hover:text-red-600"
-                              >
-                                <X size={15} />
-                              </button>
+                            <td className="pr-2 py-2">
+                              <EspacioNombre producto={producto} />
+                              <div className={`${ALTO_FILA} flex items-center justify-end`}>
+                                <button
+                                  type="button"
+                                  onClick={() => eliminarItem(index)}
+                                  aria-label="Quitar producto"
+                                  className="p-1 text-gray-400 hover:text-red-600"
+                                >
+                                  <X size={15} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );

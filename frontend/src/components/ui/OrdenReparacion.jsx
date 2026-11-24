@@ -192,11 +192,10 @@ function generarHTML(reparacion, cliente, tipo) {
   `;
 }
 
-export function imprimirOrden(reparacion, cliente) {
-    const contenidoHTML = `
-    ${generarHTML(reparacion, cliente, "cliente")}
-    ${generarHTML(reparacion, cliente, "tecnico")}
-  `;
+// Imprime la orden. Por defecto las dos copias; con ["tecnico"], solo la del
+// técnico (cuando la del cliente se manda por WhatsApp)
+export function imprimirOrden(reparacion, cliente, copias = ["cliente", "tecnico"]) {
+    const contenidoHTML = copias.map((c) => generarHTML(reparacion, cliente, c)).join("");
 
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
