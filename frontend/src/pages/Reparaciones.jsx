@@ -23,6 +23,7 @@ import {
   Wrench,
   Mail,
   MessageCircle,
+  BellRing,
   X,
   AlertTriangle,
   PlusCircle,
@@ -67,7 +68,7 @@ import { useTabla } from "../hooks/useTabla";
 import { useEmailConfigurado, preferenciaEmail, avisarEnvio } from "../hooks/useEmail";
 import { CampoEnviarEmail, EnviarEmailModal } from "../components/ui/EnvioEmail";
 import EnviarWhatsApp from "../components/ui/EnviarWhatsApp";
-import { mensajeOrden } from "../utils/whatsapp";
+import { mensajeOrden, mensajeListo } from "../utils/whatsapp";
 
 function NuevoClienteModal({ onClose, onSave }) {
   const [form, setForm] = useState({
@@ -1636,6 +1637,12 @@ function construirAcciones({
       icono: <Mail size={15} />,
       onClick: () => onEnviarEmail(reparacion),
     },
+    onWhatsApp &&
+      reparacion.estado === "lista" && {
+        label: "Avisar que está lista (WhatsApp)",
+        icono: <BellRing size={15} />,
+        onClick: () => onWhatsApp(reparacion, "listo"),
+      },
     onWhatsApp && {
       label: "Enviar orden por WhatsApp",
       icono: <MessageCircle size={15} />,
@@ -1678,6 +1685,15 @@ function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir, onEn
           >
             Cerrar
           </button>
+          {onWhatsApp && reparacion.estado === "lista" && (
+            <button
+              onClick={() => onWhatsApp(reparacion, "listo")}
+              className="flex items-center gap-2 px-4 py-2 border border-green-300 text-green-700 bg-green-50 rounded-xl text-sm hover:bg-green-100 transition"
+            >
+              <BellRing size={16} />
+              Avisar que está lista
+            </button>
+          )}
           {onWhatsApp && (
             <button
               onClick={() => onWhatsApp(reparacion)}
@@ -2608,6 +2624,10 @@ export default function Reparaciones() {
   const clienteWhatsApp =
     whatsAppDe && (whatsAppDe.cliente || clientes.find((c) => c.id === whatsAppDe.reparacion.cliente_id));
 
+  // "listo": aviso de que el equipo se puede retirar; si no, la orden completa
+  const abrirWhatsApp = (r, tipo) =>
+    setWhatsAppDe(tipo === "listo" ? { reparacion: r, tipo } : { reparacion: r, copiaTecnico: "opcional" });
+
   const fetchData = async () => {
     try {
       const [reps, clients, tipos] = await Promise.all([
@@ -2668,6 +2688,18 @@ export default function Reparaciones() {
       await reparacionesService.update(id, data);
       toast.success("Estado actualizado");
       fetchData();
+      // Al quedar lista, se ofrece avisarle al cliente que la pase a retirar
+      const r = reparaciones.find((x) => x.id === id);
+      if (data.estado === "lista" && r) {
+        const avisar = await confirmar({
+          titulo: "Equipo listo para retirar",
+          mensaje: `¿Querés avisarle al cliente por WhatsApp que ya puede retirar el equipo de la orden ${r.numero_orden}?`,
+          detalle: "También lo podés hacer después desde las acciones de la orden.",
+          textoConfirmar: "Sí, avisar por WhatsApp",
+          textoCancelar: "Ahora no",
+        });
+        if (avisar) abrirWhatsApp({ ...r, estado: "lista" }, "listo");
+      }
     } catch (error) {
       toast.error(error.response?.data?.detail || "Error al actualizar");
     }
@@ -2954,7 +2986,7 @@ export default function Reparaciones() {
                         onCancelar={handleCancelar}
                         onImprimir={(r) => setShowOrden(r)}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
-                    onWhatsApp={(r) => setWhatsAppDe({ reparacion: r, copiaTecnico: "opcional" })}
+                    onWhatsApp={abrirWhatsApp}
                         onVerDetalle={setReparacionDetalle}
                       />
                     ))}
@@ -2978,7 +3010,7 @@ export default function Reparaciones() {
                     onCancelar={handleCancelar}
                     onImprimir={(r) => setShowOrden(r)}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
-                    onWhatsApp={(r) => setWhatsAppDe({ reparacion: r, copiaTecnico: "opcional" })}
+                    onWhatsApp={abrirWhatsApp}
                         onVerDetalle={setReparacionDetalle}
                   />
                 ))}
@@ -3009,9 +3041,17 @@ export default function Reparaciones() {
           )}
           {whatsAppDe && (
             <EnviarWhatsApp
-              titulo={`Enviar orden ${whatsAppDe.reparacion.numero_orden}`}
+              titulo={
+                whatsAppDe.tipo === "listo"
+                  ? `Avisar retiro · orden ${whatsAppDe.reparacion.numero_orden}`
+                  : `Enviar orden ${whatsAppDe.reparacion.numero_orden}`
+              }
               telefono={clienteWhatsApp?.telefono}
-              mensaje={mensajeOrden(whatsAppDe.reparacion, clienteWhatsApp)}
+              mensaje={
+                whatsAppDe.tipo === "listo"
+                  ? mensajeListo(whatsAppDe.reparacion, clienteWhatsApp)
+                  : mensajeOrden(whatsAppDe.reparacion, clienteWhatsApp)
+              }
               copiaTecnico={whatsAppDe.copiaTecnico}
               onImprimirTecnico={() => imprimirOrden(whatsAppDe.reparacion, clienteWhatsApp, ["tecnico"])}
               onClose={() => setWhatsAppDe(null)}
@@ -3067,7 +3107,7 @@ export default function Reparaciones() {
           onClose={() => setReparacionDetalle(null)}
           onImprimir={(r) => setShowOrden(r)}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
-                    onWhatsApp={(r) => setWhatsAppDe({ reparacion: r, copiaTecnico: "opcional" })}
+                    onWhatsApp={abrirWhatsApp}
         />
       )}
       {showOrden && (

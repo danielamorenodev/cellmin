@@ -112,3 +112,19 @@ export function mensajeOrden(r, cliente) {
   lineas.push("", "Guardá este mensaje: lo vas a necesitar para retirar tu equipo.");
   return lineas.join("\n");
 }
+
+// Aviso de que el equipo ya se puede retirar (con el saldo, si queda algo por pagar)
+export function mensajeListo(r, cliente) {
+  const eq = r.equipo || {};
+  const equipo = [eq.marca, eq.modelo].filter(Boolean).join(" ") || "equipo";
+  const lineas = [
+    `${saludo(cliente)} Tu ${equipo} ya está listo para retirar en ${local(r.sucursal)}.`,
+    "",
+    `*Orden ${r.numero_orden}*`,
+  ];
+  if (r.saldo_pendiente > 0) lineas.push(`Saldo a pagar al retirar: *${formatCurrency(r.saldo_pendiente)}*`);
+  else if (r.precio_total > 0) lineas.push("Ya está todo pago.");
+  if (r.garantia_dias > 0) lineas.push(`Garantía: ${r.garantia_dias} días desde la entrega.`);
+  lineas.push("", "Acordate de traer la orden o decirnos el número. ¡Te esperamos!");
+  return lineas.join("\n");
+}
