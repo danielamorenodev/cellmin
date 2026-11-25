@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Search, X, Smartphone, Edit, Trash2, ToggleLeft, List } from "lucide-react";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import { marcasService } from "../services/marcas.service";
 import { useAuth } from "../context/AuthContext";
 import MenuAcciones from "../components/ui/MenuAcciones";
@@ -107,7 +108,15 @@ function ModelosModal({ marca, esAdmin, onClose, onCambio }) {
   };
 
   const quitar = async (modelo) => {
-    if (!confirm(`¿Quitar el modelo «${modelo}» de ${marca.nombre}? Las órdenes ya cargadas no cambian.`)) return;
+    if (
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés quitar el modelo «${modelo}» de ${marca.nombre}?`,
+        detalle: "Las órdenes ya cargadas no cambian.",
+        textoConfirmar: "Sí, quitar",
+        peligro: true,
+      }))
+    )
+      return;
     try {
       onCambio(await marcasService.quitarModelo(marca.id, modelo));
       toast.success(`Modelo «${modelo}» quitado`);
@@ -238,7 +247,14 @@ export default function MarcasModelos() {
 
   const alternar = async (marca) => {
     const accion = marca.activo ? "Desactivar" : "Activar";
-    if (!confirm(`¿${accion} la marca ${marca.nombre}?`)) return;
+    if (
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés ${accion.toLowerCase()} la marca ${marca.nombre}?`,
+        textoConfirmar: `Sí, ${accion.toLowerCase()}`,
+        peligro: marca.activo,
+      }))
+    )
+      return;
     try {
       reemplazar(await marcasService.update(marca.id, { activo: !marca.activo }));
       toast.success(`Marca ${marca.activo ? "desactivada" : "activada"}`);

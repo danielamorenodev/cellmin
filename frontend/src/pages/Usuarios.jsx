@@ -12,6 +12,7 @@ import {
 import CambiarClaveModal from "../components/CambiarClaveModal";
 import { usuariosService } from "../services/usuarios.service";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
@@ -249,9 +250,11 @@ export default function Usuarios() {
   const handleToggleActivo = async (usuario) => {
     const accion = usuario.activo ? "desactivar" : "activar";
     if (
-      !confirm(
-        `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${usuario.nombre}?`,
-      )
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés ${accion} a ${usuario.nombre}?`,
+        textoConfirmar: `Sí, ${accion}`,
+        peligro: accion === "desactivar",
+      }))
     )
       return;
     try {

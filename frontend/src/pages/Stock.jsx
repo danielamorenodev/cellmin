@@ -10,6 +10,7 @@ import {
 import { stockService } from "../services/stock.service";
 import { productosService } from "../services/productos.service";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import {
   SUCURSALES,
   formatDateTime,
@@ -74,6 +75,13 @@ function MovimientoModal({ onClose, onSave, productoInicial = null, sucursalInic
       );
       return;
     }
+    if (
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés registrar ${form.tipo === "salida" ? "una salida" : form.tipo === "entrada" ? "una entrada" : "un ajuste"} de ${cantidad} ${cantidad === 1 ? "unidad" : "unidades"} en ${nombreSucursal(form.sucursal)}?`,
+        textoConfirmar: "Sí, registrar",
+      }))
+    )
+      return;
     setLoading(true);
     try {
       await stockService.crearMovimiento({

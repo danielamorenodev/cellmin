@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cajaService } from "../services/caja.service";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
@@ -370,6 +371,18 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
       toast.error("No podés dejar en caja más efectivo del que contaste");
       return;
     }
+    if (
+      !(await confirmar({
+        titulo: "Cerrar caja",
+        mensaje: "¿Estás seguro de que querés cerrar la caja?",
+        detalle: hayDiferencias
+          ? "Hay diferencias entre lo esperado y lo contado: quedan registradas en el cierre. Después de cerrar no se pueden registrar más ventas en esta caja."
+          : "Después de cerrar no se pueden registrar más ventas en esta caja.",
+        textoConfirmar: "Sí, cerrar la caja",
+        peligro: hayDiferencias,
+      }))
+    )
+      return;
     setLoading(true);
     try {
       const result = await cajaService.cerrar({
@@ -659,6 +672,14 @@ function MovimientoModal({ onClose, onSave }) {
       toast.error("Ingresá un monto mayor a 0");
       return;
     }
+    if (
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés registrar ${form.tipo === "egreso" ? "un egreso" : "un ingreso"} de ${formatCurrency(parseFloat(form.monto))} en la caja?`,
+        detalle: form.motivo ? `Motivo: ${form.motivo}` : undefined,
+        textoConfirmar: "Sí, registrar",
+      }))
+    )
+      return;
     setLoading(true);
     try {
       await cajaService.agregarMovimiento({

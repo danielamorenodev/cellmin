@@ -30,6 +30,7 @@ import {
 import { reparacionesService } from "../services/reparaciones.service";
 import { clientesService } from "../services/clientes.service";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 import PrecioUSD from "../components/ui/PrecioUSD";
 import {
@@ -1377,6 +1378,15 @@ function PagoModal({ reparacion, onClose, onSave }) {
       toast.error("No hay cotización del dólar disponible");
       return;
     }
+    if (
+      !(await confirmar({
+        titulo: "Confirmar cobro",
+        mensaje: `¿Estás seguro de que querés registrar el cobro de ${formatCurrency(saldo)} de la orden ${reparacion.numero_orden}?`,
+        detalle: vuelto ? `Vuelto: ${formatCurrency(vuelto)}` : undefined,
+        textoConfirmar: "Sí, registrar el cobro",
+      }))
+    )
+      return;
     setLoading(true);
     try {
       // Los dólares se cobran al final: así lo que sobra del saldo, ya
@@ -2358,9 +2368,11 @@ function GestionTiposReparacion() {
   const handleToggle = async (tipo) => {
     const accion = tipo.activo ? "desactivar" : "activar";
     if (
-      !confirm(
-        `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} este tipo?`,
-      )
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés ${accion} el tipo «${tipo.nombre}»?`,
+        textoConfirmar: `Sí, ${accion}`,
+        peligro: accion === "desactivar",
+      }))
     )
       return;
     try {
@@ -2627,6 +2639,26 @@ export default function Reparaciones() {
     fetchData();
   }, []);
 
+  // "Pasar a …" desde las acciones: se confirma antes de cambiar el estado
+  const cambiarEstado = async (id, data) => {
+    const r = reparaciones.find((x) => x.id === id);
+    const nuevo = ESTADOS_REP[data.estado]?.label || data.estado;
+    const entrega = data.estado === "entregada";
+    const ok = await confirmar({
+      titulo: entrega ? "Entregar equipo" : "Cambiar estado",
+      mensaje: entrega
+        ? `¿Estás seguro de que querés marcar la orden ${r?.numero_orden} como entregada?`
+        : `¿Estás seguro de que querés pasar la orden ${r?.numero_orden} a «${nuevo}»?`,
+      detalle: entrega
+        ? r?.saldo_pendiente > 0
+          ? `Tiene un saldo pendiente de ${formatCurrency(r.saldo_pendiente)}. El código de desbloqueo se borra al entregar.`
+          : "El código de desbloqueo se borra al entregar."
+        : undefined,
+      textoConfirmar: entrega ? "Sí, entregar" : `Sí, pasar a «${nuevo}»`,
+    });
+    if (ok) handleUpdate(id, data);
+  };
+
   const handleUpdate = async (id, data) => {
     if (data.estado === "en_reparacion" && !data.tecnico_id) {
       setAsignarTecnico(reparaciones.find((r) => r.id === id));
@@ -2698,11 +2730,18 @@ export default function Reparaciones() {
   const handleCancelar = async (id) => {
     const r = reparaciones.find((x) => x.id === id);
     const pagado = r?.total_pagado || 0;
-    const mensaje =
-      pagado > 0
-        ? `¿Cancelar esta orden? Se devolverán ${formatCurrency(pagado)} al cliente y se registrará como egreso en la caja, con el mismo medio de pago de cada cobro.`
-        : "¿Cancelar esta orden de reparación?";
-    if (!confirm(mensaje)) return;
+    if (
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés cancelar la orden ${r?.numero_orden || ""}?`,
+        detalle:
+          pagado > 0
+            ? `Se devolverán ${formatCurrency(pagado)} al cliente y se registrará como egreso en la caja, con el mismo medio de pago de cada cobro.`
+            : "La orden queda cancelada y no se puede volver a abrir.",
+        textoConfirmar: "Sí, cancelar la orden",
+        peligro: true,
+      }))
+    )
+      return;
     try {
       const res = await reparacionesService.cancelar(id);
       toast.success(
@@ -2907,7 +2946,7 @@ export default function Reparaciones() {
                         reparacion={r}
                         clientes={clientes}
                         tiposDisponibles={tiposDisponibles}
-                        onUpdate={handleUpdate}
+                        onUpdate={cambiarEstado}
                         onEditarTipos={(r) => setShowEditarTipos(r)}
                         onPago={(r) => setShowPago(r)}
                         cajaAbierta={cajaAbierta}
@@ -2931,7 +2970,7 @@ export default function Reparaciones() {
                     reparacion={r}
                     clientes={clientes}
                     tiposDisponibles={tiposDisponibles}
-                    onUpdate={handleUpdate}
+                    onUpdate={cambiarEstado}
                     onEditarTipos={(r) => setShowEditarTipos(r)}
                     onPago={(r) => setShowPago(r)}
                     cajaAbierta={cajaAbierta}

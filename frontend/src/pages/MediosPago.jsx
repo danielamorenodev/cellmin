@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Edit, Trash2, ToggleLeft, CreditCard, PlusCircle, X } from "lucide-react";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import { tarjetasService } from "../services/tarjetas.service";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import InputNumero from "../components/ui/InputNumero";
@@ -211,6 +212,16 @@ export default function MediosPago() {
   }, []);
 
   const alternar = async (t) => {
+    const accion = t.activo ? "desactivar" : "activar";
+    if (
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés ${accion} la tarjeta ${t.nombre}?`,
+        detalle: t.activo ? "No se va a poder elegir al cobrar." : undefined,
+        textoConfirmar: `Sí, ${accion}`,
+        peligro: t.activo,
+      }))
+    )
+      return;
     try {
       await tarjetasService.update(t.id, { activo: !t.activo });
       toast.success(`Tarjeta ${t.nombre} ${t.activo ? "desactivada" : "activada"}`);

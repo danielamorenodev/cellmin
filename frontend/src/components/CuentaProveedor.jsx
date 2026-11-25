@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X, Ban, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import { proveedoresService } from "../services/proveedores.service";
 import { formatCurrency, formatDateTime, mensajeError, textoSaldo } from "../utils/helpers";
 import InputNumero from "./ui/InputNumero";
@@ -71,7 +72,15 @@ export default function CuentaProveedor({ proveedor, esAdmin, onClose, onCambio 
   };
 
   const anular = async (mov) => {
-    if (!confirm(`¿Anular ${mov.tipo === "deuda" ? "la deuda" : "el pago"} de ${formatCurrency(mov.monto)}?`)) return;
+    if (
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés anular ${mov.tipo === "deuda" ? "la deuda" : "el pago"} de ${formatCurrency(mov.monto)}?`,
+        detalle: "El saldo del proveedor se recalcula.",
+        textoConfirmar: "Sí, anular",
+        peligro: true,
+      }))
+    )
+      return;
     try {
       await proveedoresService.anularMovimiento(proveedor.id, mov.id);
       toast.success("Movimiento anulado");

@@ -24,6 +24,7 @@ import { comprasService } from "../services/compras.service";
 import { proveedoresService } from "../services/proveedores.service";
 import { productosService } from "../services/productos.service";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 import CeldaVariante, { EspacioNombre } from "../components/ui/CeldaVariante";
 import { ALTO_FILA, agregarOtraVariante } from "../utils/variantes";
@@ -288,6 +289,16 @@ function NuevaCompraModal({ onClose, onSave }) {
       toast.error("Lo que queda debiendo tiene que ser mayor a 0 y no superar el total");
       return;
     }
+    const unidadesIngreso = form.items.reduce((acc, i) => acc + (Number(i.cantidad) || 0), 0);
+    if (
+      !(await confirmar({
+        titulo: "Registrar ingreso",
+        mensaje: `¿Estás seguro de que querés registrar el ingreso de ${unidadesIngreso} ${unidadesIngreso === 1 ? "unidad" : "unidades"} por ${formatCurrency(total)}?`,
+        detalle: adeudado > 0 ? `Queda debiendo ${formatCurrency(adeudado)} al proveedor.` : undefined,
+        textoConfirmar: "Sí, registrar",
+      }))
+    )
+      return;
     setLoading(true);
     try {
       const data = {
@@ -584,30 +595,6 @@ function NuevaCompraModal({ onClose, onSave }) {
           }}
         />
       )}
-    </div>
-  );
-}
-
-function ModalConfirmar({ mensaje, onConfirmar, onCancelar }) {
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 space-y-4">
-        <p className="text-gray-800 font-medium text-center">{mensaje}</p>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancelar}
-            className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
-          >
-            Volver
-          </button>
-          <button
-            onClick={onConfirmar}
-            className="flex-1 py-2 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700 transition"
-          >
-            Confirmar
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -913,9 +900,11 @@ function GestionProveedores() {
   const handleToggle = async (proveedor) => {
     const accion = proveedor.activo ? "desactivar" : "activar";
     if (
-      !confirm(
-        `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${proveedor.nombre}?`,
-      )
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés ${accion} al proveedor ${proveedor.nombre}?`,
+        textoConfirmar: `Sí, ${accion}`,
+        peligro: accion === "desactivar",
+      }))
     )
       return;
     try {
@@ -1210,7 +1199,6 @@ export default function Compras() {
   const [search, setSearch] = useState("");
   // "?nuevo=1" abre directamente el ingreso (botón de Productos y stock)
   const [showModal, setShowModal] = useState(() => params.get("nuevo") === "1");
-  const [compraCancelar, setCompraCancelar] = useState(null);
   const [compraDetalle, setCompraDetalle] = useState(null);
 
   const fetchData = async () => {
@@ -1241,17 +1229,22 @@ export default function Compras() {
         .includes(search.toLowerCase()),
   );
 
-  const handleCancelar = async () => {
+  const handleCancelar = async (id, numero) => {
+    if (
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés anular el ingreso ${numero}?`,
+        detalle: "Se va a restar el stock que había sumado y se anula la deuda con el proveedor, si la había.",
+        textoConfirmar: "Sí, anular el ingreso",
+        peligro: true,
+      }))
+    )
+      return;
     try {
-      await comprasService.cancelar(compraCancelar.id);
+      await comprasService.cancelar(id);
       toast.success("Ingreso anulado: se restó el stock que había sumado");
-      setCompraCancelar(null);
       fetchData();
     } catch (error) {
-      toast.error(
-        error.response?.data?.detail || "Error al anular el ingreso",
-      );
-      setCompraCancelar(null);
+      toast.error(error.response?.data?.detail || "Error al anular el ingreso");
     }
   };
 
@@ -1335,7 +1328,7 @@ export default function Compras() {
                         onVerDetalle={setCompraDetalle}
                         onCancel={
                           puedeCancelar
-                            ? (id, numero) => setCompraCancelar({ id, numero })
+                            ? handleCancelar
                             : null
                         }
                       />
@@ -1358,7 +1351,7 @@ export default function Compras() {
                       onVerDetalle={setCompraDetalle}
                       onCancel={
                         puedeCancelar
-                          ? (id, numero) => setCompraCancelar({ id, numero })
+                          ? handleCancelar
                           : null
                       }
                     />
@@ -1396,13 +1389,6 @@ export default function Compras() {
         />
       )}
 
-      {compraCancelar && (
-        <ModalConfirmar
-          mensaje={`¿Anular el ingreso ${compraCancelar.numero}? Se va a restar el stock que había sumado.`}
-          onConfirmar={handleCancelar}
-          onCancelar={() => setCompraCancelar(null)}
-        />
-      )}
     </div>
   );
 }

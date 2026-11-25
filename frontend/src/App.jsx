@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AlineacionTablas from "./components/ui/AlineacionTablas";
+import Confirmacion from "./components/ui/Confirmacion";
 import { useAuth } from "./context/AuthContext";
 import Layout from "./components/layout/Layout";
 import Login from "./pages/Login";
@@ -45,7 +46,8 @@ function PrivateLayout({ children }) {
 export default function App() {
   return (
     <>
-    <AlineacionTablas />
+      <Confirmacion />
+      <AlineacionTablas />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<Navigate to="/dashboard" />} />

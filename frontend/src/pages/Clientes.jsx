@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { clientesService } from "../services/clientes.service";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
@@ -177,9 +178,11 @@ export default function Clientes() {
   const handleToggle = async (cliente) => {
     const accion = cliente.activo ? "desactivar" : "activar";
     if (
-      !confirm(
-        `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${cliente.nombre}?`,
-      )
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés ${accion} a ${cliente.nombre}?`,
+        textoConfirmar: `Sí, ${accion}`,
+        peligro: accion === "desactivar",
+      }))
     )
       return;
     try {

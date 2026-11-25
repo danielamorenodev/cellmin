@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Plus, ArrowRight, X, Truck, Eye, Printer } from "lucide-react";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import { remitosService } from "../services/remitos.service";
 import { productosService } from "../services/productos.service";
 import BuscadorProducto from "../components/ui/BuscadorProducto";
@@ -73,6 +74,16 @@ function NuevoRemitoModal({ onClose, onSave }) {
       toast.error(`Hay cantidades mayores al stock de ${nombreSucursal(origen)}`);
       return;
     }
+    const unidades = items.reduce((acc, i) => acc + (Number(i.cantidad) || 0), 0);
+    if (
+      !(await confirmar({
+        titulo: "Registrar remito",
+        mensaje: `¿Estás seguro de que querés enviar ${unidades} ${unidades === 1 ? "unidad" : "unidades"} de ${nombreSucursal(origen)} a ${nombreSucursal(destino)}?`,
+        detalle: "Se descuenta el stock de la sucursal que envía y se suma en la que recibe.",
+        textoConfirmar: "Sí, registrar",
+      }))
+    )
+      return;
     setLoading(true);
     try {
       const r = await remitosService.create({

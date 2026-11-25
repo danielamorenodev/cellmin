@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Navigate } from "react-router-dom";
 import { CircleDollarSign, AlertTriangle, Save, RefreshCw, Globe } from "lucide-react";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import { useAuth } from "../context/AuthContext";
 import { cotizacionService } from "../services/cotizacion.service";
 import { useCotizacion, refrescarCotizacion } from "../hooks/useCotizacion";
@@ -84,6 +85,15 @@ export default function Dolar() {
   const handleGuardar = async (e) => {
     e.preventDefault();
     if (!puedeGuardar) return;
+    if (
+      !(await confirmar({
+        titulo: "Actualizar dólar",
+        mensaje: `¿Estás seguro de que querés cambiar el dólar a ${formatCurrency(valorNumero)}?`,
+        detalle: "Los productos con precio en dólares cambian de precio en pesos.",
+        textoConfirmar: "Sí, actualizar",
+      }))
+    )
+      return;
     setGuardando(true);
     try {
       await cotizacionService.guardar(valorNumero);

@@ -18,11 +18,13 @@ import {
   Minus,
   Mail,
   MessageCircle,
+  CheckCircle,
 } from "lucide-react";
 import { ventasService } from "../services/ventas.service";
 import { productosService } from "../services/productos.service";
 import { clientesService } from "../services/clientes.service";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import PrecioUSD from "../components/ui/PrecioUSD";
 import { useCotizacion } from "../hooks/useCotizacion";
 import { useSucursales } from "../hooks/useSucursales";
@@ -151,7 +153,6 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
   // Ticket por email (opcional, recuerda la última elección)
   const emailConfigurado = useEmailConfigurado();
   const [enviarEmail, setEnviarEmail] = useState(() => preferenciaEmail.leer("venta"));
-  const [enviarWhatsApp, setEnviarWhatsApp] = useState(() => preferenciaEmail.leer("venta_whatsapp"));
   const [emailDestino, setEmailDestino] = useState("");
   // Quién vendió: por defecto el usuario conectado; se puede elegir otro
   // vendedor de la sucursal (por ejemplo, si cobra el cajero)
@@ -539,9 +540,23 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
       return;
     }
     if (enviando.current) return;
+    enviando.current = true; // evita un segundo envío mientras se pregunta
+    const unidades = carrito.reduce((acc, i) => acc + (Number(i.cantidad) || 0), 0);
+    const seguro = await confirmar({
+      titulo: "Confirmar venta",
+      mensaje: `¿Estás seguro de que querés registrar la venta por ${formatCurrency(totalACobrar)}?`,
+      detalle: `${unidades} ${unidades === 1 ? "unidad" : "unidades"} · ${
+        clientes.find((c) => c.id === form.cliente_id)
+          ? `Cliente: ${clientes.find((c) => c.id === form.cliente_id).nombre}`
+          : "Consumidor final"
+      }`,
+      textoConfirmar: "Sí, registrar la venta",
+    });
+    if (!seguro) {
+      enviando.current = false;
+      return;
+    }
     preferenciaEmail.guardar("venta", enviarEmail);
-    preferenciaEmail.guardar("venta_whatsapp", enviarWhatsApp);
-    enviando.current = true;
     setLoading(true);
     try {
       const metodo_pago = pagoMixto
@@ -588,7 +603,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
           : `Venta ${result.numero_venta} registrada`,
       );
       avisarEnvio(result.envio_email);
-      onSave(result.id, enviarWhatsApp, clientes.find((c) => c.id === form.cliente_id));
+      onSave(result.id, clientes.find((c) => c.id === form.cliente_id), result.envio_email);
     } catch (error) {
       toast.error(
         error.response?.data?.detail || "Error al registrar la venta",
@@ -877,17 +892,6 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                 </select>
               </div>
             </div>
-
-            <label className="flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2.5 cursor-pointer text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={enviarWhatsApp}
-                onChange={(e) => setEnviarWhatsApp(e.target.checked)}
-                className="w-4 h-4 text-green-600"
-              />
-              <MessageCircle size={15} className="text-green-600" />
-              Enviar el ticket por WhatsApp al cliente
-            </label>
 
             {emailConfigurado && (
               <CampoEnviarEmail
@@ -1562,25 +1566,69 @@ function ModalDetalleVenta({ venta, cliente, onClose, onImprimir }) {
   );
 }
 
-function ModalConfirmar({ mensaje, onConfirmar, onCancelar }) {
+// Una opción de la ventana "Venta registrada"; queda tildada al usarla
+function OpcionTicket({ hecho, icono, texto, onClick, color }) {
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 space-y-4">
-        <p className="text-gray-800 font-medium text-center">{mensaje}</p>
-        <div className="flex gap-3">
-          <button
-            onClick={onCancelar}
-            className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirmar}
-            className="flex-1 py-2 bg-red-600 text-white rounded-xl text-sm hover:bg-red-700 transition"
-          >
-            Confirmar
-          </button>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition ${
+        hecho ? "border-gray-200 bg-gray-50 text-gray-500" : "border-gray-200 hover:bg-gray-50 text-gray-800"
+      }`}
+    >
+      <span className={hecho ? "text-green-600" : color}>{hecho ? <CheckCircle size={18} /> : icono}</span>
+      {texto}
+      {hecho && <span className="ml-auto text-xs font-normal">Listo</span>}
+    </button>
+  );
+}
+
+// Después de registrar una venta: imprimir el ticket, mandarlo por WhatsApp o
+// por email (se puede hacer más de una cosa; también desde el listado)
+function VentaRegistrada({ venta, envioEmail, emailConfigurado, onImprimir, onWhatsApp, onEmail, onClose }) {
+  const [hecho, setHecho] = useState({});
+  const marcar = (que, accion) => () => {
+    setHecho((h) => ({ ...h, [que]: true }));
+    accion();
+  };
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 p-4">
+      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 space-y-4" role="dialog" aria-labelledby="venta-registrada">
+        <div className="text-center space-y-1">
+          <CheckCircle size={40} className="mx-auto text-green-600" />
+          <h2 id="venta-registrada" className="text-lg font-semibold text-gray-800">
+            Venta {venta.numero_venta} registrada
+          </h2>
+          <p className="text-sm text-gray-500">
+            Total {formatCurrency(venta.total)} · ¿Qué querés hacer con el ticket?
+          </p>
         </div>
+        <div className="space-y-2">
+          <OpcionTicket hecho={hecho.imprimir} icono={<Printer size={18} />} color="text-blue-600" texto="Imprimir ticket" onClick={marcar("imprimir", onImprimir)} />
+          <OpcionTicket
+            hecho={hecho.whatsapp}
+            icono={<MessageCircle size={18} />}
+            color="text-green-600"
+            texto="Enviar por WhatsApp"
+            onClick={marcar("whatsapp", onWhatsApp)}
+          />
+          {envioEmail?.enviado ? (
+            <p className="flex items-center gap-2 text-xs text-gray-500 px-1">
+              <CheckCircle size={14} className="text-green-600" /> Ya se envió por email a {envioEmail.destino}
+            </p>
+          ) : (
+            emailConfigurado && (
+              <OpcionTicket hecho={hecho.email} icono={<Mail size={18} />} color="text-gray-600" texto="Enviar por email" onClick={marcar("email", onEmail)} />
+            )
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-full py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700"
+        >
+          Listo
+        </button>
       </div>
     </div>
   );
@@ -1612,9 +1660,8 @@ export default function Ventas() {
   const [emailDe, setEmailDe] = useState(null);
   // Venta cuyo ticket se manda por WhatsApp
   const [whatsAppDe, setWhatsAppDe] = useState(null);
-  const [showConfirmar, setShowConfirmar] = useState(false);
-  const [ventaCancelarId, setVentaCancelarId] = useState(null);
-  const [ventaCancelarNumero, setVentaCancelarNumero] = useState(null);
+  // Venta recién registrada: se pregunta si imprimir o enviar el ticket
+  const [ventaRegistrada, setVentaRegistrada] = useState(null);
 
   const [filtros, setFiltros] = useState({
     busqueda: "",
@@ -1673,13 +1720,19 @@ export default function Ventas() {
   useEffect(() => {
   }, [filtros]);
 
-  const handleCancel = async () => {
+  const handleCancel = async (id, numero) => {
+    if (
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés cancelar la venta ${numero}?`,
+        detalle: "Se restaura el stock y se registra la devolución del dinero en la caja abierta.",
+        textoConfirmar: "Sí, cancelar la venta",
+        peligro: true,
+      }))
+    )
+      return;
     try {
-      await ventasService.cancel(ventaCancelarId);
+      await ventasService.cancel(id);
       toast.success("Venta cancelada: stock restaurado y dinero devuelto desde la caja");
-      setShowConfirmar(false);
-      setVentaCancelarId(null);
-      setVentaCancelarNumero(null);
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Error al cancelar la venta");
@@ -2063,11 +2116,7 @@ export default function Ventas() {
                     clientes={clientes}
                     puedeCancelar={puedeCancelar(venta)}
                     onVerDetalle={setVentaDetalle}
-                    onCancel={(id, numero) => {
-                      setVentaCancelarId(id);
-                      setVentaCancelarNumero(numero);
-                      setShowConfirmar(true);
-                    }}
+                    onCancel={handleCancel}
                     onImprimir={(v) => {
                       setVentaImprimir(v);
                       setShowTicket(true);
@@ -2089,11 +2138,7 @@ export default function Ventas() {
                 clientes={clientes}
                 puedeCancelar={puedeCancelar(venta)}
                 onVerDetalle={setVentaDetalle}
-                onCancel={(id, numero) => {
-                  setVentaCancelarId(id);
-                  setVentaCancelarNumero(numero);
-                  setShowConfirmar(true);
-                }}
+                onCancel={handleCancel}
                 onImprimir={(v) => {
                   setVentaImprimir(v);
                   setShowTicket(true);
@@ -2117,16 +2162,16 @@ export default function Ventas() {
         <NuevaVentaModal
           sucursal={cajaActual?.sucursal}
           onClose={() => setShowModal(false)}
-          onSave={async (ventaId, conWhatsApp, cliente) => {
+          onSave={async (ventaId, cliente, envioEmail) => {
             setShowModal(false);
             fetchData();
-            if (conWhatsApp && ventaId) {
-              try {
-                // Se pasa el cliente: si se creó desde la venta, todavía no está en la lista
-                setWhatsAppDe({ ...(await ventasService.getById(ventaId)), _cliente: cliente });
-              } catch {
-                toast.error("No se pudo preparar el mensaje de WhatsApp");
-              }
+            if (!ventaId) return;
+            try {
+              // Se pasa el cliente: si se creó desde la venta, todavía no está en la lista
+              const venta = { ...(await ventasService.getById(ventaId)), _cliente: cliente };
+              setVentaRegistrada({ venta, envioEmail });
+            } catch {
+              toast.error("La venta se registró, pero no se pudo abrir el ticket. Imprimilo desde el listado.");
             }
           }}
         />
@@ -2144,7 +2189,7 @@ export default function Ventas() {
       {emailDe && (
         <EnviarEmailModal
           titulo={`Enviar ticket ${emailDe.numero_venta}`}
-          emailInicial={clientes.find((c) => c.id === emailDe.cliente_id)?.email}
+          emailInicial={(emailDe._cliente || clientes.find((c) => c.id === emailDe.cliente_id))?.email}
           onEnviar={(email) => ventasService.enviarEmail(emailDe._id, email)}
           onClose={() => setEmailDe(null)}
         />
@@ -2159,6 +2204,21 @@ export default function Ventas() {
             setVentaImprimir(v);
             setShowTicket(true);
           }}
+        />
+      )}
+
+      {ventaRegistrada && (
+        <VentaRegistrada
+          venta={ventaRegistrada.venta}
+          envioEmail={ventaRegistrada.envioEmail}
+          emailConfigurado={emailConfigurado}
+          onImprimir={() => {
+            setVentaImprimir(ventaRegistrada.venta);
+            setShowTicket(true);
+          }}
+          onWhatsApp={() => setWhatsAppDe(ventaRegistrada.venta)}
+          onEmail={() => setEmailDe(ventaRegistrada.venta)}
+          onClose={() => setVentaRegistrada(null)}
         />
       )}
 
@@ -2181,7 +2241,7 @@ export default function Ventas() {
             </div>
             <TicketVenta
               venta={ventaImprimir}
-              cliente={clientes.find((c) => c.id === ventaImprimir.cliente_id)}
+              cliente={ventaImprimir._cliente || clientes.find((c) => c.id === ventaImprimir.cliente_id)}
             />
             <button
               onClick={() => {
@@ -2196,17 +2256,6 @@ export default function Ventas() {
         </div>
       )}
 
-      {showConfirmar && (
-        <ModalConfirmar
-          mensaje={`¿Cancelar la venta ${ventaCancelarNumero}? Se restaura el stock y se registra la devolución del dinero en la caja abierta.`}
-          onConfirmar={handleCancel}
-          onCancelar={() => {
-            setShowConfirmar(false);
-            setVentaCancelarId(null);
-            setVentaCancelarNumero(null);
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
 import MenuAcciones from "../components/ui/MenuAcciones";
 import { productosService } from "../services/productos.service";
 import toast from "react-hot-toast";
+import { confirmar } from "../utils/confirmar";
 import PrecioUSD from "../components/ui/PrecioUSD";
 import { useCotizacion } from "../hooks/useCotizacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
@@ -1253,9 +1254,11 @@ function GestionCategorias({ onCambio }) {
   const handleToggle = async (categoria) => {
     const accion = categoria.activo ? "desactivar" : "activar";
     if (
-      !confirm(
-        `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} esta categoría?`,
-      )
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés ${accion} la categoría ${categoria.nombre}?`,
+        textoConfirmar: `Sí, ${accion}`,
+        peligro: accion === "desactivar",
+      }))
     )
       return;
     try {
@@ -1499,9 +1502,11 @@ export default function Productos() {
     const producto = productos.find((p) => p.id === id);
     const accion = producto?.activo ? "desactivar" : "activar";
     if (
-      !confirm(
-        `¿${accion.charAt(0).toUpperCase() + accion.slice(1)} este producto?`,
-      )
+      !(await confirmar({
+        mensaje: `¿Estás seguro de que querés ${accion} el producto ${producto?.nombre || ""}?`,
+        textoConfirmar: `Sí, ${accion}`,
+        peligro: accion === "desactivar",
+      }))
     )
       return;
     try {
