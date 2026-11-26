@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     smtp_remitente: str = ""  # "Cellmin <ventas@cellmin.com>"; si falta, se usa smtp_usuario
     smtp_seguridad: str = "starttls"  # starttls (puerto 587), ssl (puerto 465) o ninguna
 
+    # Recuperación de contraseña: el link se manda SIEMPRE a este email de la
+    # empresa (no al del usuario). Si queda vacío se usa SMTP_USUARIO.
+    recuperacion_email: str = ""
+    # Dirección del sistema para armar el link (ej.: https://cellmin.jybora.com).
+    # Si falta, se usa el origen del navegador solo si está en CORS_ORIGINS.
+    url_sistema: str = ""
+
     class Config:
         env_file = ".env"
 

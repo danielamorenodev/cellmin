@@ -138,9 +138,13 @@ SMTP_USUARIO=cellmin.local@gmail.com
 SMTP_CLAVE=la-contraseña-de-aplicación
 SMTP_REMITENTE=Cellmin <cellmin.local@gmail.com>
 SMTP_SEGURIDAD=starttls
+RECUPERACION_EMAIL=dueno@ejemplo.com
+URL_SISTEMA=https://cellmin.jybora.com
 ```
 
 Con Gmail, `SMTP_CLAVE` es una **contraseña de aplicación** (Cuenta de Google → Seguridad → Verificación en dos pasos → Contraseñas de aplicaciones), no la contraseña común. Con el puerto 465 usá `SMTP_SEGURIDAD=ssl`. Después reiniciá el backend (`sudo systemctl restart cellmin-backend`). Si `SMTP_HOST` queda vacío, la opción no se muestra. Los envíos fallidos quedan en el registro de errores.
+
+**Recuperar la contraseña:** con el correo configurado, el ingreso ofrece **¿Olvidaste tu contraseña?**. El link para crear una contraseña nueva llega siempre a `RECUPERACION_EMAIL` (el email de la empresa; si queda vacío, a `SMTP_USUARIO`), nunca al email del usuario, y dice qué usuario lo pidió. Vale 30 minutos y una sola vez. `URL_SISTEMA` es la dirección con la que se arma ese link.
 
 ### Crear el primer administrador
 ```bash

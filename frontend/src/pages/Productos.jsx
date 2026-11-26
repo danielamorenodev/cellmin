@@ -6,6 +6,7 @@ import InputPrecio, { SelectorMoneda } from "../components/ui/InputPrecio";
 import { categoriasService } from "../services/categorias.service";
 import { useState, useEffect } from "react";
 import {
+  Filter,
   Plus,
   PackagePlus,
   Edit,
@@ -141,6 +142,18 @@ function StockDesglose({ item }) {
 const CAMPO =
   "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500";
 const ETIQUETA = "block text-xs font-medium text-gray-600 mb-1";
+
+// Venta por debajo del costo: se avisa (no se bloquea: puede ser una liquidación)
+const debajoDelCosto = (costo, venta) =>
+  parseFloat(costo) > 0 && parseFloat(venta) > 0 && parseFloat(venta) < parseFloat(costo);
+function AvisoMargen({ costo, venta }) {
+  if (!debajoDelCosto(costo, venta)) return null;
+  return (
+    <p role="alert" className="col-span-full text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+      El precio de venta es menor que el costo: se pierde {formatCurrency(parseFloat(costo) - parseFloat(venta))} por unidad.
+    </p>
+  );
+}
 
 // Sección del formulario con un subtítulo discreto
 function Seccion({ titulo, accion, children }) {
@@ -346,6 +359,7 @@ function VarianteForm({
               className={CAMPO}
             />
           </div>
+          <AvisoMargen costo={variante.precio_costo} venta={variante.precio_venta} />
         </div>
       )}
       <StockPorSucursal
@@ -614,6 +628,25 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
           ? mapaVacio(0)
           : mapaAEnteros(stock_sucursal);
       }
+      const perdida = form.tiene_variantes
+        ? variantes.filter((v) => debajoDelCosto(v.precio_costo, v.precio_venta)).map((v) => v.nombre || "sin nombre")
+        : debajoDelCosto(data.precio_costo, data.precio_venta)
+          ? [data.nombre]
+          : [];
+      if (perdida.length) {
+        const seguir = await confirmar({
+          titulo: "Precio de venta menor que el costo",
+          mensaje: `¿Estás seguro de que querés guardar ${form.tiene_variantes ? "variantes" : "el producto"} con un precio de venta menor que el costo?`,
+          detalle: form.tiene_variantes ? `Variantes: ${perdida.join(", ")}.` : "Cada venta va a dar pérdida.",
+          textoConfirmar: "Sí, guardar igual",
+          textoCancelar: "No, revisar el precio",
+          peligro: true,
+        });
+        if (!seguir) {
+          setLoading(false);
+          return;
+        }
+      }
       if (producto) {
         await productosService.update(producto.id, data);
         toast.success("Producto actualizado");
@@ -764,6 +797,7 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
                       className={CAMPO}
                     />
                   </div>
+                  <AvisoMargen costo={form.precio_costo} venta={form.precio_venta} />
                 </div>
               )}
               {form.tiene_variantes && (
@@ -801,6 +835,9 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
                           key={moneda}
                           className={CAMPO}
                         />
+                      </div>
+                      <div className="col-span-3 -mt-1 empty:hidden">
+                        <AvisoMargen costo={precioCostoGlobal} venta={precioVentaGlobal} />
                       </div>
                       <div>
                         <span className={ETIQUETA} aria-hidden="true">&nbsp;</span>
@@ -882,7 +919,7 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
 
           {/* Pie fijo: siempre visible aunque el formulario tenga desplazamiento */}
           <div className="flex gap-3 lg:justify-end px-6 py-3 border-t border-gray-100 bg-white rounded-b-2xl shrink-0">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 lg:flex-none lg:w-44 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
@@ -1195,7 +1232,7 @@ function CategoriaModal({ categoria, onClose, onSave }) {
             />
           </div>
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
@@ -1690,6 +1727,7 @@ export default function Productos() {
                     : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
                 }`}
               >
+                <Filter size={16} />
                 Filtros{" "}
                 {filtrosActivos &&
                   `(${Object.values(filtros).filter((v) => v !== "").length})`}

@@ -52,10 +52,10 @@ const puedeIr = (rol, ruta) =>
   MODULOS.some((m) => m.items.some((i) => rutaBase(i.path) === rutaBase(ruta) && i.roles.includes(rol)));
 
 const PESTANAS = [
-  { id: "mias", label: "Para mi puesto", icono: BookOpen },
-  { id: "todas", label: "Todas las guías", icono: BookOpen },
-  { id: "problemas", label: "Problemas frecuentes", icono: LifeBuoy },
-  { id: "glosario", label: "Glosario", icono: Languages },
+  { id: "mias", label: "Mi puesto", titulo: "Guías para mi puesto", icono: BookOpen },
+  { id: "todas", label: "Todas", titulo: "Todas las guías", icono: BookOpen },
+  { id: "problemas", label: "Problemas", titulo: "Problemas frecuentes", icono: LifeBuoy },
+  { id: "glosario", label: "Glosario", titulo: "Glosario", icono: Languages },
 ];
 
 function Guia({ guia, abierta, onToggle, rol, onIr }) {
@@ -160,7 +160,11 @@ export default function Ayuda({ onClose }) {
     buscador.current?.focus();
   }, []);
   useEffect(() => {
-    const tecla = (e) => e.key === "Escape" && onClose();
+    const tecla = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault(); // que Escape no cierre también la ventana de atrás
+      onClose();
+    };
     document.addEventListener("keydown", tecla);
     return () => document.removeEventListener("keydown", tecla);
   }, [onClose]);
@@ -208,7 +212,7 @@ export default function Ayuda({ onClose }) {
               </h2>
               <p className="text-xs text-gray-500">Manual de usuario de Cellmin Gestión</p>
             </div>
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               aria-label="Cerrar la ayuda"
@@ -228,13 +232,14 @@ export default function Ayuda({ onClose }) {
               className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <div className="flex gap-1 overflow-x-auto [scrollbar-width:none] -mx-1 px-1">
+          <div className="grid grid-cols-4 gap-1">
             {PESTANAS.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => setPestana(p.id)}
-                className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                title={p.titulo}
+                className={`whitespace-nowrap text-center px-1 py-1.5 rounded-lg text-xs font-medium transition ${
                   pestana === p.id ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"
                 }`}
               >

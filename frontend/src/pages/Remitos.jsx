@@ -242,7 +242,7 @@ function NuevoRemitoModal({ onClose, onSave }) {
             </div>
           </div>
           <div className="flex gap-3 sm:justify-end px-6 py-3 border-t border-gray-100 shrink-0">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 sm:flex-none sm:w-40 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"

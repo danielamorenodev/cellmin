@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import InputNumero from "../components/ui/InputNumero";
 import {
   Check,
@@ -235,7 +236,7 @@ function AbrirCajaModal({ onClose, onSave }) {
             />
           </div>
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
@@ -635,7 +636,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
 
           {/* Pie fijo: siempre visible */}
           <div className="flex gap-3 lg:justify-end px-6 py-3 border-t border-gray-100 bg-white rounded-b-2xl shrink-0">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 lg:flex-none lg:w-44 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
@@ -787,7 +788,7 @@ function MovimientoModal({ onClose, onSave }) {
             />
           </div>
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
@@ -962,7 +963,7 @@ function ResumenCierre({ resultado, onClose }) {
             </div>
           )}
 
-          <button
+          <button data-cerrar
             onClick={onClose}
             className="w-full py-2 bg-gray-800 text-white rounded-xl text-sm hover:bg-gray-900 transition"
           >
@@ -1154,6 +1155,12 @@ export default function Caja() {
 
   const miCajaAbierta = miCaja?.estado === "abierta";
 
+  // Desde "Nueva venta" con la caja cerrada se llega con ?abrir=1: se abre la
+  // ventana para abrir la caja y, al terminar, se vuelve a vender (?volver=…)
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const [volverA] = useState(() => params.get("volver"));
+
   // Recarga el listado y, si se está viendo una caja, también su detalle
   const fetchData = async (idVista = caja?.id) => {
     try {
@@ -1163,6 +1170,11 @@ export default function Caja() {
         cajaService.getHistorial(),
       ]);
       setMiCaja(mia);
+      if (params.get("abrir") === "1") {
+        if (mia?.estado !== "abierta") setShowAbrirModal(true);
+        else if (volverA?.startsWith("/")) navigate(volverA);
+        setParams({}, { replace: true });
+      }
       setAbiertas(lista);
       setHistorial(hist);
       if (idVista) {
@@ -1182,6 +1194,9 @@ export default function Caja() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Desde "Nueva venta" con la caja cerrada se llega con ?abrir=1: se abre la
+  // ventana para abrir la caja y, al terminar, se vuelve a vender (?volver=…)
 
   // Abre el detalle de una caja del listado (y opcionalmente una acción)
   const verCaja = async (c, accion) => {
@@ -1779,7 +1794,8 @@ export default function Caja() {
           onClose={() => setShowAbrirModal(false)}
           onSave={() => {
             setShowAbrirModal(false);
-            fetchData();
+            if (volverA?.startsWith("/")) navigate(volverA);
+            else fetchData();
           }}
         />
       )}

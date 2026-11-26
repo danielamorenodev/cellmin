@@ -34,7 +34,7 @@ export default function EnviarWhatsApp({ titulo, telefono, mensaje, copiaTecnico
           <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
             <MessageCircle size={18} className="text-green-600" /> {titulo}
           </h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label="Cerrar">
+          <button data-cerrar onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label="Cerrar">
             <X size={16} />
           </button>
         </div>
@@ -89,7 +89,7 @@ export default function EnviarWhatsApp({ titulo, telefono, mensaje, copiaTecnico
             </label>
           )}
           <div className="flex gap-3">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"

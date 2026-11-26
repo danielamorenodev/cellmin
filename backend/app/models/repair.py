@@ -1,6 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime
+
+from app.utils import validaciones
 
 class Equipo(BaseModel):
     marca: str
@@ -9,6 +11,12 @@ class Equipo(BaseModel):
     problema_descripcion: Optional[str] = None
     bloqueo_tipo: Optional[str] = "ninguno"  # ninguno, patron, password, pin
     bloqueo_valor: Optional[str] = None      # patron: "1-5-9-6" (puntos 1 a 9)
+
+    @field_validator("imei", mode="before")
+    @classmethod
+    def imei_valido(cls, v):
+        v = v.strip() if isinstance(v, str) else v
+        return validaciones.imei(v or None)
 
 class Sena(BaseModel):
     monto: float

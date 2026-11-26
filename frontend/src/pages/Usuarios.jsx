@@ -18,12 +18,13 @@ import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
 import { mensajeError } from "../utils/helpers";
+import { useAuth } from "../context/AuthContext";
 
 const ROLES = [
   {
     value: "administrador",
     label: "Administrador",
-    color: "bg-red-100 text-red-700",
+    color: "bg-indigo-100 text-indigo-700",
   },
   { value: "cajero", label: "Cajero", color: "bg-blue-100 text-blue-700" },
   {
@@ -185,7 +186,7 @@ function UsuarioModal({ usuario, onClose, onSave }) {
             </div>
           </div>
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
@@ -207,6 +208,7 @@ function UsuarioModal({ usuario, onClose, onSave }) {
 }
 
 export default function Usuarios() {
+  const { user } = useAuth();
   const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -282,7 +284,8 @@ export default function Usuarios() {
       icono: <KeyRound size={15} />,
       onClick: () => setClaveDe(usuario),
     },
-    {
+    // Nadie se puede desactivar a sí mismo (si es el único admin, quedaría afuera)
+    usuario.id !== user?.id && {
       label: usuario.activo ? "Desactivar" : "Activar",
       icono: usuario.activo ? <Trash2 size={15} /> : <UserCheck size={15} />,
       onClick: () => handleToggleActivo(usuario),

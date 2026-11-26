@@ -64,7 +64,7 @@ function MarcaModal({ marca, onClose, onSave }) {
             <p className="text-xs text-gray-500">Los modelos se agregan después, desde las acciones de la marca.</p>
           )}
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition text-sm"
@@ -138,7 +138,7 @@ function ModelosModal({ marca, esAdmin, onClose, onCambio }) {
               {marca.modelos.length} {marca.modelos.length === 1 ? "modelo" : "modelos"}
             </p>
           </div>
-          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg">
+          <button data-cerrar onClick={onClose} aria-label="Cerrar" className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg">
             <X size={18} />
           </button>
         </div>

@@ -31,6 +31,8 @@ import {
 import { reparacionesService } from "../services/reparaciones.service";
 import { clientesService } from "../services/clientes.service";
 import toast from "react-hot-toast";
+import InputValidado from "../components/ui/InputValidado";
+import { errorDni, errorTelefono, errorImei, primerError } from "../utils/validaciones";
 import { confirmar } from "../utils/confirmar";
 import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 import PrecioUSD from "../components/ui/PrecioUSD";
@@ -83,6 +85,11 @@ function NuevoClienteModal({ onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const errorForm = primerError([form.dni, errorDni], [form.telefono, errorTelefono]);
+    if (errorForm) {
+      toast.error(errorForm);
+      return;
+    }
     setLoading(true);
     try {
       const cliente = await clientesService.create(form);
@@ -130,8 +137,10 @@ function NuevoClienteModal({ onClose, onSave }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 DNI
               </label>
-              <input
+              <InputValidado
                 type="text"
+                inputMode="numeric"
+                validar={errorDni}
                 value={form.dni}
                 onChange={(e) => setForm({ ...form, dni: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -141,8 +150,10 @@ function NuevoClienteModal({ onClose, onSave }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Teléfono
               </label>
-              <input
+              <InputValidado
                 type="text"
+                inputMode="tel"
+                validar={errorTelefono}
                 value={form.telefono}
                 onChange={(e) => setForm({ ...form, telefono: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -172,7 +183,7 @@ function NuevoClienteModal({ onClose, onSave }) {
             />
           </div>
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
@@ -324,9 +335,13 @@ function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle, onCrear
       <div className="space-y-1">
         {tiposFiltrados.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">
-            {onCrear
-              ? "No hay tipos con ese nombre. Escribí el problema para crearlo."
-              : "No se encontraron tipos"}
+            {!busqueda.trim()
+              ? onCrear
+                ? "Todavía no hay tipos de reparación cargados. Escribí el problema en el buscador para crear el primero."
+                : "No hay tipos de reparación cargados."
+              : onCrear
+                ? "No hay tipos con ese nombre. Usá el botón de arriba para crearlo."
+                : "No hay tipos con ese nombre."}
           </p>
         ) : (
           tiposPagina.map((tipo) => {
@@ -563,6 +578,11 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
       toast.error("Seleccioná un cliente");
       return;
     }
+    const errorEquipo = errorImei(form.equipo.imei);
+    if (errorEquipo) {
+      toast.error(errorEquipo);
+      return;
+    }
     const { bloqueo_tipo, bloqueo_valor } = form.equipo;
     if (bloqueo_tipo === "patron" && bloqueo_valor.split("-").length < 4) {
       toast.error("El patrón debe unir al menos 4 puntos");
@@ -653,7 +673,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
             <h2 className="text-lg font-semibold text-gray-800">
               Nueva Orden de Reparación
             </h2>
-            <button
+            <button data-cerrar
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg"
             >
@@ -797,8 +817,12 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
                   <label className="block text-xs text-gray-600 mb-1">
                     IMEI
                   </label>
-                  <input
+                  <InputValidado
                     type="text"
+                    inputMode="numeric"
+                    maxLength={20}
+                    placeholder="15 números (*#06#)"
+                    validar={errorImei}
                     value={form.equipo.imei}
                     onChange={(e) =>
                       setForm({
@@ -1145,7 +1169,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
               </div>
             </div>
             <div className="shrink-0 border-t border-gray-100 px-6 py-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-3">
-              <button
+              <button data-cerrar
                 type="button"
                 onClick={onClose}
                 className="sm:w-44 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
@@ -1253,7 +1277,7 @@ function EditarTiposModal({ reparacion, tiposDisponibles, onClose, onSave }) {
           />
 
           <div className="flex gap-3">
-            <button
+            <button data-cerrar
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
             >
@@ -1379,11 +1403,25 @@ function PagoModal({ reparacion, onClose, onSave }) {
       toast.error("No hay cotización del dólar disponible");
       return;
     }
+    // Lo que se aplica a la orden (con vuelto, el saldo justo) y lo que queda
+    const aplicado = Math.round(Math.min(totalPagado, saldo) * 100) / 100;
+    const queda = Math.round((saldo - aplicado) * 100) / 100;
+    const parcial = queda > 0.005;
+    if (!(aplicado > 0)) {
+      toast.error("Ingresá el monto que se cobra");
+      return;
+    }
     if (
       !(await confirmar({
         titulo: "Confirmar cobro",
-        mensaje: `¿Estás seguro de que querés registrar el cobro de ${formatCurrency(saldo)} de la orden ${reparacion.numero_orden}?`,
-        detalle: vuelto ? `Vuelto: ${formatCurrency(vuelto)}` : undefined,
+        mensaje: `¿Estás seguro de que querés registrar ${parcial ? "un pago parcial" : "el cobro"} de ${formatCurrency(aplicado)} de la orden ${reparacion.numero_orden}?`,
+        detalle:
+          [
+            parcial && `Queda un saldo de ${formatCurrency(queda)}.`,
+            vuelto && `Vuelto: ${formatCurrency(vuelto)}.`,
+          ]
+            .filter(Boolean)
+            .join(" ") || undefined,
         textoConfirmar: "Sí, registrar el cobro",
       }))
     )
@@ -1405,7 +1443,13 @@ function PagoModal({ reparacion, onClose, onSave }) {
         });
       }
       toast.success(
-        vuelto ? `Pago registrado. Vuelto: ${formatCurrency(vuelto)}` : "Pago registrado",
+        [
+          `Pago de ${formatCurrency(aplicado)} registrado.`,
+          parcial ? `Queda un saldo de ${formatCurrency(queda)}.` : "La orden quedó paga.",
+          vuelto ? `Vuelto: ${formatCurrency(vuelto)}.` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
       );
       onSave();
     } catch (error) {
@@ -1564,7 +1608,7 @@ function PagoModal({ reparacion, onClose, onSave }) {
           )}
 
           <div className="flex gap-3">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
@@ -1667,7 +1711,7 @@ function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir, onEn
             Orden {reparacion.numero_orden}
           </h2>
           <div className="flex items-center gap-3">
-            <button
+            <button data-cerrar
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition"
             >
@@ -1679,7 +1723,7 @@ function ModalDetalleReparacion({ reparacion, cliente, onClose, onImprimir, onEn
           <DetalleReparacion reparacion={reparacion} cliente={cliente} />
         </div>
         <div className="flex justify-end gap-3 p-6 border-t border-gray-100">
-          <button
+          <button data-cerrar
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
           >
@@ -1774,7 +1818,7 @@ function AsignarTecnicoModal({ reparacion, onClose, onConfirmar }) {
           </p>
         </div>
         <div className="flex gap-3 px-6 py-3 border-t border-gray-100">
-          <button
+          <button data-cerrar
             type="button"
             onClick={onClose}
             className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"
@@ -2329,7 +2373,7 @@ function TipoModal({ tipo, onClose, onSave }) {
             />
           </div>
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"

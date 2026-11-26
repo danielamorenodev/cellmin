@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { clientesService } from "../services/clientes.service";
 import toast from "react-hot-toast";
+import InputValidado from "../components/ui/InputValidado";
+import { errorDni, errorTelefono, primerError } from "../utils/validaciones";
 import { confirmar } from "../utils/confirmar";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import Paginacion from "../components/ui/Paginacion";
@@ -31,6 +33,11 @@ function ClienteModal({ cliente, onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const errorForm = primerError([form.dni, errorDni], [form.telefono, errorTelefono]);
+    if (errorForm) {
+      toast.error(errorForm);
+      return;
+    }
     setLoading(true);
     try {
       if (cliente) {
@@ -87,8 +94,10 @@ function ClienteModal({ cliente, onClose, onSave }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 DNI
               </label>
-              <input
+              <InputValidado
                 type="text"
+                inputMode="numeric"
+                validar={errorDni}
                 value={form.dni}
                 onChange={(e) => setForm({ ...form, dni: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -98,8 +107,10 @@ function ClienteModal({ cliente, onClose, onSave }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Teléfono
               </label>
-              <input
+              <InputValidado
                 type="text"
+                inputMode="tel"
+                validar={errorTelefono}
                 value={form.telefono}
                 onChange={(e) => setForm({ ...form, telefono: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -129,7 +140,7 @@ function ClienteModal({ cliente, onClose, onSave }) {
             />
           </div>
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"

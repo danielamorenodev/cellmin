@@ -2,6 +2,8 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 from datetime import datetime
 
+from app.utils import validaciones
+
 
 def _limpiar(v):
     """Los formularios mandan "" en los campos que no se completan: se guardan
@@ -33,6 +35,16 @@ class ClientCreate(BaseModel):
             raise ValueError("El nombre es obligatorio")
         return v
 
+    @field_validator("dni")
+    @classmethod
+    def dni_valido(cls, v):
+        return validaciones.dni(v)
+
+    @field_validator("telefono")
+    @classmethod
+    def telefono_valido(cls, v):
+        return validaciones.telefono(v)
+
 
 class ClientUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -47,6 +59,16 @@ class ClientUpdate(BaseModel):
     @classmethod
     def vacio_a_none(cls, v):
         return _limpiar(v)
+
+    @field_validator("dni")
+    @classmethod
+    def dni_valido(cls, v):
+        return validaciones.dni(v)
+
+    @field_validator("telefono")
+    @classmethod
+    def telefono_valido(cls, v):
+        return validaciones.telefono(v)
 
 
 class ClientResponse(BaseModel):

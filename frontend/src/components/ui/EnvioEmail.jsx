@@ -66,7 +66,7 @@ export function EnviarEmailModal({ titulo, emailInicial, onEnviar, onClose }) {
           <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
             <Mail size={18} /> {titulo}
           </h2>
-          <button type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label="Cerrar">
+          <button data-cerrar type="button" onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg" aria-label="Cerrar">
             <X size={16} />
           </button>
         </div>
@@ -87,7 +87,7 @@ export function EnviarEmailModal({ titulo, emailInicial, onEnviar, onClose }) {
             />
           </div>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50">
+            <button data-cerrar type="button" onClick={onClose} className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50">
               Cancelar
             </button>
             <button type="submit" disabled={enviando} className="flex-1 py-2 bg-blue-600 text-white rounded-xl text-sm hover:bg-blue-700 disabled:bg-blue-400">

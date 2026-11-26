@@ -10,6 +10,7 @@ import {
 import { stockService } from "../services/stock.service";
 import { productosService } from "../services/productos.service";
 import toast from "react-hot-toast";
+import AvisoRango from "../components/ui/AvisoRango";
 import { confirmar } from "../utils/confirmar";
 import {
   SUCURSALES,
@@ -243,7 +244,7 @@ function MovimientoModal({ onClose, onSave, productoInicial = null, sucursalInic
           </div>
 
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
@@ -436,6 +437,8 @@ export default function Stock() {
             </select>
             <input
               type="date"
+              aria-label="Desde"
+              max={filtrosMovimientos.fecha_hasta || undefined}
               value={filtrosMovimientos.fecha_desde}
               onChange={(e) =>
                 setFiltrosMovimientos({
@@ -447,6 +450,8 @@ export default function Stock() {
             />
             <input
               type="date"
+              aria-label="Hasta"
+              min={filtrosMovimientos.fecha_desde || undefined}
               value={filtrosMovimientos.fecha_hasta}
               onChange={(e) =>
                 setFiltrosMovimientos({
@@ -456,6 +461,7 @@ export default function Stock() {
               }
               className="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <AvisoRango desde={filtrosMovimientos.fecha_desde} hasta={filtrosMovimientos.fecha_hasta} className="basis-full" />
           </div>
 
           {/* Desktop */}

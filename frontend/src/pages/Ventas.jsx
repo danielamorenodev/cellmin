@@ -1,6 +1,7 @@
 import { cajaService } from "../services/caja.service";
 import InputNumero from "../components/ui/InputNumero";
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Plus,
   Search,
@@ -19,11 +20,14 @@ import {
   Mail,
   MessageCircle,
   CheckCircle,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { ventasService } from "../services/ventas.service";
 import { productosService } from "../services/productos.service";
 import { clientesService } from "../services/clientes.service";
 import toast from "react-hot-toast";
+import AvisoRango from "../components/ui/AvisoRango";
 import { confirmar } from "../utils/confirmar";
 import PrecioUSD from "../components/ui/PrecioUSD";
 import { useCotizacion } from "../hooks/useCotizacion";
@@ -628,7 +632,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
               {nombreSucursal(sucursal)}
             </span>
           </h2>
-          <button
+          <button data-cerrar
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
@@ -674,6 +678,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
                     e.preventDefault();
                     agregarPorCodigo();
                   } else if (e.key === "Escape" && (search || abierto)) {
+                    e.preventDefault();
                     e.stopPropagation();
                     setSearch("");
                     setAbierto(false);
@@ -1535,7 +1540,7 @@ function ModalDetalleVenta({ venta, cliente, onClose, onImprimir }) {
             Venta {venta.numero_venta}
           </h2>
           <div className="flex items-center gap-2">
-            <button
+            <button data-cerrar
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-lg transition"
             >
@@ -1547,7 +1552,7 @@ function ModalDetalleVenta({ venta, cliente, onClose, onImprimir }) {
           <DetalleVenta venta={venta} cliente={cliente} />
         </div>
         <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
-          <button
+          <button data-cerrar
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
           >
@@ -1622,7 +1627,7 @@ function VentaRegistrada({ venta, envioEmail, emailConfigurado, onImprimir, onWh
             )
           )}
         </div>
-        <button
+        <button data-cerrar
           type="button"
           onClick={onClose}
           className="w-full py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700"
@@ -1662,6 +1667,13 @@ export default function Ventas() {
   const [whatsAppDe, setWhatsAppDe] = useState(null);
   // Venta recién registrada: se pregunta si imprimir o enviar el ticket
   const [ventaRegistrada, setVentaRegistrada] = useState(null);
+  // "Nueva venta" desde Inicio llega con ?nueva=1: si la caja está abierta se
+  // abre el formulario; si no, queda el aviso para abrirla
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const puedeAbrirCaja = ["cajero", "administrador"].includes(user?.rol);
+  // Para el filtro "Vendedor": todo el personal que vende, aunque todavía no tenga ventas
+  const personalVentas = usePersonal();
 
   const [filtros, setFiltros] = useState({
     busqueda: "",
@@ -1686,6 +1698,10 @@ export default function Ventas() {
       setCajaAbierta(caja?.estado === "abierta");
       setCajaActual(caja);
       setMotivoCaja(caja?.motivo || "");
+      if (params.get("nueva") === "1") {
+        if (caja?.estado === "abierta") setShowModal(true);
+        setParams({}, { replace: true });
+      }
     } catch {
       setCajaAbierta(false);
       setCajaActual(null);
@@ -1878,6 +1894,30 @@ export default function Ventas() {
         </div>
       </div>
 
+      {/* Caja cerrada: se avisa y se ofrece abrirla (o pedirla, si es vendedor) */}
+      {cajaAbierta === false && (
+        <div role="status" className="flex flex-col sm:flex-row sm:items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
+          <Lock size={20} className="text-amber-600 shrink-0" />
+          <div className="flex-1 text-sm">
+            <p className="font-semibold text-amber-900">Abrí la caja para vender</p>
+            <p className="text-amber-800">
+              {puedeAbrirCaja
+                ? motivoCaja || "Para registrar ventas tiene que haber una caja abierta en la sucursal."
+                : motivoCaja || "Pedile a un cajero que abra la caja de tu sucursal."}
+            </p>
+          </div>
+          {puedeAbrirCaja && (
+            <button
+              type="button"
+              onClick={() => navigate(`/caja?abrir=1&volver=${encodeURIComponent("/ventas?nueva=1")}`)}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition"
+            >
+              <Unlock size={16} /> Abrir caja
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Buscador y filtros */}
       <div className="space-y-3">
         <div className="flex gap-2">
@@ -1953,7 +1993,7 @@ export default function Ventas() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todos</option>
-                {clientes.map((c) => (
+                {[...clientes].sort((a, b) => `${a.nombre} ${a.apellido || ""}`.localeCompare(`${b.nombre} ${b.apellido || ""}`, "es")).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nombre} {c.apellido || ""}
                   </option>
@@ -1970,7 +2010,16 @@ export default function Ventas() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todos</option>
-                {[...new Set(ventas.map((v) => v.vendedor_nombre).filter(Boolean))].sort().map((n) => (
+                {[
+                  ...new Set([
+                    ...personalVentas
+                      .filter((p) => ["vendedor", "cajero", "administrador"].includes(p.rol))
+                      .map((p) => p.nombre),
+                    ...ventas.map((v) => v.vendedor_nombre),
+                  ].filter(Boolean)),
+                ]
+                  .sort((a, b) => a.localeCompare(b, "es"))
+                  .map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
@@ -1997,6 +2046,7 @@ export default function Ventas() {
               </label>
               <input
                 type="date"
+                max={filtros.fecha_hasta || undefined}
                 value={filtros.fecha_desde}
                 onChange={(e) =>
                   setFiltros({ ...filtros, fecha_desde: e.target.value })
@@ -2010,12 +2060,14 @@ export default function Ventas() {
               </label>
               <input
                 type="date"
+                min={filtros.fecha_desde || undefined}
                 value={filtros.fecha_hasta}
                 onChange={(e) =>
                   setFiltros({ ...filtros, fecha_hasta: e.target.value })
                 }
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <AvisoRango desde={filtros.fecha_desde} hasta={filtros.fecha_hasta} className="mt-1" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">

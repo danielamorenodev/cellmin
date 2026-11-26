@@ -105,3 +105,160 @@ async def cambiar_mi_clave(datos: CambioClave, current_user: dict = Depends(get_
         accion="cambiar_clave", modulo="usuarios", descripcion=f"{user['nombre']} cambió su contraseña",
     )
     return {"message": "Contraseña actualizada"}
+
+
+# ---------- Recuperación de contraseña ----------
+# Cualquier usuario puede pedirla desde el login con su email. El link NO va a
+# su email sino al único email de la empresa (RECUPERACION_EMAIL), que dice qué
+# usuario lo pidió. Vale 30 minutos y una sola vez; en la base se guarda solo
+# el hash del código, así que una copia de la base no sirve para usarlo.
+import hashlib
+import html as html_util
+import secrets
+from datetime import datetime, timedelta
+
+from app.config import settings
+from app.utils import email as email_util
+
+VALIDEZ_LINK = timedelta(minutes=30)
+MAXIMO_POR_HORA = 3  # pedidos por usuario (y 10 por dirección IP)
+RESPUESTA_GENERICA = (
+    "Si el email corresponde a un usuario activo, enviamos un link al email de la empresa "
+    "para crear una contraseña nueva. Vale 30 minutos."
+)
+
+
+def _hash(codigo: str) -> str:
+    return hashlib.sha256(codigo.encode()).hexdigest()
+
+
+def _email_empresa() -> str:
+    return (settings.recuperacion_email or settings.smtp_usuario or "").strip()
+
+
+def recuperacion_disponible() -> bool:
+    return email_util.email_configurado() and bool(_email_empresa())
+
+
+def _url_sistema(request: Request) -> str | None:
+    if settings.url_sistema.strip():
+        return settings.url_sistema.strip().rstrip("/")
+    # Solo un origen conocido: si no, alguien podría hacer que el link apunte a otro sitio
+    origen = (request.headers.get("origin") or "").rstrip("/")
+    return origen if origen in settings.origenes_permitidos else None
+
+
+class PedidoRecuperacion(BaseModel):
+    email: str
+
+
+class NuevaClave(BaseModel):
+    codigo: str
+    nueva: str
+
+
+@router.get("/recuperar/estado")
+async def estado_recuperacion():
+    return {"disponible": recuperacion_disponible()}
+
+
+@router.post("/recuperar")
+async def pedir_recuperacion(datos: PedidoRecuperacion, request: Request):
+    if not recuperacion_disponible():
+        raise HTTPException(
+            status_code=503,
+            detail="La recuperación por email todavía no está configurada. "
+                   "Pedile al administrador que te asigne una contraseña nueva.",
+        )
+    base = _url_sistema(request)
+    if not base:
+        raise HTTPException(status_code=503, detail="Falta configurar URL_SISTEMA en el servidor.")
+    db = get_db()
+    ip = request.client.host if request.client else None
+    hace_una_hora = datetime.utcnow() - timedelta(hours=1)
+    if ip and await db.recuperaciones.count_documents({"ip": ip, "fecha": {"$gte": hace_una_hora}}) >= 10:
+        raise HTTPException(status_code=429, detail="Demasiados pedidos. Probá de nuevo en una hora.")
+
+    user = await db.usuarios.find_one({"email": filtro_email(datos.email), "activo": True})
+    if not user:
+        await guardar_evento(db, "ingreso_fallido", "autenticacion", "recuperar_clave",
+                             f"Pedido de recuperación con {datos.email[:120]}: no es un usuario activo", ip=ip)
+        await db.recuperaciones.insert_one({"usuario_id": None, "ip": ip, "fecha": datetime.utcnow(), "usado": True})
+        return {"message": RESPUESTA_GENERICA}
+    uid = str(user["_id"])
+    if await db.recuperaciones.count_documents({"usuario_id": uid, "fecha": {"$gte": hace_una_hora}}) >= MAXIMO_POR_HORA:
+        return {"message": RESPUESTA_GENERICA}
+
+    codigo = secrets.token_urlsafe(32)
+    ahora = datetime.utcnow()
+    # Un pedido nuevo deja sin efecto los anteriores
+    await db.recuperaciones.update_many({"usuario_id": uid, "usado": False}, {"$set": {"usado": True}})
+    await db.recuperaciones.insert_one({
+        "usuario_id": uid, "hash": _hash(codigo), "fecha": ahora,
+        "vence": ahora + VALIDEZ_LINK, "usado": False, "ip": ip,
+    })
+    link = f"{base}/recuperar?codigo={codigo}"
+    nombre = html_util.escape(user["nombre"])
+    correo = html_util.escape(user["email"])
+    rol = html_util.escape(user.get("rol", ""))
+    asunto = f"Cellmin: recuperar la contraseña de {user['nombre']}"
+    texto = (
+        f"{user['nombre']} ({user['email']}, {user.get('rol', '')}) pidió crear una contraseña nueva en Cellmin.\n\n"
+        f"Para hacerlo, abrí este link (vale 30 minutos y una sola vez):\n{link}\n\n"
+        "Si nadie lo pidió, ignorá este email: la contraseña actual sigue funcionando."
+    )
+    html = (
+        f"<p><strong>{nombre}</strong> ({correo}, {rol}) pidió crear una contraseña nueva en Cellmin.</p>"
+        f'<p><a href="{html_util.escape(link)}" style="display:inline-block;padding:10px 18px;background:#2563eb;'
+        f'color:#fff;border-radius:8px;text-decoration:none">Crear contraseña nueva</a></p>'
+        "<p>El link vale 30 minutos y se puede usar una sola vez.</p>"
+        "<p style=\"color:#666\">Si nadie lo pidió, ignorá este email: la contraseña actual sigue funcionando.</p>"
+    )
+    try:
+        await email_util.enviar_email(_email_empresa(), asunto, html, texto)
+    except email_util.ErrorEmail as e:
+        from app.utils.logger import log_errores
+        log_errores.error(f"Recuperación de contraseña de {user['email']}: {e}")
+        raise HTTPException(status_code=502, detail="No se pudo enviar el email. Probá más tarde o avisale al administrador.")
+    await registrar_auditoria(
+        db=db, usuario_id=uid, usuario_nombre=user["nombre"], rol=user.get("rol", ""),
+        accion="pedir_recuperacion", modulo="usuarios",
+        descripcion=f"{user['nombre']} pidió recuperar su contraseña (link enviado al email de la empresa)",
+    )
+    return {"message": RESPUESTA_GENERICA}
+
+
+async def _pedido_vigente(db, codigo: str):
+    pedido = await db.recuperaciones.find_one({"hash": _hash(codigo or ""), "usado": False})
+    if not pedido or pedido["vence"] < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="El link no es válido o ya venció. Pedí uno nuevo desde el ingreso.")
+    user = await db.usuarios.find_one({"_id": ObjectId(pedido["usuario_id"]), "activo": True})
+    if not user:
+        raise HTTPException(status_code=400, detail="El link no es válido o ya venció. Pedí uno nuevo desde el ingreso.")
+    return pedido, user
+
+
+@router.get("/recuperar/{codigo}")
+async def ver_recuperacion(codigo: str):
+    """Para mostrar en la pantalla de qué usuario se cambia la contraseña."""
+    _, user = await _pedido_vigente(get_db(), codigo)
+    return {"nombre": user["nombre"], "email": user["email"]}
+
+
+@router.post("/recuperar/confirmar")
+async def confirmar_recuperacion(datos: NuevaClave, request: Request):
+    db = get_db()
+    pedido, user = await _pedido_vigente(db, datos.codigo)
+    if len(datos.nueva) < MINIMO_CLAVE:
+        raise HTTPException(status_code=400, detail=f"La contraseña tiene que tener al menos {MINIMO_CLAVE} caracteres")
+    # Se marca usado antes de cambiar la clave: el mismo link no sirve dos veces
+    marcado = await db.recuperaciones.update_one({"_id": pedido["_id"], "usado": False}, {"$set": {"usado": True}})
+    if marcado.modified_count != 1:
+        raise HTTPException(status_code=400, detail="El link ya se usó. Pedí uno nuevo desde el ingreso.")
+    await db.usuarios.update_one({"_id": user["_id"]}, {"$set": {"password": hash_password(datos.nueva)}})
+    await registrar_auditoria(
+        db=db, usuario_id=str(user["_id"]), usuario_nombre=user["nombre"], rol=user.get("rol", ""),
+        accion="recuperar_clave", modulo="usuarios",
+        descripcion=f"{user['nombre']} creó una contraseña nueva con el link de recuperación",
+    )
+    return {"message": "Contraseña actualizada. Ya podés ingresar con la nueva."}

@@ -178,7 +178,7 @@ export default function Dashboard() {
   const tarjetas = (PORROL[user?.rol] || PORROL.administrador).map((k) => ({ clave: k, ...T[k] }));
 
   const A = {
-    venta: { label: "Nueva venta", icon: ShoppingCart, color: "bg-blue-50 text-blue-600 hover:bg-blue-100", path: "/ventas" },
+    venta: { label: "Nueva venta", icon: ShoppingCart, color: "bg-blue-50 text-blue-600 hover:bg-blue-100", path: "/ventas?nueva=1" },
     reparacion: { label: "Nueva reparación", icon: Wrench, color: "bg-orange-50 text-orange-700 hover:bg-orange-100", path: "/reparaciones" },
     reparaciones: { label: "Ver reparaciones", icon: Wrench, color: "bg-orange-50 text-orange-700 hover:bg-orange-100", path: "/reparaciones" },
     reportes: { label: "Ver reportes", icon: TrendingUp, color: "bg-purple-50 text-purple-600 hover:bg-purple-100", path: "/reportes" },

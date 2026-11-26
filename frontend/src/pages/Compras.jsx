@@ -24,6 +24,8 @@ import { comprasService } from "../services/compras.service";
 import { proveedoresService } from "../services/proveedores.service";
 import { productosService } from "../services/productos.service";
 import toast from "react-hot-toast";
+import InputValidado from "../components/ui/InputValidado";
+import { errorCuit, errorTelefono, primerError } from "../utils/validaciones";
 import { confirmar } from "../utils/confirmar";
 import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 import CeldaVariante, { EspacioNombre } from "../components/ui/CeldaVariante";
@@ -53,6 +55,11 @@ function ProveedorModal({ proveedor, onClose, onSave }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const errorForm = primerError([form.cuit, errorCuit], [form.telefono, errorTelefono]);
+    if (errorForm) {
+      toast.error(errorForm);
+      return;
+    }
     setLoading(true);
     try {
       if (proveedor) {
@@ -98,8 +105,10 @@ function ProveedorModal({ proveedor, onClose, onSave }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 CUIT
               </label>
-              <input
+              <InputValidado
                 type="text"
+                inputMode="numeric"
+                validar={errorCuit}
                 value={form.cuit}
                 onChange={(e) => setForm({ ...form, cuit: e.target.value })}
                 placeholder="XX-XXXXXXXX-X"
@@ -110,8 +119,10 @@ function ProveedorModal({ proveedor, onClose, onSave }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Teléfono
               </label>
-              <input
+              <InputValidado
                 type="text"
+                inputMode="tel"
+                validar={errorTelefono}
                 value={form.telefono}
                 onChange={(e) => setForm({ ...form, telefono: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -152,7 +163,7 @@ function ProveedorModal({ proveedor, onClose, onSave }) {
             />
           </div>
           <div className="flex gap-3 pt-2">
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
@@ -557,7 +568,7 @@ function NuevaCompraModal({ onClose, onSave }) {
             <p className="flex-1 text-sm text-gray-600">
               Total del ingreso: <span className="text-lg font-bold text-gray-800">{formatCurrency(total)}</span>
             </p>
-            <button
+            <button data-cerrar
               type="button"
               onClick={onClose}
               className="sm:w-40 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition"
@@ -607,7 +618,7 @@ function ModalDetalleCompra({ compra, proveedor, onClose }) {
           <h2 className="text-lg font-semibold text-gray-800">
             Compra {compra.numero_compra}
           </h2>
-          <button
+          <button data-cerrar
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
@@ -618,7 +629,7 @@ function ModalDetalleCompra({ compra, proveedor, onClose }) {
           <DetalleCompra compra={compra} proveedor={proveedor} />
         </div>
         <div className="flex justify-end p-6 border-t border-gray-100">
-          <button
+          <button data-cerrar
             onClick={onClose}
             className="px-4 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50 transition"
           >

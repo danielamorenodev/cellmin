@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ShieldAlert, Bug, Activity, Search } from "lucide-react";
 import toast from "react-hot-toast";
+import AvisoRango from "../components/ui/AvisoRango";
 import api from "../services/api";
 import Paginacion from "../components/ui/Paginacion";
 import { useTabla } from "../hooks/useTabla";
@@ -103,12 +104,13 @@ export default function RegistroActividad() {
       <div className="bg-white border border-gray-200 rounded-2xl p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
         <label className="text-xs text-gray-600">
           Desde
-          <input type="date" value={filtros.desde} onChange={(e) => setFiltros({ ...filtros, desde: e.target.value })} className={`${campo} w-full mt-1`} />
+          <input type="date" max={filtros.hasta || undefined} value={filtros.desde} onChange={(e) => setFiltros({ ...filtros, desde: e.target.value })} className={`${campo} w-full mt-1`} />
         </label>
         <label className="text-xs text-gray-600">
           Hasta
-          <input type="date" value={filtros.hasta} onChange={(e) => setFiltros({ ...filtros, hasta: e.target.value })} className={`${campo} w-full mt-1`} />
+          <input type="date" min={filtros.desde || undefined} value={filtros.hasta} onChange={(e) => setFiltros({ ...filtros, hasta: e.target.value })} className={`${campo} w-full mt-1`} />
         </label>
+        <AvisoRango desde={filtros.desde} hasta={filtros.hasta} className="sm:col-span-2 lg:col-span-6" />
         <label className="text-xs text-gray-600">
           Tipo
           <select value={filtros.tipo} onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })} className={`${campo} w-full mt-1`}>

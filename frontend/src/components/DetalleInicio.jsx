@@ -45,7 +45,7 @@ export default function DetalleInicio({ tipo, filtro, filas: todas, onClose }) {
           >
             Ir a la sección <ArrowRight size={14} />
           </button>
-          <button onClick={onClose} aria-label="Cerrar detalle" className="p-1 text-gray-400 hover:text-gray-700">
+          <button data-cerrar onClick={onClose} aria-label="Cerrar detalle" className="p-1 text-gray-400 hover:text-gray-700">
             <X size={18} />
           </button>
         </div>

@@ -5,6 +5,7 @@ import {
   Package,
   Wrench,
   AlertTriangle,
+  CheckCircle2,
   DollarSign,
   Download,
 } from "lucide-react";
@@ -24,6 +25,8 @@ import {
   Legend,
 } from "recharts";
 import toast from "react-hot-toast";
+import AvisoRango from "../components/ui/AvisoRango";
+import { rangoInvertido } from "../utils/validaciones";
 import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 import ReporteReparaciones from "../components/reportes/ReporteReparaciones";
 import Paginacion from "../components/ui/Paginacion";
@@ -49,8 +52,9 @@ const ESTADOS_REP = {
   en_diagnostico: "En diagnóstico",
   ingresada: "Ingresada",
   en_reparacion: "En reparación",
-  lista: "Lista",
+  lista: "Lista para entregar",
   entregada: "Entregada",
+  cancelada: "Cancelada",
 };
 
 function StatCard({ title, value, subtitle, icon: Icon, color }) {
@@ -67,6 +71,14 @@ function StatCard({ title, value, subtitle, icon: Icon, color }) {
     </div>
   );
 }
+
+// Eje de montos: $500, $12k, $1,5M (sin repetir "$0k" en valores chicos)
+const ejePesos = (v) =>
+  Math.abs(v) >= 1e6
+    ? `$${(v / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 })}M`
+    : Math.abs(v) >= 1000
+      ? `$${Math.round(v / 1000)}k`
+      : `$${Math.round(v)}`;
 
 export default function Reportes() {
   const [descargando, setDescargando] = useState(false);
@@ -108,6 +120,7 @@ export default function Reportes() {
     useState(false);
 
   const fetchData = async () => {
+    if (usandoFechaPersonalizada && rangoInvertido(fechaDesde, fechaHasta)) return;
     setLoading(true);
     try {
       const desde = usandoFechaPersonalizada ? fechaDesde : null;
@@ -154,29 +167,47 @@ export default function Reportes() {
         </button>
       </EncabezadoPagina>
 
-      {/* Período */}
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-        {usandoFechaPersonalizada ? (
-            <div className="flex flex-wrap gap-3 items-center bg-blue-50 p-4 rounded-xl">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-blue-700">Desde</label>
+      {/* Período: la casilla va primero y todo mide lo mismo, así nada salta
+          de lugar al pasar de los períodos al rango personalizado */}
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-3 min-h-[38px]">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={usandoFechaPersonalizada}
+              onChange={(e) => {
+                setUsandoFechaPersonalizada(e.target.checked);
+                if (!e.target.checked) {
+                  setFechaDesde("");
+                  setFechaHasta("");
+                }
+              }}
+              className="w-4 h-4 text-blue-600"
+            />
+            <span className="text-sm text-gray-600">Rango personalizado</span>
+          </label>
+          {usandoFechaPersonalizada ? (
+            <div className="flex flex-wrap items-center gap-2 bg-gray-100 p-1 rounded-xl">
+              <label className="flex items-center gap-1.5 pl-2 text-xs font-medium text-gray-600">
+                Desde
                 <input
                   type="date"
+                  max={fechaHasta || undefined}
                   value={fechaDesde}
                   onChange={(e) => setFechaDesde(e.target.value)}
-                  className="px-3 py-2 border border-blue-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-blue-700">Hasta</label>
+              </label>
+              <label className="flex items-center gap-1.5 pr-1 text-xs font-medium text-gray-600">
+                Hasta
                 <input
                   type="date"
+                  min={fechaDesde || undefined}
                   value={fechaHasta}
                   onChange={(e) => setFechaHasta(e.target.value)}
-                  className="px-3 py-2 border border-blue-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-              </div>
+              </label>
             </div>
           ) : (
             <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
@@ -195,22 +226,8 @@ export default function Reportes() {
               ))}
             </div>
           )}
-            <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={usandoFechaPersonalizada}
-              onChange={(e) => {
-                setUsandoFechaPersonalizada(e.target.checked);
-                if (!e.target.checked) {
-                  setFechaDesde("");
-                  setFechaHasta("");
-                }
-              }}
-              className="w-4 h-4 text-blue-600"
-            />
-            <span className="text-sm text-gray-600">Rango personalizado</span>
-          </label>
         </div>
+        <AvisoRango desde={fechaDesde} hasta={fechaHasta} />
       </div>
 
       {/* Tabs */}
@@ -294,7 +311,7 @@ export default function Reportes() {
                       <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
                       <YAxis
                         tick={{ fontSize: 11 }}
-                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                        tickFormatter={ejePesos}
                       />
                       <Tooltip formatter={(v) => formatCurrency(v)} />
                       <Bar
@@ -452,6 +469,13 @@ export default function Reportes() {
                 <h3 className="font-semibold text-gray-700 mb-4">
                   Resumen de rentabilidad
                 </h3>
+                {!rentabilidadData.total_ingresos && !rentabilidadData.total_costo ? (
+                  <div className="h-[250px] flex flex-col items-center justify-center text-center text-gray-500">
+                    <BarChart2 size={40} className="text-gray-300 mb-2" />
+                    <p className="font-medium">Sin datos en este período</p>
+                    <p className="text-sm">Cuando haya ventas, acá vas a ver ingresos, costo y ganancia.</p>
+                  </div>
+                ) : (
                 <ResponsiveContainer width="100%" height={250}>
                   <BarChart
                     data={[
@@ -467,7 +491,7 @@ export default function Reportes() {
                     <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                     <YAxis
                       tick={{ fontSize: 11 }}
-                      tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                      tickFormatter={ejePesos}
                     />
                     <Tooltip formatter={(v) => formatCurrency(v)} />
                     <Bar dataKey="valor" radius={[4, 4, 0, 0]}>
@@ -477,6 +501,7 @@ export default function Reportes() {
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
+                )}
               </div>
             </div>
           )}
@@ -565,7 +590,7 @@ export default function Reportes() {
           {/* TAB REPARACIONES */}
           {tab === "reparaciones" && reparacionesData && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
                 <StatCard
                   title="Total órdenes"
                   value={reparacionesData.total}
@@ -648,9 +673,9 @@ export default function Reportes() {
             <div className="space-y-4">
               {stockBajoData.length === 0 ? (
                 <div className="text-center py-12 bg-white rounded-2xl border border-gray-100">
-                  <AlertTriangle
+                  <CheckCircle2
                     size={48}
-                    className="mx-auto text-green-300 mb-3"
+                    className="mx-auto text-green-500 mb-3"
                   />
                   <p className="text-gray-500 font-medium">
                     Todo el stock está en niveles normales

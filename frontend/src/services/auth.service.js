@@ -22,6 +22,13 @@ export const authService = {
     return response.data;
   },
 
+  // Recuperación de contraseña (el link llega al email de la empresa)
+  estadoRecuperacion: async () => (await api.get("/auth/recuperar/estado")).data,
+  pedirRecuperacion: async (email) => (await api.post("/auth/recuperar", { email })).data,
+  verRecuperacion: async (codigo) => (await api.get(`/auth/recuperar/${encodeURIComponent(codigo)}`)).data,
+  confirmarRecuperacion: async (codigo, nueva) =>
+    (await api.post("/auth/recuperar/confirmar", { codigo, nueva })).data,
+
   logout: () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");

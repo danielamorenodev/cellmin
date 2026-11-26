@@ -115,7 +115,7 @@ export default function CambiarClaveModal({ usuario = null, onClose }) {
           )}
         </div>
         <div className="flex gap-3 px-6 py-3 border-t border-gray-100">
-          <button
+          <button data-cerrar
             type="button"
             onClick={onClose}
             className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-xl text-sm hover:bg-gray-50"

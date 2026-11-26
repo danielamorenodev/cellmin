@@ -23,7 +23,11 @@ export default function MenuAcciones({ acciones }) {
         return;
       cerrar();
     };
-    const tecla = (e) => e.key === "Escape" && cerrar();
+    const tecla = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault(); // que Escape no cierre también la ventana de atrás
+      cerrar();
+    };
     document.addEventListener("mousedown", clickAfuera);
     document.addEventListener("keydown", tecla);
     window.addEventListener("scroll", cerrar, true);

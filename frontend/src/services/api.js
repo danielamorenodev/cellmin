@@ -26,7 +26,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Un 401 en el ingreso o en la recuperación es "datos incorrectos", no una
+    // sesión vencida: no se recarga la página (se perdía el aviso de error)
+    const esAcceso = /\/auth\/(login|recuperar)/.test(error.config?.url || "");
+    if (error.response?.status === 401 && !esAcceso) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";

@@ -2,6 +2,8 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 from datetime import datetime
 
+from app.utils import validaciones
+
 
 def _limpiar(v):
     """Campos vacíos del formulario ("") se guardan vacíos (el email "" daba error)."""
@@ -32,6 +34,16 @@ class SupplierCreate(BaseModel):
             raise ValueError("El nombre es obligatorio")
         return v
 
+    @field_validator("cuit")
+    @classmethod
+    def cuit_valido(cls, v):
+        return validaciones.cuit(v)
+
+    @field_validator("telefono")
+    @classmethod
+    def telefono_valido(cls, v):
+        return validaciones.telefono(v)
+
 
 class SupplierUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -46,6 +58,16 @@ class SupplierUpdate(BaseModel):
     @classmethod
     def vacio_a_none(cls, v):
         return _limpiar(v)
+
+    @field_validator("cuit")
+    @classmethod
+    def cuit_valido(cls, v):
+        return validaciones.cuit(v)
+
+    @field_validator("telefono")
+    @classmethod
+    def telefono_valido(cls, v):
+        return validaciones.telefono(v)
 
 
 class MovimientoCuenta(BaseModel):

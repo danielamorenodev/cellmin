@@ -19,7 +19,10 @@ export const GUIAS = [
         ]
       },
       {
-        "texto": "Por seguridad, la sesión se cierra sola a las 8 horas. Para salir antes, usá **Salir**, arriba a la derecha."
+        "texto": "Si el email o la contraseña no coinciden, el aviso aparece en rojo debajo de la contraseña. Con el ojito del campo podés ver lo que escribiste. Por seguridad, la sesión se cierra sola a las 8 horas. Para salir antes, usá **Salir**, arriba a la derecha."
+      },
+      {
+        "texto": "**¿Te olvidaste la contraseña?** En el ingreso, tocá **¿Olvidaste tu contraseña?**, escribí tu email y presioná **Enviar link**. El link **no llega a tu email**: llega al **email de la empresa**, que dice qué usuario lo pidió. Pedíselo a quien lo revisa. Al abrirlo, cargás la contraseña nueva dos veces y presionás **Guardar contraseña**. El link vale 30 minutos y sirve una sola vez. Si la opción dice que no está configurada, el administrador te asigna una nueva desde Configuración → Usuarios."
       }
     ]
   },
@@ -39,7 +42,7 @@ export const GUIAS = [
         "texto": "Arriba ves tu nombre, el valor del dólar vigente y el botón **?**, que abre la **ayuda**: las guías de este manual para tu puesto, con buscador, problemas frecuentes y glosario. También se abre con la tecla ?. Arriba de todo aparecen las guías de la pantalla en la que estás, y cada paso se puede tocar para marcarlo mientras lo hacés. Los mensajes verdes confirman que algo salió bien y los rojos indican un problema y cómo resolverlo. En los listados, los tres puntitos de cada fila muestran las acciones disponibles, y abajo hay **páginas** para recorrer el listado completo. En **Inicio**, al tocar una tarjeta (por ejemplo, Reparaciones activas) se abre el detalle."
       },
       {
-        "texto": "**Antes de guardar, cancelar o desactivar algo, el sistema pregunta «¿Estás seguro de que querés…?»** y explica qué va a pasar. Presioná **Sí, …** para seguir o **No, volver** (o la tecla Esc) para no hacer nada. En las acciones que borran o cancelan, el botón de confirmar es rojo y queda marcado **No, volver**, así un Enter apurado no cancela nada."
+        "texto": "**Antes de guardar, cancelar o desactivar algo, el sistema pregunta «¿Estás seguro de que querés…?»** y explica qué va a pasar. Presioná **Sí, …** para seguir o **No, volver** (o la tecla Esc) para no hacer nada. En las acciones que borran o cancelan, el botón de confirmar es rojo y queda marcado **No, volver**, así un Enter apurado no cancela nada. **Las ventanas se cierran con la tecla Esc**, la X o **Cancelar**; si ya cargaste algo, el sistema pregunta antes de cerrar para que no se pierda (**No, seguir editando** vuelve al formulario)."
       },
       {
         "texto": "**Inicio** muestra tres tarjetas con los datos de tu puesto y cuatro accesos directos. Por ejemplo, el cajero y el vendedor ven las ventas del día, las reparaciones activas y las listas para entregar; el técnico, las reparaciones activas, las suyas y las atrasadas; depósito, el stock bajo, los ingresos y los remitos de la semana; y el administrador, ventas, reparaciones y stock."
@@ -93,7 +96,7 @@ export const GUIAS = [
           "En **Inventario → Productos y stock**, presioná **Nuevo producto**. El formulario está dividido en cuatro partes: información del producto, características, precios e inventario.",
           "En **Información del producto** cargá nombre y categoría. En **Código de barras**, escaneá el código del empaque o escribilo; si el producto no tiene, presioná **Generar interno** (si lo dejás vacío, el sistema lo genera al guardar).",
           "En **Características**, si el producto tiene colores o capacidades, marcá **Tiene variantes**. Si es un celular, dejá marcada **Pedir el IMEI al venderlo** (se marca sola si la categoría es de celulares). El IMEI no se carga acá: se pide en cada venta, uno por unidad.",
-          "En **Precios**, elegí la moneda del precio. **Pesos (fijo)**: el precio no cambia cuando sube el dólar (fundas, vidrios, cargadores). **Dólares (sigue al dólar)**: se carga en US$ y el precio en pesos se actualiza solo cada vez que se carga un valor nuevo del dólar; en el listado esos productos llevan la etiqueta **US$**. Con variantes, podés marcar **Mismo precio para todas las variantes** y presionar **Aplicar**.",
+          "En **Precios**, elegí la moneda del precio. Si el precio de venta queda por debajo del costo, aparece un aviso con cuánto se pierde por unidad y al guardar se pide confirmar. **Pesos (fijo)**: el precio no cambia cuando sube el dólar (fundas, vidrios, cargadores). **Dólares (sigue al dólar)**: se carga en US$ y el precio en pesos se actualiza solo cada vez que se carga un valor nuevo del dólar; en el listado esos productos llevan la etiqueta **US$**. Con variantes, podés marcar **Mismo precio para todas las variantes** y presionar **Aplicar**.",
           "En **Inventario**, completá la tabla de cada sucursal: el **stock inicial** es la cantidad con la que empieza el producto y el **stock mínimo** es el número en el que el sistema avisa que hay que reponer (0 = sin aviso). Con variantes, cada una tiene su propia tabla.",
           "Presioná **Guardar**."
         ]
@@ -116,7 +119,7 @@ export const GUIAS = [
       {
         "pasos": [
           "En **Inventario → Ingresos de mercadería**, presioná **Nuevo ingreso** (también está el botón **Ingreso de mercadería** en Productos y stock).",
-          "Elegí el proveedor, la sucursal que recibe y el número del remito o la factura del proveedor. Si el proveedor no existe, crealo ahí mismo con **+ Nuevo proveedor**.",
+          "Elegí el proveedor, la sucursal que recibe y el número del remito o la factura del proveedor. Si el proveedor no existe, crealo ahí mismo con **+ Nuevo proveedor** (el CUIT lleva 11 números, por ejemplo 20-12345678-6, y el sistema controla que sea válido).",
           "Buscá cada producto por nombre o código. Si es un producto que todavía no existe, presioná **Producto nuevo**, cargalo y vuelve solo al ingreso (su stock entra con este ingreso).",
           "Si el producto tiene variantes, elegí la variante en la línea. Para cargar **más de una variante del mismo producto** (por ejemplo, la funda en negro y en azul), presioná **+ Otra variante** debajo: se agrega otra línea del mismo producto para elegir la otra variante.",
           "Completá cantidad y costo de cada línea y presioná **Registrar ingreso**. El sistema pregunta si estás seguro y muestra las unidades, el total y, si corresponde, lo que queda debiendo. El aviso confirma cuántas unidades se sumaron y en qué sucursal."
@@ -235,7 +238,7 @@ export const GUIAS = [
     "bloques": [
       {
         "pasos": [
-          "Entrá a **Ventas** y presioná **Nueva venta**.",
+          "Entrá a **Ventas** y presioná **Nueva venta** (o usá el acceso **Nueva venta** de Inicio). Si la caja está cerrada, aparece el aviso **Abrí la caja para vender** con el botón **Abrir caja**: al abrirla, el sistema vuelve solo a Ventas con la venta lista para cargar.",
           "Escaneá el producto con el lector o buscalo por nombre: ves el stock de tu sucursal. Repetí para cada producto.",
           "Si vendés un celular, debajo aparece el campo **IMEI**: escanealo de la caja o del equipo, o escribí los 15 números (en el celular se ve marcando *#06#). Si llevás dos unidades, aparece un campo por cada una. El campo se pone verde cuando el IMEI es válido; sin todos los IMEI no se puede confirmar la venta.",
           "En **Vendió**, dejá tu nombre o elegí el vendedor que atendió al cliente.",
@@ -306,7 +309,7 @@ export const GUIAS = [
       {
         "pasos": [
           "En **Reparaciones**, buscá la orden por número, cliente o IMEI.",
-          "Abrí sus acciones y elegí **Cobrar**: el saldo es el presupuesto menos la seña. Se puede cobrar en pesos, en dólares, con tarjeta (eligiendo cuál y las cuotas) o con varios medios. Antes de registrarlo, el sistema pide confirmar el cobro.",
+          "Abrí sus acciones y elegí **Cobrar**: el saldo es el presupuesto menos la seña. Se puede cobrar en pesos, en dólares, con tarjeta (eligiendo cuál y las cuotas) o con varios medios. **También se puede cobrar una parte**: cambiá el monto y el sistema confirma el pago parcial con el monto que se cobra y el saldo que queda.",
           "En las acciones, elegí **Pasar a Entregada** y confirmá con **Sí, entregar** (si queda saldo, el sistema lo avisa). El código de desbloqueo se borra al entregar. El sistema registra la fecha y calcula el vencimiento de la garantía."
         ]
       }
@@ -388,7 +391,7 @@ export const GUIAS = [
       {
         "pasos": [
           "En **Clientes**, presioná **Nuevo cliente**.",
-          "Completá nombre, apellido, DNI y teléfono (email y dirección son opcionales).",
+          "Completá nombre, apellido, DNI y teléfono (email y dirección son opcionales). El DNI lleva 7 u 8 números (con o sin puntos) y el teléfono, el código de área (por ejemplo, 351 555 1234). Si algo no está bien, se marca en rojo debajo del campo.",
           "Guardá. Si el DNI ya existe, el sistema te avisa."
         ]
       }
@@ -410,7 +413,7 @@ export const GUIAS = [
           "En **Reparaciones → Órdenes**, presioná **Nueva orden**.",
           "Arriba revisá **Atendió** (por defecto, vos), la **sucursal de ingreso** y la **entrega estimada** que le prometés al cliente (por defecto, en 3 días).",
           "Buscá al cliente o crealo sin salir de la pantalla con **+ Nuevo cliente**.",
-          "Buscá la marca y el modelo en sus barras. Si no están, aparece **Crear «…»** para agregarlos en el momento (el modelo se habilita después de elegir la marca). Cargá el IMEI y la falla que cuenta el cliente.",
+          "Buscá la marca y el modelo en sus barras. Si no están, aparece **Crear «…»** para agregarlos en el momento (el modelo se habilita después de elegir la marca). Cargá el IMEI (15 números; se ve marcando *#06#; si no se puede ver, dejalo vacío) y la falla que cuenta el cliente.",
           "Si el equipo tiene bloqueo, indicá el tipo (patrón, PIN o contraseña). Si es un patrón, dibujalo en la cuadrícula.",
           "Si sabés qué reparación necesita, elegí uno o más tipos: el presupuesto se calcula solo. Si el tipo no existe, escribilo en el buscador y presioná **Crear tipo de reparación «…»**: cargá el precio y presioná **Crear y elegir** (queda guardado para las próximas órdenes). Si no sabés todavía qué tiene, dejalo vacío y la orden queda “En diagnóstico”.",
           "Revisá los días de garantía (90 por defecto). Si el cliente deja seña, marcá **Cobrar seña ahora** e ingresá el monto.",
@@ -648,7 +651,7 @@ export const GUIAS = [
 export const PROBLEMAS = [
   [
     "No me deja vender.",
-    "La caja de tu sucursal no está abierta. Si sos cajero, abrila en **Caja**; si sos vendedor, pedile a un cajero que la abra."
+    "La caja de tu sucursal no está abierta: en **Ventas** aparece el aviso **Abrí la caja para vender**. Si sos cajero, presioná **Abrir caja** ahí mismo; si sos vendedor, pedile a un cajero que la abra."
   ],
   [
     "No me deja cobrar una reparación ni cancelar una venta.",
@@ -704,7 +707,15 @@ export const PROBLEMAS = [
   ],
   [
     "Olvidé mi contraseña.",
-    "Pedile al administrador que te asigne una nueva. Después podés cambiarla desde tu nombre → Cambiar mi contraseña."
+    "En el ingreso tocá **¿Olvidaste tu contraseña?**: el link llega al email de la empresa (pedíselo a quien lo revisa). Si no está configurado, pedile al administrador que te asigne una nueva. Después podés cambiarla desde tu nombre → Cambiar mi contraseña."
+  ],
+  [
+    "Un campo se pone en rojo (DNI, teléfono, CUIT o IMEI).",
+    "Tiene letras o le faltan números. DNI: 7 u 8 números. Teléfono: con código de área, entre 8 y 15 números. CUIT: 11 números válidos. IMEI: 15 números (*#06#)."
+  ],
+  [
+    "Los filtros de fecha no muestran nada.",
+    "Revisá que la fecha «hasta» no sea anterior a la «desde»: si pasa, aparece un aviso en rojo debajo de las fechas."
   ],
   [
     "El lector no carga el producto.",

@@ -106,7 +106,7 @@ export default function CuentaProveedor({ proveedor, esAdmin, onClose, onCambio 
             <h2 className="text-lg font-semibold text-gray-800">Cuenta de {proveedor.nombre}</h2>
             <p className={`text-sm font-semibold mt-0.5 ${estado.color}`}>{estado.texto}</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Cerrar">
+          <button data-cerrar onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg" aria-label="Cerrar">
             <X size={18} />
           </button>
         </div>

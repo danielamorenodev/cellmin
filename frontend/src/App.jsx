@@ -1,9 +1,11 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import AlineacionTablas from "./components/ui/AlineacionTablas";
 import Confirmacion from "./components/ui/Confirmacion";
+import ProtegerFormularios from "./components/ui/ProtegerFormularios";
 import { useAuth } from "./context/AuthContext";
 import Layout from "./components/layout/Layout";
 import Login from "./pages/Login";
+import RecuperarClave from "./pages/RecuperarClave";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
 import NotFound from "./pages/NotFound";
@@ -48,8 +50,10 @@ export default function App() {
     <>
       <Confirmacion />
       <AlineacionTablas />
+      <ProtegerFormularios />
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/recuperar" element={<RecuperarClave />} />
       <Route path="/" element={<Navigate to="/dashboard" />} />
       <Route
         path="/dashboard"
