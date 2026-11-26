@@ -1,5 +1,6 @@
-// Generado desde el manual de usuario (tp/b5.js) (documentación del TP): no editar a mano.
-// Así la ayuda del sistema y el manual en Word dicen siempre lo mismo.
+// Basado en el manual de usuario (tp/b5.js). Desde noviembre de 2026 se actualiza
+// también a mano con las funciones nuevas: al regenerarlo desde el manual, pasar
+// antes estos cambios al Word para no perderlos.
 export const GUIAS = [
   {
     "id": "3-ingresar",
@@ -32,10 +33,13 @@ export const GUIAS = [
     "ruta": "/dashboard",
     "bloques": [
       {
-        "texto": "A la izquierda está el **menú**, con hasta siete módulos: Inicio, Ventas, Reparaciones, Inventario, Clientes, Reportes y Configuración (cada perfil ve solo los suyos). Al apoyar el mouse sobre un módulo aparecen sus secciones, que también se ven como pestañas arriba de cada pantalla. Con el botón de arriba del menú lo achicás a solo íconos; la página se acomoda al lado y nunca queda tapada. En el celular el menú se abre con el botón ☰ y cada módulo se despliega al tocarlo."
+        "texto": "A la izquierda está el **menú**, con hasta siete módulos: Inicio, Ventas, Reparaciones, Inventario, Clientes, Reportes y Configuración (cada perfil ve solo los suyos). Cerrado, el menú muestra solo el logo de Cellmin y los íconos; **se abre solo al apoyar el mouse encima y se cierra al sacarlo**. Al apoyar el mouse sobre un módulo aparecen sus secciones, que también se ven como pestañas arriba de cada pantalla. La página se acomoda al lado del menú y nunca queda tapada. En el celular el menú se abre con el botón ☰ y cada módulo se despliega al tocarlo."
       },
       {
-        "texto": "Arriba ves tu nombre, el valor del dólar vigente y el botón **?**, que abre la **ayuda**: las guías de este manual para tu puesto, con buscador, problemas frecuentes y glosario. También se abre con la tecla ?. Arriba de todo aparecen las guías de la pantalla en la que estás, y cada paso se puede tocar para marcarlo mientras lo hacés. Los mensajes verdes confirman que algo salió bien y los rojos indican un problema y cómo resolverlo. En los listados, los tres puntitos de cada fila muestran las acciones disponibles. En **Inicio**, al tocar una tarjeta (por ejemplo, Reparaciones activas) se abre el detalle."
+        "texto": "Arriba ves tu nombre, el valor del dólar vigente y el botón **?**, que abre la **ayuda**: las guías de este manual para tu puesto, con buscador, problemas frecuentes y glosario. También se abre con la tecla ?. Arriba de todo aparecen las guías de la pantalla en la que estás, y cada paso se puede tocar para marcarlo mientras lo hacés. Los mensajes verdes confirman que algo salió bien y los rojos indican un problema y cómo resolverlo. En los listados, los tres puntitos de cada fila muestran las acciones disponibles, y abajo hay **páginas** para recorrer el listado completo. En **Inicio**, al tocar una tarjeta (por ejemplo, Reparaciones activas) se abre el detalle."
+      },
+      {
+        "texto": "**Antes de guardar, cancelar o desactivar algo, el sistema pregunta «¿Estás seguro de que querés…?»** y explica qué va a pasar. Presioná **Sí, …** para seguir o **No, volver** (o la tecla Esc) para no hacer nada. En las acciones que borran o cancelan, el botón de confirmar es rojo y queda marcado **No, volver**, así un Enter apurado no cancela nada."
       },
       {
         "texto": "**Inicio** muestra tres tarjetas con los datos de tu puesto y cuatro accesos directos. Por ejemplo, el cajero y el vendedor ven las ventas del día, las reparaciones activas y las listas para entregar; el técnico, las reparaciones activas, las suyas y las atrasadas; depósito, el stock bajo, los ingresos y los remitos de la semana; y el administrador, ventas, reparaciones y stock."
@@ -114,7 +118,8 @@ export const GUIAS = [
           "En **Inventario → Ingresos de mercadería**, presioná **Nuevo ingreso** (también está el botón **Ingreso de mercadería** en Productos y stock).",
           "Elegí el proveedor, la sucursal que recibe y el número del remito o la factura del proveedor. Si el proveedor no existe, crealo ahí mismo con **+ Nuevo proveedor**.",
           "Buscá cada producto por nombre o código. Si es un producto que todavía no existe, presioná **Producto nuevo**, cargalo y vuelve solo al ingreso (su stock entra con este ingreso).",
-          "Completá cantidad y costo de cada línea y presioná **Registrar ingreso**. El aviso confirma cuántas unidades se sumaron y en qué sucursal."
+          "Si el producto tiene variantes, elegí la variante en la línea. Para cargar **más de una variante del mismo producto** (por ejemplo, la funda en negro y en azul), presioná **+ Otra variante** debajo: se agrega otra línea del mismo producto para elegir la otra variante.",
+          "Completá cantidad y costo de cada línea y presioná **Registrar ingreso**. El sistema pregunta si estás seguro y muestra las unidades, el total y, si corresponde, lo que queda debiendo. El aviso confirma cuántas unidades se sumaron y en qué sucursal."
         ]
       },
       {
@@ -174,7 +179,7 @@ export const GUIAS = [
         "pasos": [
           "En **Inventario → Remitos**, presioná **Nuevo remito**.",
           "Elegí qué sucursal envía: la otra queda como la que recibe.",
-          "Buscá los productos y cargá cuánto se envía. Al lado ves el stock de la sucursal que envía; si no alcanza, se marca en rojo y no deja registrar.",
+          "Buscá los productos y cargá cuánto se envía (con **+ Otra variante** mandás varias variantes del mismo producto). Al lado ves el stock de la sucursal que envía; si no alcanza, se marca en rojo y no deja registrar.",
           "Presioná **Registrar remito**. La mercadería se descuenta de una sucursal y se suma en la otra, y queda un comprobante numerado (R-0001) para imprimir y mandar con la mercadería."
         ]
       }
@@ -238,8 +243,13 @@ export const GUIAS = [
           "Elegí el medio de pago: efectivo, transferencia, débito, crédito o **dólares**. Con débito o crédito elegí la tarjeta y, en crédito, las cuotas: si el plan tiene recargo, el sistema lo suma y muestra cuánto se cobra en la tarjeta.",
           "Si el cliente paga con varios medios, marcá **Pago mixto** y cargá cuánto va por cada uno (con **Agregar otro medio de pago** sumás más). Efectivo y dólares se cargan una sola vez; tarjetas y transferencias se pueden repetir, por ejemplo, con dos tarjetas distintas.",
           "Si paga en efectivo o en dólares, ingresá lo que entrega: el sistema calcula el vuelto, siempre en pesos.",
-          "Presioná **Confirmar venta** e imprimí el ticket."
+          "Si el sistema tiene configurado el email, podés marcar **Enviar el ticket por email al cliente**: se manda solo al registrar la venta.",
+          "Presioná **Confirmar venta**. El sistema pregunta si estás seguro y muestra el total, las unidades y el cliente: presioná **Sí, registrar la venta** (o **No, volver** para seguir editando).",
+          "Aparece la ventana **Venta registrada** con lo que podés hacer con el ticket: **Imprimir ticket**, **Enviar por WhatsApp** o **Enviar por email**. Podés hacer una, varias o ninguna; cada una se tilda al usarla. Presioná **Listo** para cerrar."
         ]
+      },
+      {
+        "texto": "Si después necesitás el ticket de nuevo, en el listado de **Ventas** abrí las acciones de la venta: ahí están **Imprimir ticket**, **Enviar ticket por WhatsApp** y **Enviar ticket por email**."
       }
     ]
   },
@@ -255,8 +265,8 @@ export const GUIAS = [
     "bloques": [
       {
         "pasos": [
-          "En **Ventas**, abrí las acciones de la venta y elegí **Cancelar**.",
-          "Confirmá. Los productos vuelven al stock y la devolución del dinero se registra en la caja abierta."
+          "En **Ventas**, abrí las acciones de la venta y elegí **Cancelar venta**.",
+          "El sistema pregunta si estás seguro: presioná **Sí, cancelar la venta**. Los productos vuelven al stock y la devolución del dinero se registra en la caja abierta."
         ]
       },
       {
@@ -277,7 +287,8 @@ export const GUIAS = [
       {
         "pasos": [
           "En **Caja**, elegí registrar un movimiento.",
-          "Indicá si es ingreso o egreso, el medio de pago, el monto y el motivo (por ejemplo, “pago de flete”)."
+          "Indicá si es ingreso o egreso, el medio de pago, el monto y el motivo (por ejemplo, “pago de flete”).",
+          "Guardá y confirmá en la pregunta «¿Estás seguro…?»."
         ]
       }
     ]
@@ -295,8 +306,8 @@ export const GUIAS = [
       {
         "pasos": [
           "En **Reparaciones**, buscá la orden por número, cliente o IMEI.",
-          "Abrí sus acciones y elegí **Cobrar**: el saldo es el presupuesto menos la seña. Se puede cobrar en pesos, en dólares, con tarjeta (eligiendo cuál y las cuotas) o con varios medios.",
-          "Marcá la orden como entregada. El sistema registra la fecha y calcula el vencimiento de la garantía."
+          "Abrí sus acciones y elegí **Cobrar**: el saldo es el presupuesto menos la seña. Se puede cobrar en pesos, en dólares, con tarjeta (eligiendo cuál y las cuotas) o con varios medios. Antes de registrarlo, el sistema pide confirmar el cobro.",
+          "En las acciones, elegí **Pasar a Entregada** y confirmá con **Sí, entregar** (si queda saldo, el sistema lo avisa). El código de desbloqueo se borra al entregar. El sistema registra la fecha y calcula el vencimiento de la garantía."
         ]
       }
     ]
@@ -316,7 +327,7 @@ export const GUIAS = [
           "En **Caja**, presioná **Cerrar caja**.",
           "Contá el dinero y cargá cuánto hay por cada medio de pago, incluidos los dólares.",
           "En la columna **Diferencia** ves lo que sobra o falta en cada medio de pago, y a la derecha, la diferencia total. Revisala antes de confirmar.",
-          "Indicá cuánto efectivo queda en la caja para mañana y confirmá. El cierre queda en el historial."
+          "Indicá cuánto efectivo queda en la caja para mañana y confirmá (si hay diferencias, el sistema lo vuelve a avisar antes de cerrar). El cierre queda en el historial."
         ]
       }
     ]
@@ -401,9 +412,10 @@ export const GUIAS = [
           "Buscá al cliente o crealo sin salir de la pantalla con **+ Nuevo cliente**.",
           "Buscá la marca y el modelo en sus barras. Si no están, aparece **Crear «…»** para agregarlos en el momento (el modelo se habilita después de elegir la marca). Cargá el IMEI y la falla que cuenta el cliente.",
           "Si el equipo tiene bloqueo, indicá el tipo (patrón, PIN o contraseña). Si es un patrón, dibujalo en la cuadrícula.",
-          "Si sabés qué reparación necesita, elegí uno o más tipos: el presupuesto se calcula solo. Si no, dejalo vacío y la orden queda “En diagnóstico”.",
+          "Si sabés qué reparación necesita, elegí uno o más tipos: el presupuesto se calcula solo. Si el tipo no existe, escribilo en el buscador y presioná **Crear tipo de reparación «…»**: cargá el precio y presioná **Crear y elegir** (queda guardado para las próximas órdenes). Si no sabés todavía qué tiene, dejalo vacío y la orden queda “En diagnóstico”.",
           "Revisá los días de garantía (90 por defecto). Si el cliente deja seña, marcá **Cobrar seña ahora** e ingresá el monto.",
-          "Guardá e imprimí la orden para el cliente."
+          "Si querés mandarle la orden al cliente, marcá **Enviar la orden por WhatsApp al cliente** (y, si está configurado, **Enviar la orden por email**).",
+          "Guardá. Se imprime la orden: con WhatsApp, la copia del cliente va por mensaje y **siempre se imprime la copia del técnico**. Se abre WhatsApp con el número del cliente y el mensaje listo: solo falta tocar enviar."
         ]
       }
     ]
@@ -423,6 +435,54 @@ export const GUIAS = [
         "pasos": [
           "En **Reparaciones**, buscá por número de orden, IMEI o cliente.",
           "La orden entregada muestra la fecha de vencimiento de la garantía."
+        ]
+      }
+    ]
+  },
+  {
+    "id": "6b-enviar-por-whatsapp-o-email",
+    "capitulo": "Vendedor",
+    "titulo": "Enviar el ticket o la orden por WhatsApp o email",
+    "perfiles": [
+      "vendedor",
+      "cajero",
+      "administrador"
+    ],
+    "ruta": "/ventas",
+    "bloques": [
+      {
+        "texto": "Por **WhatsApp**, el sistema abre la app (o WhatsApp Web) con el chat del cliente y el mensaje ya escrito: solo falta tocar enviar. El mensaje lleva el detalle del ticket o de la orden, nunca el código de desbloqueo del equipo."
+      },
+      {
+        "pasos": [
+          "**Ticket de una venta:** al registrarla, en la ventana **Venta registrada** elegí **Enviar por WhatsApp**. Más tarde, desde el listado de **Ventas**: acciones de la venta → **Enviar ticket por WhatsApp**.",
+          "**Orden de reparación:** al crearla, marcá **Enviar la orden por WhatsApp al cliente** (se imprime siempre la copia del técnico). Más tarde: acciones de la orden → **Enviar orden por WhatsApp**, donde podés elegir si imprimir de nuevo la copia del técnico.",
+          "En la ventana de WhatsApp revisá el número: se completa con el teléfono del cliente. Si no tiene o le falta el código de área, escribilo (por ejemplo, 351 555 1234). Debajo dice con qué número se abre el chat.",
+          "Si querés, cambiá el texto del mensaje y presioná **Abrir WhatsApp**. En WhatsApp, tocá enviar."
+        ]
+      },
+      {
+        "texto": "Por **email** funciona igual: al registrar la venta o crear la orden marcá la casilla de enviar por email (se usa el email del cliente y se puede cambiar), o mandalo después desde las acciones con **Enviar … por email**. La opción aparece solo si el administrador configuró el envío de emails en el servidor."
+      }
+    ]
+  },
+  {
+    "id": "6b-avisar-equipo-listo",
+    "capitulo": "Vendedor",
+    "titulo": "Avisar al cliente que el equipo está listo",
+    "perfiles": [
+      "vendedor",
+      "cajero",
+      "tecnico",
+      "administrador"
+    ],
+    "ruta": "/reparaciones",
+    "bloques": [
+      {
+        "pasos": [
+          "Cuando la orden pasa a **Lista para entregar**, el sistema pregunta «¿Querés avisarle al cliente por WhatsApp que ya puede retirar el equipo?». Presioná **Sí, avisar por WhatsApp** (o **Ahora no**).",
+          "Se abre la ventana de WhatsApp con el número del cliente y el mensaje: el equipo, el local donde retirarlo, el número de orden y el **saldo a pagar** (o que ya está todo pago). Revisalo y presioná **Abrir WhatsApp**.",
+          "Si no avisaste en ese momento, mientras la orden esté lista para entregar aparece **Avisar que está lista (WhatsApp)** en sus acciones y el botón **Avisar que está lista** en su detalle."
         ]
       }
     ]
@@ -455,8 +515,9 @@ export const GUIAS = [
       {
         "pasos": [
           "Abrí la orden.",
-          "Si estaba “En diagnóstico”, cargá los tipos de reparación: el presupuesto se calcula solo y el mostrador puede avisarle al cliente.",
-          "Avanzá el estado: Ingresada → En reparación → Lista para entregar. Al pasar a **En reparación** el sistema pregunta qué técnico la repara (si sos vos, ya aparecés elegido): queda en la orden y en el historial del técnico."
+          "Si estaba “En diagnóstico”, cargá los tipos de reparación (si no existe, crealo en el momento desde el buscador): el presupuesto se calcula solo y el mostrador puede avisarle al cliente.",
+          "Avanzá el estado: Ingresada → En reparación → Lista para entregar. Al pasar a **En reparación** el sistema pregunta qué técnico la repara (si sos vos, ya aparecés elegido): queda en la orden y en el historial del técnico. Cada cambio de estado pide confirmación.",
+          "Al pasarla a **Lista para entregar**, el sistema pregunta si querés **avisarle al cliente por WhatsApp** que ya puede retirar el equipo (ver la guía «Avisar al cliente que el equipo está listo»)."
         ]
       }
     ]
@@ -475,7 +536,8 @@ export const GUIAS = [
         "pasos": [
           "En **Reparaciones**, entrá a la sección **Tipos de reparación** y creá uno nuevo.",
           "Cargá nombre, descripción y precio. Si cambiás un precio, las órdenes ya emitidas conservan el anterior.",
-          "En **Reparaciones → Marcas y modelos** está el catálogo de equipos: podés agregar marcas y modelos para que aparezcan al buscarlos en la orden."
+          "También se pueden crear en el momento, mientras cargás la orden.",
+          "En **Reparaciones → Marcas y modelos** está el catálogo de equipos, como un listado. Con **Nueva Marca** agregás una; desde las acciones de cada marca podés editar el nombre, ver y agregar sus modelos, quitar un modelo o desactivar la marca. Todo lo que agregues aparece al buscar en la orden."
         ]
       }
     ]
@@ -650,7 +712,23 @@ export const PROBLEMAS = [
   ],
   [
     "No imprime el ticket.",
-    "Verificá que la impresora esté encendida y elegida como predeterminada. El ticket se puede reimprimir desde el detalle de la venta."
+    "Verificá que la impresora esté encendida y elegida como predeterminada. El ticket se puede reimprimir desde las acciones de la venta (**Imprimir ticket**) o desde su detalle."
+  ],
+  [
+    "WhatsApp no abre el chat del cliente o dice que el número no es válido.",
+    "Revisá el número en la ventana de WhatsApp: tiene que llevar el código de área (por ejemplo, 351 555 1234), sin el 0 ni el 15 de más. Si el cliente no tiene teléfono cargado, escribilo ahí y, para la próxima, cargalo en **Clientes**."
+  ],
+  [
+    "No aparece la opción de enviar por email.",
+    "El envío de emails todavía no está configurado en el servidor. Mientras tanto, usá WhatsApp o imprimí. Avisale al administrador."
+  ],
+  [
+    "No encuentro el tipo de reparación en la orden.",
+    "Escribilo en el buscador de tipos y presioná **Crear tipo de reparación «…»**, cargá el precio y presioná **Crear y elegir**."
+  ],
+  [
+    "Toqué cancelar (o desactivar) sin querer.",
+    "No pasa nada hasta que confirmes: en la pregunta «¿Estás seguro…?» presioná **No, volver** o la tecla Esc."
   ],
   [
     "Se cortó internet.",
