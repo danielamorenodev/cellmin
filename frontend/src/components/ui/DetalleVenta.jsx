@@ -52,12 +52,20 @@ export default function DetalleVenta({ venta, cliente }) {
           </p>
           <span
             className={`px-2 py-1 rounded-lg text-xs font-medium ${
-              completada
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-700"
+              !completada
+                ? "bg-red-100 text-red-700"
+                : venta.total_devuelto > 0
+                  ? "bg-orange-100 text-orange-700"
+                  : "bg-green-100 text-green-700"
             }`}
           >
-            {completada ? "Completada" : "Cancelada"}
+            {!completada
+              ? "Cancelada"
+              : venta.total_devuelto > 0
+                ? venta.total_devuelto >= venta.total - 0.01
+                  ? "Devuelta"
+                  : "Con devolución"
+                : "Completada"}
           </span>
         </div>
       </div>

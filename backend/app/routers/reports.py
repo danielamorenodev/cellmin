@@ -118,6 +118,18 @@ async def reparaciones_detalle(desde: str = None, hasta: str = None, current_use
     clientes = await _nombres_clientes(db, [r.get("cliente_id") for r in reps])
     return [fila_reparacion(r, clientes) for r in reps]
 
+async def devoluciones_en(db, desde, hasta=None):
+    """Devoluciones hechas entre esas fechas (de ventas de cualquier fecha).
+    Restan en el día en que se devolvió, no en el de la venta."""
+    rango = {"$gte": desde, **({"$lte": hasta} if hasta else {})}
+    resultado = []
+    async for v in db.ventas.find({"devoluciones.fecha": rango}, {"devoluciones": 1, "sucursal": 1, "items": 1}):
+        for d in v.get("devoluciones", []):
+            if d["fecha"] >= desde and (hasta is None or d["fecha"] <= hasta):
+                resultado.append({**d, "sucursal": d.get("sucursal") or v.get("sucursal", "sucursal_1")})
+    return resultado
+
+
 @router.get("/dashboard")
 async def get_dashboard(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "dashboard:read")
@@ -127,7 +139,7 @@ async def get_dashboard(current_user: dict = Depends(get_current_user)):
         "estado": "completada",
         "fecha": {"$gte": hoy}
     }).to_list(None)
-    total_hoy = sum(v["total"] for v in ventas_hoy)
+    total_hoy = round(sum(v["total"] for v in ventas_hoy) - sum(d["monto"] for d in await devoluciones_en(db, hoy)), 2)
     activas = await db.reparaciones.find(
         {"estado": {"$in": ESTADOS_ACTIVOS}}, {"estado": 1, "fecha_estimada_entrega": 1, "tecnico_id": 1}
     ).to_list(None)
@@ -169,7 +181,9 @@ async def get_ventas_report(
     ventas_completadas = [v for v in ventas if v["estado"] == "completada"]
     ventas_canceladas = [v for v in ventas if v["estado"] == "cancelada"]
 
-    total = sum(v["total"] for v in ventas_completadas)
+    devoluciones = await devoluciones_en(db, fecha_desde, fecha_hasta)
+    total_devoluciones = round(sum(d["monto"] for d in devoluciones), 2)
+    total = round(sum(v["total"] for v in ventas_completadas) - total_devoluciones, 2)
     total_descuentos = sum(v.get("descuento", 0) for v in ventas_completadas)
 
     # Los gráficos cuentan solo lo vendido (las canceladas no suman) y el día
@@ -189,6 +203,12 @@ async def get_ventas_report(
         fila = por_vendedor.setdefault(nombre, {"vendedor": nombre, "cantidad": 0, "total": 0})
         fila["cantidad"] += 1
         fila["total"] += v["total"]
+    # Las devoluciones restan el día que se hicieron, por el medio con que se devolvió
+    for d in devoluciones:
+        dia = dia_local(d["fecha"])
+        por_dia[dia] = por_dia.get(dia, 0) - d["monto"]
+        por_metodo[d["metodo"]] = por_metodo.get(d["metodo"], 0) - d["monto"]
+        por_sucursal[d["sucursal"]] = por_sucursal.get(d["sucursal"], 0) - d["monto"]
 
     return {
         "por_vendedor": sorted(por_vendedor.values(), key=lambda f: -f["total"]),
@@ -197,6 +217,8 @@ async def get_ventas_report(
         "hasta": fecha_hasta,
         "cantidad_ventas": len(ventas_completadas),
         "cantidad_canceladas": len(ventas_canceladas),
+        "cantidad_devoluciones": len(devoluciones),
+        "total_devoluciones": total_devoluciones,
         "total": total,
         "total_descuentos": total_descuentos,
         "por_dia": [{"fecha": k, "total": v} for k, v in sorted(por_dia.items())],
@@ -238,6 +260,21 @@ async def get_productos_vendidos(
         if g["_id"].get("variante"):
             fila["variantes"].append({"nombre": g["_id"]["variante"], "cantidad": g["cantidad"]})
 
+    # Las devoluciones del período restan unidades y monto
+    for d in await devoluciones_en(db, fecha_desde, fecha_hasta):
+        for i in d["items"]:
+            fila = vendidos.setdefault(i["producto_id"], {"nombre": i["nombre_producto"], "cantidad": 0, "total": 0.0, "ventas": set(), "variantes": []})
+            fila["cantidad"] -= i["cantidad"]
+            fila["total"] -= i.get("monto", 0)
+            fila.setdefault("devueltas", 0)
+            fila["devueltas"] = fila.get("devueltas", 0) + i["cantidad"]
+            if i.get("variante_nombre"):
+                var = next((x for x in fila["variantes"] if x["nombre"] == i["variante_nombre"]), None)
+                if var:
+                    var["cantidad"] -= i["cantidad"]
+                else:
+                    fila["variantes"].append({"nombre": i["variante_nombre"], "cantidad": -i["cantidad"]})
+
     categorias = {str(c["_id"]): c["nombre"] async for c in db.categorias.find({}, {"nombre": 1})}
     resultado = []
     vistos = set()
@@ -259,6 +296,7 @@ async def get_productos_vendidos(
             "cantidad_total": v["cantidad"] if v else 0,
             "total_vendido": round(v["total"], 2) if v else 0,
             "cantidad_ventas": len(v["ventas"]) if v else 0,
+            "devueltas": v.get("devueltas", 0) if v else 0,
             "variantes": sorted(v["variantes"], key=lambda x: -x["cantidad"]) if v else [],
         })
     # Vendidos que ya no existen (producto borrado): igual cuentan
@@ -267,7 +305,7 @@ async def get_productos_vendidos(
             resultado.append({
                 "id": pid, "nombre": v["nombre"], "categoria": "", "activo": False, "stock": None,
                 "cantidad_total": v["cantidad"], "total_vendido": round(v["total"], 2),
-                "cantidad_ventas": len(v["ventas"]),
+                "cantidad_ventas": len(v["ventas"]), "devueltas": v.get("devueltas", 0),
                 "variantes": sorted(v["variantes"], key=lambda x: -x["cantidad"]),
             })
     resultado.sort(key=lambda r: (-r["cantidad_total"], r["nombre"].lower()))
@@ -307,12 +345,26 @@ async def get_rentabilidad(
             return (var or {}).get("precio_costo") or 0
         return p.get("precio_costo") or 0
 
-    total_ingresos = sum(v["total"] for v in ventas)
+    devoluciones = await devoluciones_en(db, fecha_desde, fecha_hasta)
+    for d in devoluciones:
+        for i in d["items"]:
+            if ObjectId.is_valid(i.get("producto_id", "")) and i["producto_id"] not in productos:
+                p = await db.productos.find_one({"_id": ObjectId(i["producto_id"])}, {"precio_costo": 1, "variantes": 1})
+                if p:
+                    productos[i["producto_id"]] = p
+    total_ingresos = sum(v["total"] for v in ventas) - sum(d["monto"] for d in devoluciones)
     total_costo = 0
     for v in ventas:
         for item in v.get("items", []):
             costo = item.get("precio_costo")
             total_costo += (costo if costo is not None else costo_actual(item)) * item["cantidad"]
+    # Lo devuelto que vuelve al stock deja de ser costo; lo que vino fallado se pierde
+    for d in devoluciones:
+        for item in d["items"]:
+            if item.get("vuelve_stock"):
+                costo = item.get("precio_costo")
+                total_costo -= (costo if costo is not None else costo_actual(item)) * item["cantidad"]
+    total_ingresos = round(total_ingresos, 2)
     total_costo = round(total_costo, 2)
     ganancia = round(total_ingresos - total_costo, 2)
     margen = (ganancia / total_ingresos * 100) if total_ingresos > 0 else 0

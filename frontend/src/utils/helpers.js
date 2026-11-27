@@ -103,6 +103,7 @@ export const MOTIVOS_STOCK = {
   cancelacion_compra: "Anulación de ingreso",
   venta: "Venta",
   cancelacion_venta: "Cancelación de venta",
+  devolucion_venta: "Devolución de venta",
   remito_salida: "Remito: envío a otra sucursal",
   remito_entrada: "Remito: recibido de otra sucursal",
 };

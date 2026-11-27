@@ -276,6 +276,9 @@ export const GUIAS = [
         "texto": "Solo se pueden cancelar ventas de la caja abierta del día. Las de cajas ya cerradas quedaron incluidas en su cierre. La opción aparece solo para el cajero que abrió la caja de la sucursal de la venta y para el administrador."
       },
       {
+        "texto": "**Devoluciones (ventas de cualquier fecha):** si el cliente devuelve algo, por ejemplo días después, en las acciones de la venta elegí **Registrar devolución**. Marcá qué productos y cuántas unidades vuelven (en celulares, qué IMEI), y en cada uno si **vuelve al stock** (destildalo si vino fallado). El monto se calcula con lo que pagó el cliente (con descuento o recargo) y se puede cambiar; elegí si se devuelve en efectivo, transferencia, débito o crédito y, si querés, el motivo. El dinero sale de la **caja abierta de hoy de la sucursal de la venta** (la registra el cajero de esa caja o el administrador). La venta original no se modifica: queda con el estado **Con devolución** (o **Devuelta** si se devolvió todo), y el comprobante se puede imprimir o mandar por WhatsApp. Una venta con devoluciones ya no se puede cancelar. En los reportes, la devolución resta el día en que se hizo."
+      },
+      {
         "texto": "**Cancelar una orden de reparación:** en sus acciones, **Cancelar orden**. Si la orden no tiene pagos, la puede cancelar cualquiera que cambie estados. Si tiene pagos (por ejemplo, una seña), se devuelven en la **caja abierta de la sucursal de la orden**, con el mismo medio de cada cobro: la cancela el cajero que abrió esa caja o el administrador, y la caja tiene que estar abierta."
       }
     ]

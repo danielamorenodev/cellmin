@@ -41,10 +41,12 @@ const CONCEPTOS_MOV = {
   cancelacion_venta: "Ventas canceladas (devoluciones)",
   vuelto: "Vueltos entregados (en pesos)",
   devolucion_reparacion: "Devoluciones de reparaciones",
+  devolucion_venta: "Devoluciones de ventas",
 };
 const grupoMovimiento = (m) => {
   if (m.concepto === "cancelacion_venta") return "cancelacion_venta";
   if (m.concepto === "devolucion_reparacion") return "devolucion_reparacion";
+  if (m.concepto === "devolucion_venta") return "devolucion_venta";
   if (m.concepto === "vuelto") return "vuelto";
   if (m.concepto === "reparacion") return "cobro_reparacion";
   return "manual";
@@ -56,7 +58,7 @@ const etiquetaConcepto = (m) =>
       ? "Reparación"
       : m.concepto === "cancelacion_venta"
         ? "Cancelación"
-        : m.concepto === "devolucion_reparacion"
+        : m.concepto === "devolucion_reparacion" || m.concepto === "devolucion_venta"
           ? "Devolución"
           : m.concepto === "vuelto"
             ? "Vuelto"

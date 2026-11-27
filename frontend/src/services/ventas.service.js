@@ -24,6 +24,12 @@ export const ventasService = {
     return response.data;
   },
 
+  // Devolución de una venta de cualquier fecha (el dinero sale de la caja de hoy)
+  devolver: async (id, datos) => {
+    const response = await api.post(`/sales/${id}/devolucion`, datos);
+    return response.data;
+  },
+
   cancel: async (id) => {
     const response = await api.put(`/sales/${id}/cancel`);
     return response.data;

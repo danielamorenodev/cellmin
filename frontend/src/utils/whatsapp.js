@@ -128,3 +128,21 @@ export function mensajeListo(r, cliente) {
   lineas.push("", "Acordate de traer la orden o decirnos el número. ¡Te esperamos!");
   return lineas.join("\n");
 }
+
+// Comprobante de una devolución
+export function mensajeDevolucion(venta, d, cliente) {
+  const metodo = { efectivo: "efectivo", transferencia: "transferencia", debito: "débito", credito: "crédito" }[d.metodo] || d.metodo;
+  const lineas = [
+    `${saludo(cliente)} Te dejamos el comprobante de tu devolución en ${local(venta.sucursal)}.`,
+    "",
+    `*Devolución ${d.numero}* · ${formatDateTime(d.fecha)}`,
+    `De la venta ${venta.numero_venta} del ${formatDateTime(venta.fecha)}`,
+  ];
+  for (const it of d.items || []) {
+    lineas.push(`• ${it.nombre_producto} x${it.cantidad}`);
+    for (const imei of it.imeis || []) lineas.push(`   IMEI ${imei}`);
+  }
+  lineas.push(`*Devuelto: ${formatCurrency(d.monto)}* en ${metodo}`);
+  lineas.push("", "Comprobante no válido como factura.");
+  return lineas.join("\n");
+}

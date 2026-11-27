@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from app.database import get_db
-from app.models.sale import SaleCreate
+from app.models.sale import SaleCreate, DevolucionCreate
 from app.models.repair import EnvioEmail
 from app.utils.envio_comprobantes import preparar_destino, enviar_ticket
 from app.utils.auth import get_current_user
@@ -470,6 +470,11 @@ async def cancel_sale(sale_id: str, current_user: dict = Depends(get_current_use
         raise HTTPException(status_code=404, detail="Venta no encontrada")
     if sale["estado"] == "cancelada":
         raise HTTPException(status_code=400, detail="La venta ya está cancelada")
+    if sale.get("devoluciones"):
+        raise HTTPException(
+            status_code=400,
+            detail="Esta venta ya tiene devoluciones: para devolver el resto, registrá otra devolución.",
+        )
 
     # La devolución del dinero se registra en la caja abierta de la sucursal
     # de la venta. La cancela quien abrió esa caja o un administrador.
@@ -567,3 +572,172 @@ async def cancel_sale(sale_id: str, current_user: dict = Depends(get_current_use
     )
 
     return {"message": "Venta cancelada", "numero_venta": numero, "total_devuelto": sale["total"]}
+
+
+# ── Devoluciones ─────────────────────────────────────────────────────────
+# Para ventas de cualquier fecha (también las de cajas ya cerradas, que no se
+# pueden cancelar). La venta original no cambia: se le anota la devolución.
+# El dinero sale de la caja abierta HOY en la sucursal de la venta; cada
+# producto vuelve o no al stock (si vino fallado).
+
+METODOS_DEVOLUCION = ("efectivo", "transferencia", "debito", "credito")
+
+
+def devuelto_por_item(sale) -> list:
+    """Unidades ya devueltas de cada producto de la venta (por posición)."""
+    devueltas = [0] * len(sale.get("items", []))
+    for d in sale.get("devoluciones", []):
+        for it in d.get("items", []):
+            if 0 <= it["indice"] < len(devueltas):
+                devueltas[it["indice"]] += it["cantidad"]
+    return devueltas
+
+
+def precio_pagado_unitario(sale, item) -> float:
+    """Lo que pagó el cliente por unidad: el precio con el descuento o el
+    recargo de la venta repartido en proporción."""
+    suma = sum(i.get("subtotal", 0) for i in sale.get("items", [])) or 0
+    factor = (sale.get("total", 0) / suma) if suma > 0 else 1
+    return (item.get("subtotal", 0) / item["cantidad"]) * factor if item.get("cantidad") else 0
+
+
+@router.post("/{sale_id}/devolucion")
+async def registrar_devolucion(sale_id: str, datos: DevolucionCreate, current_user: dict = Depends(get_current_user)):
+    check_permission(current_user["role"], "ventas:cancel")
+    db = get_db()
+    if not ObjectId.is_valid(sale_id):
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    oid = ObjectId(sale_id)
+    sale = await db.ventas.find_one({"_id": oid})
+    if not sale:
+        raise HTTPException(status_code=404, detail="Venta no encontrada")
+    if sale["estado"] != "completada":
+        raise HTTPException(status_code=400, detail="La venta está cancelada: no se puede devolver")
+    if datos.metodo not in METODOS_DEVOLUCION:
+        raise HTTPException(status_code=400, detail="Elegí cómo se devuelve el dinero: efectivo, transferencia, débito o crédito")
+
+    sucursal = sale.get("sucursal", "sucursal_1")
+    caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
+    if not caja:
+        raise HTTPException(
+            status_code=400,
+            detail="Para registrar una devolución tiene que estar abierta la caja de la sucursal de la venta, "
+                   "de donde sale el dinero.",
+        )
+    exigir_dueno_o_admin(caja, current_user, "registrar devoluciones en")
+
+    items_venta = sale.get("items", [])
+    devueltas = devuelto_por_item(sale)
+    elegidos, monto_calculado, vistos = [], 0.0, set()
+    for it in datos.items:
+        if it.cantidad <= 0:
+            continue
+        if not 0 <= it.indice < len(items_venta) or it.indice in vistos:
+            raise HTTPException(status_code=400, detail="Producto de la venta inválido")
+        vistos.add(it.indice)
+        original = items_venta[it.indice]
+        quedan = original["cantidad"] - devueltas[it.indice]
+        if it.cantidad > quedan:
+            raise HTTPException(
+                status_code=400,
+                detail=f"De «{original['nombre_producto']}» se pueden devolver como máximo {quedan} unidad(es).",
+            )
+        imeis = []
+        if original.get("imeis"):
+            ya = {x for d in sale.get("devoluciones", []) for i in d.get("items", []) if i["indice"] == it.indice for x in i.get("imeis", [])}
+            imeis = [imei_util.normalizar(x) for x in (it.imeis or [])]
+            if len(imeis) != it.cantidad or len(set(imeis)) != len(imeis) or any(x not in original["imeis"] or x in ya for x in imeis):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Elegí qué IMEI de «{original['nombre_producto']}» se devuelven (uno por unidad).",
+                )
+        monto_calculado += precio_pagado_unitario(sale, original) * it.cantidad
+        elegidos.append({
+            "indice": it.indice,
+            "producto_id": original["producto_id"],
+            "variante_nombre": original.get("variante_nombre"),
+            "nombre_producto": original["nombre_producto"],
+            "cantidad": it.cantidad,
+            "vuelve_stock": it.vuelve_stock,
+            "imeis": imeis,
+            "precio_costo": original.get("precio_costo"),
+        })
+    if not elegidos:
+        raise HTTPException(status_code=400, detail="Elegí al menos un producto para devolver")
+
+    monto_calculado = round(monto_calculado, 2)
+    ya_devuelto = sale.get("total_devuelto", 0) or 0
+    maximo = round(sale.get("total", 0) - ya_devuelto, 2)
+    monto = monto_calculado if datos.monto is None else round(datos.monto, 2)
+    # Lo devuelto de cada producto (para los reportes por producto)
+    for it in elegidos:
+        original = items_venta[it["indice"]]
+        parte = precio_pagado_unitario(sale, original) * it["cantidad"]
+        it["monto"] = round(parte * (monto / monto_calculado), 2) if monto_calculado > 0 else 0
+    if monto < 0 or monto > maximo + 0.01:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El monto a devolver tiene que estar entre $0 y {maximo:,.2f} (lo que queda de la venta).".replace(",", "X").replace(".", ",").replace("X", "."),
+        )
+
+    ahora = datetime.utcnow()
+    numero = await get_next_number(db, "devoluciones", "D-")
+    devolucion = {
+        "numero": numero,
+        "fecha": ahora,
+        "items": elegidos,
+        "monto": monto,
+        "metodo": datos.metodo,
+        "motivo": (datos.motivo or "").strip() or None,
+        "usuario_id": current_user["user_id"],
+        "usuario_nombre": (await db.usuarios.find_one({"_id": ObjectId(current_user["user_id"])}, {"nombre": 1}) or {}).get("nombre", ""),
+        "caja_id": str(caja["_id"]),
+        "sucursal": sucursal,
+    }
+    # Solo si nadie registró otra devolución de esta venta mientras tanto
+    cantidad_previa = len(sale.get("devoluciones", []))
+    guardada = await db.ventas.update_one(
+        {"_id": oid, "estado": "completada", f"devoluciones.{cantidad_previa}": {"$exists": False}},
+        {"$push": {"devoluciones": devolucion}, "$set": {"total_devuelto": round(ya_devuelto + monto, 2)}},
+    )
+    if guardada.modified_count != 1:
+        raise HTTPException(status_code=409, detail="La venta cambió mientras se registraba la devolución. Actualizá y volvé a intentar.")
+
+    numero_venta = sale.get("numero_venta", "")
+    for it in elegidos:
+        if not it["vuelve_stock"]:
+            continue
+        await db.stock_movimientos.insert_one({
+            "producto_id": it["producto_id"],
+            "variante_nombre": it["variante_nombre"],
+            "tipo": "entrada",
+            "cantidad": it["cantidad"],
+            "sucursal": sucursal,
+            "motivo": "devolucion_venta",
+            "referencia_id": sale_id,
+            "notas": f"Devolución {numero} de la venta {numero_venta}",
+            "usuario_id": current_user["user_id"],
+            "fecha": ahora,
+        })
+        await aplicar_delta(db, it["producto_id"], it["variante_nombre"], sucursal, it["cantidad"])
+
+    if monto > 0:
+        await db.cajas.update_one({"_id": caja["_id"]}, {"$push": {"movimientos": {
+            "tipo": "egreso",
+            "monto": monto,
+            "motivo": f"Devolución {numero} — venta {numero_venta}",
+            "metodo_pago": datos.metodo,
+            "concepto": "devolucion_venta",
+            "referencia_id": sale_id,
+            "notas": devolucion["motivo"],
+            "usuario_id": current_user["user_id"],
+            "fecha": ahora,
+        }}})
+
+    detalle = ", ".join(f"{i['cantidad']} × {i['nombre_producto']}{'' if i['vuelve_stock'] else ' (no vuelve al stock)'}" for i in elegidos)
+    await registrar_auditoria(
+        db=db, usuario_id=current_user["user_id"], usuario_nombre=devolucion["usuario_nombre"],
+        rol=current_user["role"], accion="devolucion", modulo="ventas",
+        descripcion=f"Devolución {numero} de la venta {numero_venta}: {detalle}. Devuelto: {monto} ({datos.metodo})",
+    )
+    return {"message": "Devolución registrada", "numero": numero, "monto": monto, "devolucion": devolucion}

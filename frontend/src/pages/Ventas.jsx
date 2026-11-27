@@ -22,6 +22,7 @@ import {
   CheckCircle,
   Lock,
   Unlock,
+  Undo2,
 } from "lucide-react";
 import { ventasService } from "../services/ventas.service";
 import { productosService } from "../services/productos.service";
@@ -55,10 +56,12 @@ import SelectorCliente from "../components/ui/SelectorCliente";
 import { useTabla } from "../hooks/useTabla";
 import TicketVenta from "../components/ui/TicketVenta";
 import DetalleVenta from "../components/ui/DetalleVenta";
+import DevolucionModal, { DevolucionRegistrada, ListaDevoluciones } from "../components/ui/DevolucionVenta";
+import { imprimirDevolucion, quedaParaDevolver } from "../utils/devoluciones";
 import { useEmailConfigurado, preferenciaEmail, avisarEnvio } from "../hooks/useEmail";
 import { CampoEnviarEmail, EnviarEmailModal } from "../components/ui/EnvioEmail";
 import EnviarWhatsApp from "../components/ui/EnviarWhatsApp";
-import { mensajeTicket } from "../utils/whatsapp";
+import { mensajeTicket, mensajeDevolucion } from "../utils/whatsapp";
 
 function estadoStock(stock, minimo) {
   if (stock <= 0) return "agotado";
@@ -1214,6 +1217,7 @@ function construirAcciones({
   onVerDetalle,
   onEnviarEmail,
   onWhatsApp,
+  onDevolver,
 }) {
   return [
     {
@@ -1241,6 +1245,11 @@ function construirAcciones({
       icono: <MessageCircle size={15} />,
       onClick: () => onWhatsApp(venta),
     },
+    onDevolver && {
+      label: "Registrar devolución",
+      icono: <Undo2 size={15} />,
+      onClick: () => onDevolver(venta),
+    },
     venta.estado === "completada" &&
       puedeCancelar && {
         label: "Cancelar venta",
@@ -1259,6 +1268,7 @@ function FilaVenta({
   onImprimir,
   onEnviarEmail,
   onWhatsApp,
+  onDevolver,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -1303,12 +1313,20 @@ function FilaVenta({
         <td className="col-centro px-6 py-4 ">
           <span
             className={`px-2 py-1 rounded-lg text-xs font-medium ${
-              venta.estado === "completada"
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-700"
+              venta.estado !== "completada"
+                ? "bg-red-100 text-red-700"
+                : venta.total_devuelto > 0
+                  ? "bg-orange-100 text-orange-700"
+                  : "bg-green-100 text-green-700"
             }`}
           >
-            {venta.estado === "completada" ? "Completada" : "Cancelada"}
+            {venta.estado !== "completada"
+              ? "Cancelada"
+              : venta.total_devuelto > 0
+                ? venta.total_devuelto >= venta.total - 0.01
+                  ? "Devuelta"
+                  : "Con devolución"
+                : "Completada"}
           </span>
         </td>
         <td className="col-acc px-6 py-4 ">
@@ -1328,6 +1346,7 @@ function FilaVenta({
                 onVerDetalle,
                 onEnviarEmail,
                 onWhatsApp,
+                onDevolver,
               })}
             />
           </div>
@@ -1417,6 +1436,7 @@ function CardVentaMobile({
   onImprimir,
   onEnviarEmail,
   onWhatsApp,
+  onDevolver,
   onVerDetalle,
 }) {
   const [expandido, setExpandido] = useState(false);
@@ -1435,12 +1455,20 @@ function CardVentaMobile({
           </button>
           <span
             className={`px-2 py-1 rounded-lg text-xs font-medium ${
-              venta.estado === "completada"
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-700"
+              venta.estado !== "completada"
+                ? "bg-red-100 text-red-700"
+                : venta.total_devuelto > 0
+                  ? "bg-orange-100 text-orange-700"
+                  : "bg-green-100 text-green-700"
             }`}
           >
-            {venta.estado === "completada" ? "Completada" : "Cancelada"}
+            {venta.estado !== "completada"
+              ? "Cancelada"
+              : venta.total_devuelto > 0
+                ? venta.total_devuelto >= venta.total - 0.01
+                  ? "Devuelta"
+                  : "Con devolución"
+                : "Completada"}
           </span>
         </div>
         <div className="space-y-1 text-sm text-gray-600">
@@ -1478,6 +1506,7 @@ function CardVentaMobile({
                 onVerDetalle,
                 onEnviarEmail,
                 onWhatsApp,
+                onDevolver,
               })}
             />
           </div>
@@ -1549,6 +1578,9 @@ function ModalDetalleVenta({ venta, cliente, onClose, onImprimir }) {
         </div>
         <div className="p-6">
           <DetalleVenta venta={venta} cliente={cliente} />
+          <div className="mt-4">
+            <ListaDevoluciones venta={venta} onImprimir={(d) => imprimirDevolucion(venta, d, cliente)} />
+          </div>
         </div>
         <div className="p-6 border-t border-gray-100 flex justify-end gap-3">
           <button data-cerrar
@@ -1660,6 +1692,10 @@ export default function Ventas() {
   const esAdmin = user?.rol === "administrador";
   const [adminSinCaja, setAdminSinCaja] = useState(false);
   const [cajasAbiertas, setCajasAbiertas] = useState([]);
+  // Devolución en curso y la recién registrada (para imprimir / WhatsApp)
+  const [ventaDevolver, setVentaDevolver] = useState(null);
+  const [devolucionHecha, setDevolucionHecha] = useState(null);
+  const [whatsAppDevolucion, setWhatsAppDevolucion] = useState(null);
   const eligeSucursal = (esVendedor && user?.sucursales?.length > 1) || (esAdmin && adminSinCaja);
   const [sucursalVendedor, setSucursalVendedor] = useState(
     user?.sucursales?.length === 1 ? user.sucursales[0] : "",
@@ -1803,8 +1839,18 @@ export default function Ventas() {
   // Coincide con el servidor: cancela el cajero que abrió la caja de la
   // sucursal de la venta, o un administrador (en cualquier caja abierta). El
   // vendedor no cancela.
+  // Caja donde este usuario puede devolver dinero de una venta de esa sucursal
+  // (la misma regla que cancelar, pero para ventas de cualquier fecha)
+  const cajaParaDevolver = (v) =>
+    user?.rol === "administrador"
+      ? cajasAbiertas.find((c) => c.sucursal === v.sucursal)
+      : user?.rol === "cajero" && cajaActual?.estado === "abierta" && cajaActual.sucursal === v.sucursal
+        ? cajaActual
+        : null;
+  const puedeDevolver = (v) => v.estado === "completada" && quedaParaDevolver(v) && !!cajaParaDevolver(v);
+
   const puedeCancelar = (v) => {
-    if (v.estado !== "completada") return false;
+    if (v.estado !== "completada" || v.devoluciones?.length) return false;
     const caja =
       user?.rol === "administrador"
         ? cajasAbiertas.find((c) => c.sucursal === v.sucursal)
@@ -1865,7 +1911,7 @@ export default function Ventas() {
 
   const totalFiltrado = filtered
     .filter((v) => v.estado === "completada")
-    .reduce((acc, v) => acc + v.total, 0);
+    .reduce((acc, v) => acc + v.total - (v.total_devuelto || 0), 0);
 
   const nombreCliente = (v) => {
     const c = clientes.find((x) => x.id === v.cliente_id);
@@ -2228,6 +2274,7 @@ export default function Ventas() {
                     }}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
                     onWhatsApp={setWhatsAppDe}
+                    onDevolver={puedeDevolver(venta) ? setVentaDevolver : null}
                   />
                 ))}
               </tbody>
@@ -2250,6 +2297,7 @@ export default function Ventas() {
                 }}
                 onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
                     onWhatsApp={setWhatsAppDe}
+                onDevolver={puedeDevolver(venta) ? setVentaDevolver : null}
               />
             ))}
           </div>
@@ -2297,6 +2345,47 @@ export default function Ventas() {
           emailInicial={(emailDe._cliente || clientes.find((c) => c.id === emailDe.cliente_id))?.email}
           onEnviar={(email) => ventasService.enviarEmail(emailDe._id, email)}
           onClose={() => setEmailDe(null)}
+        />
+      )}
+
+      {ventaDevolver && (
+        <DevolucionModal
+          venta={ventaDevolver}
+          cliente={clientes.find((c) => c.id === ventaDevolver.cliente_id)}
+          onClose={() => setVentaDevolver(null)}
+          onHecha={(devolucion) => {
+            setDevolucionHecha({ venta: ventaDevolver, devolucion });
+            setVentaDevolver(null);
+            fetchData();
+          }}
+        />
+      )}
+
+      {devolucionHecha && (
+        <DevolucionRegistrada
+          devolucion={devolucionHecha.devolucion}
+          onImprimir={() =>
+            imprimirDevolucion(
+              devolucionHecha.venta,
+              devolucionHecha.devolucion,
+              clientes.find((c) => c.id === devolucionHecha.venta.cliente_id),
+            )
+          }
+          onWhatsApp={() => setWhatsAppDevolucion(devolucionHecha)}
+          onClose={() => setDevolucionHecha(null)}
+        />
+      )}
+
+      {whatsAppDevolucion && (
+        <EnviarWhatsApp
+          titulo={`Enviar comprobante ${whatsAppDevolucion.devolucion.numero}`}
+          telefono={clientes.find((c) => c.id === whatsAppDevolucion.venta.cliente_id)?.telefono}
+          mensaje={mensajeDevolucion(
+            whatsAppDevolucion.venta,
+            whatsAppDevolucion.devolucion,
+            clientes.find((c) => c.id === whatsAppDevolucion.venta.cliente_id),
+          )}
+          onClose={() => setWhatsAppDevolucion(null)}
         />
       )}
 

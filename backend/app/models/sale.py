@@ -51,3 +51,18 @@ class SaleResponse(BaseModel):
     usuario_id: str
     notas: Optional[str]
     fecha: datetime
+
+# ── Devolución de una venta (de cualquier fecha) ──
+
+class ItemDevolucion(BaseModel):
+    indice: int                      # posición del producto en la venta
+    cantidad: int
+    vuelve_stock: bool = True        # False: vino fallado, no vuelve a la venta
+    imeis: Optional[List[str]] = None  # celulares: cuáles se devuelven
+
+
+class DevolucionCreate(BaseModel):
+    items: List[ItemDevolucion]
+    metodo: str = "efectivo"         # medio por el que se devuelve el dinero
+    monto: Optional[float] = None    # si no viene, lo proporcional de lo pagado
+    motivo: Optional[str] = None

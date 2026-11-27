@@ -5,6 +5,8 @@ import toast from "react-hot-toast";
 import { ventasService } from "../services/ventas.service";
 import { clientesService } from "../services/clientes.service";
 import DetalleVenta from "../components/ui/DetalleVenta";
+import { ListaDevoluciones } from "../components/ui/DevolucionVenta";
+import { imprimirDevolucion } from "../utils/devoluciones";
 import TicketVenta from "../components/ui/TicketVenta";
 
 export default function VentaDetalle() {
@@ -73,6 +75,7 @@ export default function VentaDetalle() {
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <DetalleVenta venta={venta} cliente={cliente} />
+        <ListaDevoluciones venta={venta} onImprimir={(d) => imprimirDevolucion(venta, d, cliente)} />
       </div>
 
       {showTicket && (
