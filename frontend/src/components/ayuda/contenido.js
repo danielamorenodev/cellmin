@@ -273,7 +273,10 @@ export const GUIAS = [
         ]
       },
       {
-        "texto": "Solo se pueden cancelar ventas de la caja abierta del día. Las de cajas ya cerradas quedaron incluidas en su cierre."
+        "texto": "Solo se pueden cancelar ventas de la caja abierta del día. Las de cajas ya cerradas quedaron incluidas en su cierre. La opción aparece solo para el cajero que abrió la caja de la sucursal de la venta y para el administrador."
+      },
+      {
+        "texto": "**Cancelar una orden de reparación:** en sus acciones, **Cancelar orden**. Si la orden no tiene pagos, la puede cancelar cualquiera que cambie estados. Si tiene pagos (por ejemplo, una seña), se devuelven en la **caja abierta de la sucursal de la orden**, con el mismo medio de cada cobro: la cancela el cajero que abrió esa caja o el administrador, y la caja tiene que estar abierta."
       }
     ]
   },

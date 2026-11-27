@@ -1659,6 +1659,7 @@ export default function Ventas() {
   // sucursal que elija (como un vendedor de las dos sucursales)
   const esAdmin = user?.rol === "administrador";
   const [adminSinCaja, setAdminSinCaja] = useState(false);
+  const [cajasAbiertas, setCajasAbiertas] = useState([]);
   const eligeSucursal = (esVendedor && user?.sucursales?.length > 1) || (esAdmin && adminSinCaja);
   const [sucursalVendedor, setSucursalVendedor] = useState(
     user?.sucursales?.length === 1 ? user.sucursales[0] : "",
@@ -1715,6 +1716,7 @@ export default function Ventas() {
       } else {
         caja = await cajaService.getActual();
         if (esAdmin) {
+          cajaService.getAbiertas().then(setCajasAbiertas).catch(() => {});
           setAdminSinCaja(caja?.estado !== "abierta");
           if (caja?.estado !== "abierta") caja = await cajaService.getParaVender(sucursal || undefined);
           // Con una sola caja abierta se usa esa: se muestra elegida
@@ -1798,10 +1800,19 @@ export default function Ventas() {
 
   // Solo se pueden cancelar ventas de la caja abierta (las de cajas ya
   // cerradas quedaron incluidas en un cierre)
-  const puedeCancelar = (v) =>
-    cajaActual?.estado === "abierta" &&
-    v.sucursal === cajaActual.sucursal &&
-    new Date(v.fecha) >= new Date(cajaActual.fecha_apertura);
+  // Coincide con el servidor: cancela el cajero que abrió la caja de la
+  // sucursal de la venta, o un administrador (en cualquier caja abierta). El
+  // vendedor no cancela.
+  const puedeCancelar = (v) => {
+    if (v.estado !== "completada") return false;
+    const caja =
+      user?.rol === "administrador"
+        ? cajasAbiertas.find((c) => c.sucursal === v.sucursal)
+        : user?.rol === "cajero" && cajaActual?.estado === "abierta" && cajaActual.sucursal === v.sucursal
+          ? cajaActual
+          : null;
+    return !!caja && new Date(v.fecha) >= new Date(caja.fecha_apertura);
+  };
 
   const limpiarFiltros = () =>
     setFiltros({

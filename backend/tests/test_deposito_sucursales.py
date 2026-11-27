@@ -77,3 +77,51 @@ def test_admin_vende_en_caja_de_otro(client, admin, nuevo_usuario):
     # El historial dice quién abrió cada caja
     hist = client.get("/api/cash/historial", headers=admin["headers"]).json()
     assert {h["usuario_apertura_nombre"] for h in hist} == {"Cajero S1", "Cajero S2"}
+
+
+# ── Cancelar una orden con pagos: caja de la sucursal de la orden ──
+
+def _orden_con_sena(client, cajero, sucursal):
+    c = client.post("/api/clients/", headers=cajero["headers"], json={"nombre": "Ana"}).json()
+    o = client.post("/api/repairs/", headers=cajero["headers"], json={
+        "cliente_id": c["id"], "sucursal": sucursal, "equipo": {"marca": "Samsung", "modelo": "A10"},
+        "tipos_reparacion": [{"tipo_id": "x", "nombre": "Pantalla", "precio": 20000}]}).json()
+    r = client.post(f"/api/repairs/{o['id']}/pago", headers=cajero["headers"], json={"monto": 5000, "tipo": "seña", "metodo": "efectivo"})
+    assert r.status_code == 200, r.text
+    return o
+
+
+def test_cancelar_orden_con_pagos(client, admin, nuevo_usuario):
+    c1 = nuevo_usuario("Cajero S1", "cajero", ("sucursal_1",))
+    c2 = nuevo_usuario("Cajero S2", "cajero", ("sucursal_2",))
+    vend = nuevo_usuario("Vendedor S1", "vendedor", ("sucursal_1",))
+    _abrir(client, c1, "sucursal_1")
+    _abrir(client, c2, "sucursal_2")
+    o = _orden_con_sena(client, c1, "sucursal_1")
+    # Ni el cajero de la otra sucursal ni el vendedor
+    assert client.put(f"/api/repairs/{o['id']}/cancelar", headers=c2["headers"]).status_code == 403
+    assert client.put(f"/api/repairs/{o['id']}/cancelar", headers=vend["headers"]).status_code == 403
+    # El administrador sin caja propia sí: la devolución sale de la caja de S1
+    r = client.put(f"/api/repairs/{o['id']}/cancelar", headers=admin["headers"])
+    assert r.status_code == 200, r.text
+    caja1 = client.get("/api/cash/actual", headers=c1["headers"]).json()
+    assert [m["monto"] for m in caja1["movimientos"] if m.get("referencia_id") == o["id"] and m["tipo"] == "egreso"] == [5000]
+    caja2 = client.get("/api/cash/actual", headers=c2["headers"]).json()
+    assert not [m for m in caja2["movimientos"] if m.get("referencia_id") == o["id"]]
+
+
+def test_cancelar_orden_con_pagos_sin_caja_de_su_sucursal(client, admin, nuevo_usuario):
+    c1 = nuevo_usuario("Cajero S1", "cajero", ("sucursal_1",))
+    _abrir(client, c1, "sucursal_1")
+    o = _orden_con_sena(client, c1, "sucursal_1")
+    client.post("/api/cash/cerrar", headers=c1["headers"], json={"montos_por_metodo": [{"metodo": "efectivo", "monto": 6000}]})
+    r = client.put(f"/api/repairs/{o['id']}/cancelar", headers=admin["headers"])
+    assert r.status_code == 400 and "Sucursal 1" in r.json()["detail"]
+
+
+def test_cancelar_orden_sin_pagos_la_cancela_cualquiera(client, nuevo_usuario):
+    vend = nuevo_usuario("Vendedor S1", "vendedor", ("sucursal_1",))
+    c = client.post("/api/clients/", headers=vend["headers"], json={"nombre": "Ana"}).json()
+    o = client.post("/api/repairs/", headers=vend["headers"], json={
+        "cliente_id": c["id"], "equipo": {"marca": "Samsung", "modelo": "A10"}}).json()
+    assert client.put(f"/api/repairs/{o['id']}/cancelar", headers=vend["headers"]).status_code == 200

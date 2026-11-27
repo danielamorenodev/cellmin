@@ -1692,7 +1692,8 @@ function construirAcciones({
       icono: <MessageCircle size={15} />,
       onClick: () => onWhatsApp(reparacion),
     },
-    reparacion.estado !== "entregada" &&
+    onCancelar &&
+      reparacion.estado !== "entregada" &&
       reparacion.estado !== "cancelada" && {
         label: "Cancelar orden",
         icono: <Ban size={15} />,
@@ -2657,6 +2658,8 @@ export default function Reparaciones() {
   // Orden que pasa a "En reparación": se pide qué técnico la hace
   const [asignarTecnico, setAsignarTecnico] = useState(null);
   const [cajaAbierta, setCajaAbierta] = useState(false);
+  // Cajas abiertas (para saber quién puede cancelar una orden con pagos)
+  const [cajasAbiertas, setCajasAbiertas] = useState([]);
   const { user } = useAuth();
   const [showOrden, setShowOrden] = useState(null);
   const [reparacionDetalle, setReparacionDetalle] = useState(null);
@@ -2686,8 +2689,9 @@ export default function Reparaciones() {
       // Solo verificar caja si el rol lo permite
       if (!["tecnico", "deposito", "vendedor"].includes(user?.rol)) {
         try {
-          const cajaActual = await cajaService.getActual();
+          const [cajaActual, abiertas] = await Promise.all([cajaService.getActual(), cajaService.getAbiertas()]);
           setCajaAbierta(cajaActual?.estado === "abierta");
+          setCajasAbiertas(abiertas);
         } catch {
           setCajaAbierta(false);
         }
@@ -2803,6 +2807,15 @@ export default function Reparaciones() {
   const atrasadas = reparaciones.filter((r) => diasAtraso(r) > 0).length;
   const filtrosActivos = Object.values(filtros).some((v) => v !== "");
 
+  // Sin pagos la cancela cualquiera que cambie estados. Con pagos, como una
+  // venta: la devolución sale de la caja abierta de la sucursal de la orden, y
+  // la cancela quien abrió esa caja o un administrador.
+  const puedeCancelarOrden = (r) => {
+    if (!(r.total_pagado > 0)) return true;
+    const caja = cajasAbiertas.find((c) => c.sucursal === (r.sucursal || "sucursal_1"));
+    return !!caja && (user?.rol === "administrador" || caja.es_mia);
+  };
+
   const handleCancelar = async (id) => {
     const r = reparaciones.find((x) => x.id === id);
     const pagado = r?.total_pagado || 0;
@@ -2811,7 +2824,7 @@ export default function Reparaciones() {
         mensaje: `¿Estás seguro de que querés cancelar la orden ${r?.numero_orden || ""}?`,
         detalle:
           pagado > 0
-            ? `Se devolverán ${formatCurrency(pagado)} al cliente y se registrará como egreso en la caja, con el mismo medio de pago de cada cobro.`
+            ? `Se devolverán ${formatCurrency(pagado)} al cliente y se registrará como egreso en la caja de ${nombreSucursal(r?.sucursal || "sucursal_1")}, con el mismo medio de pago de cada cobro.`
             : "La orden queda cancelada y no se puede volver a abrir.",
         textoConfirmar: "Sí, cancelar la orden",
         peligro: true,
@@ -3027,7 +3040,7 @@ export default function Reparaciones() {
                         onPago={(r) => setShowPago(r)}
                         cajaAbierta={cajaAbierta}
                         userRol={user?.rol}
-                        onCancelar={handleCancelar}
+                        onCancelar={puedeCancelarOrden(r) ? handleCancelar : null}
                         onImprimir={(r) => setShowOrden(r)}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
                     onWhatsApp={abrirWhatsApp}
@@ -3051,7 +3064,7 @@ export default function Reparaciones() {
                     onPago={(r) => setShowPago(r)}
                     cajaAbierta={cajaAbierta}
                     userRol={user?.rol}
-                    onCancelar={handleCancelar}
+                    onCancelar={puedeCancelarOrden(r) ? handleCancelar : null}
                     onImprimir={(r) => setShowOrden(r)}
                     onEnviarEmail={emailConfigurado ? setEmailDe : undefined}
                     onWhatsApp={abrirWhatsApp}

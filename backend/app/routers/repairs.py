@@ -7,7 +7,7 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime, timedelta
 from app.utils.logger import registrar_auditoria
-from app.utils.cajas import caja_propia, puede_sucursal
+from app.utils.cajas import caja_propia, puede_sucursal, exigir_dueno_o_admin, nombre_sucursal
 from app.utils.stock import validar_sucursal
 from app.utils.tarjetas import datos_tarjeta, texto_tarjeta
 from app.utils.personal import persona, ROLES_VENDEDOR, ROLES_TECNICO
@@ -517,17 +517,22 @@ async def cancel_repair(repair_id: str, current_user: dict = Depends(get_current
     if repair["estado"] == "cancelada":
         raise HTTPException(status_code=400, detail="La orden ya está cancelada")
 
-    # Si hay pagos cobrados se devuelven: egreso de caja por cada pago, con su mismo medio de pago
+    # Si hay pagos cobrados se devuelven: egreso por cada pago, con su mismo
+    # medio de pago, en la caja abierta de la sucursal de la orden (como las
+    # ventas). La cancela quien abrió esa caja o un administrador.
     pagos = repair.get("pagos", [])
     total_devuelto = 0
     caja = None
     if pagos:
-        caja = await caja_abierta_del_usuario(db, current_user)
+        sucursal = repair.get("sucursal", "sucursal_1")
+        caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
         if not caja:
             raise HTTPException(
                 status_code=400,
-                detail="Esta orden tiene pagos cobrados. Para cancelarla hace falta una caja abierta, donde se registra la devolución.",
+                detail=f"Esta orden tiene pagos cobrados. Para cancelarla tiene que estar abierta la caja de "
+                       f"{nombre_sucursal(sucursal)}, donde se registra la devolución.",
             )
+        exigir_dueno_o_admin(caja, current_user, "cancelar órdenes con pagos de")
     # Se marca cancelada solo si nadie la cambió mientras tanto: dos clics no devuelven dos veces
     marcada = await db.reparaciones.update_one(
         {"_id": ObjectId(repair_id), "estado": repair["estado"], "total_pagado": repair.get("total_pagado", 0)},
