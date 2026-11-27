@@ -6,6 +6,8 @@ Cada producto (o cada variante) guarda:
 y mantiene stock_actual / stock_minimo como TOTAL (suma de las sucursales)
 para los listados y reportes generales.
 """
+from datetime import datetime
+
 from fastapi import HTTPException
 from bson import ObjectId
 
@@ -85,6 +87,15 @@ async def aplicar_delta(db, producto_id, variante_nombre, sucursal, delta):
             {"_id": ObjectId(producto_id)},
             {"$inc": {f"stock_sucursal.{sucursal}": delta, "stock_actual": delta}},
         )
+
+
+async def marcar_modificado(db, producto_ids):
+    """Anota la fecha de última modificación (para listar primero lo último que
+    se tocó). Se llama al editar el producto y con los movimientos de stock
+    hechos a mano: ingresos, ajustes, compras y remitos. Las ventas no cuentan."""
+    ids = list({ObjectId(i) for i in producto_ids if i and ObjectId.is_valid(str(i))})
+    if ids:
+        await db.productos.update_many({"_id": {"$in": ids}}, {"$set": {"fecha_modificacion": datetime.utcnow()}})
 
 
 async def descontar_stock(db, producto_id, variante_nombre, sucursal, cantidad):

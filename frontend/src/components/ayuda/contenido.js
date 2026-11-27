@@ -164,7 +164,7 @@ export const GUIAS = [
     "ruta": "/productos",
     "bloques": [
       {
-        "texto": "En **Productos y stock** cada producto muestra su **stock total**; al tocar el número se abre el detalle: una fila por sucursal con su stock y su stock mínimo (y, si tiene variantes, lo mismo para cada una). La columna **Estado** marca “Bajo en S1” o “Bajo en S2” cuando el stock llegó al mínimo, y arriba aparece un aviso con el enlace **Ver solo esos**. Si un producto tiene mínimo 0, no genera alertas. Cajeros y vendedores ven esta pantalla solo para consultar."
+        "texto": "En **Productos y stock** cada producto muestra su **stock total**; al tocar el número se abre el detalle: una fila por sucursal con su stock y su stock mínimo (y, si tiene variantes, lo mismo para cada una). La columna **Estado** marca “Bajo en S1” o “Bajo en S2” cuando el stock llegó al mínimo, y arriba aparece un aviso con el enlace **Ver solo esos**. Si un producto tiene mínimo 0, no genera alertas. Cajeros y vendedores ven esta pantalla solo para consultar. Al entrar, la lista muestra **primero el último producto modificado** (columna **Modificado**): cuenta editarlo, cambiarle el precio y cargarle stock con un ingreso, un ajuste o un remito; las ventas no lo mueven. Tocando el encabezado de cualquier columna se ordena por esa."
       }
     ]
   },
@@ -614,7 +614,7 @@ export const GUIAS = [
     "ruta": "/reportes",
     "bloques": [
       {
-        "texto": "**Inicio** muestra ventas del día, reparaciones activas (con las atrasadas) y productos con stock bajo; al tocar cada tarjeta se abre la lista, por ejemplo, las reparaciones con su técnico a cargo, los días en el local y la entrega estimada. En **Reportes** elegís un período o un rango de fechas para ver ventas (también por vendedor), rentabilidad, productos más vendidos y reparaciones: por técnico, por sucursal y por quién atendió, con el promedio de días, las atrasadas y las terminadas fuera de término, y el historial filtrable por técnico, cliente, sucursal y estado."
+        "texto": "**Inicio** muestra ventas del día, reparaciones activas (con las atrasadas) y productos con stock bajo; al tocar cada tarjeta se abre la lista, por ejemplo, las reparaciones con su técnico a cargo, los días en el local y la entrega estimada. En **Reportes** elegís un período o un rango de fechas para ver ventas (también por vendedor), rentabilidad, productos y reparaciones. En **Productos** está la lista de **todos los productos** con las unidades vendidas, la cantidad de ventas y el total de cada uno en el período elegido (los que no se vendieron aparecen con 0; con **Solo los vendidos** se ocultan), con buscador, páginas y orden por cualquier columna. En reparaciones: por técnico, por sucursal y por quién atendió, con el promedio de días, las atrasadas y las terminadas fuera de término, y el historial filtrable por técnico, cliente, sucursal y estado."
       }
     ]
   },

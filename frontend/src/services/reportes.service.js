@@ -6,8 +6,11 @@ export const reportesService = {
     return response.data;
   },
 
-  getProductosVendidos: async () => {
-    const response = await api.get("/reports/productos-vendidos");
+  getProductosVendidos: async (periodo, desde = null, hasta = null) => {
+    let url = `/reports/productos-vendidos?periodo=${periodo}`;
+    if (desde) url += `&desde=${desde}`;
+    if (hasta) url += `&hasta=${hasta}`;
+    const response = await api.get(url);
     return response.data;
   },
 

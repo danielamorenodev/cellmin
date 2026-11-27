@@ -29,6 +29,7 @@ import AvisoRango from "../components/ui/AvisoRango";
 import { rangoInvertido } from "../utils/validaciones";
 import EncabezadoPagina from "../components/ui/EncabezadoPagina";
 import ReporteReparaciones from "../components/reportes/ReporteReparaciones";
+import ReporteProductos from "../components/reportes/ReporteProductos";
 import Paginacion from "../components/ui/Paginacion";
 import { useTabla } from "../hooks/useTabla";
 
@@ -106,7 +107,7 @@ export default function Reportes() {
   const [periodo, setPeriodo] = useState("mes");
   const [tab, setTab] = useState("ventas");
   const [ventasData, setVentasData] = useState(null);
-  const [productosData, setProductosData] = useState([]);
+  const [productosData, setProductosData] = useState(null);
   const [rentabilidadData, setRentabilidadData] = useState(null);
   const [reparacionesData, setReparacionesData] = useState(null);
   const [stockBajoData, setStockBajoData] = useState([]);
@@ -128,7 +129,7 @@ export default function Reportes() {
       const [ventas, productos, rentabilidad, reparaciones, stockBajo] =
         await Promise.all([
           reportesService.getVentas(periodo, desde, hasta),
-          reportesService.getProductosVendidos(),
+          reportesService.getProductosVendidos(periodo, desde, hasta),
           reportesService.getRentabilidad(periodo, desde, hasta),
           reportesService.getReparaciones(),
           reportesService.getStockBajo(),
@@ -507,85 +508,7 @@ export default function Reportes() {
           )}
 
           {/* TAB PRODUCTOS */}
-          {tab === "productos" && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100">
-                  <h3 className="font-semibold text-gray-700">
-                    Top 10 productos más vendidos
-                  </h3>
-                </div>
-                {productosData.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    No hay datos de ventas
-                  </div>
-                ) : (
-                  <>
-                    <div className="p-6">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={productosData} layout="vertical">
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="#f0f0f0"
-                          />
-                          <XAxis type="number" tick={{ fontSize: 11 }} />
-                          <YAxis
-                            dataKey="nombre"
-                            type="category"
-                            tick={{ fontSize: 11 }}
-                            width={150}
-                          />
-                          <Tooltip />
-                          <Bar
-                            dataKey="cantidad_total"
-                            fill="#3b82f6"
-                            radius={[0, 4, 4, 0]}
-                            name="Cantidad"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-t border-gray-100">
-                        <tr>
-                          <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
-                            #
-                          </th>
-                          <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
-                            Producto
-                          </th>
-                          <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
-                            Cantidad
-                          </th>
-                          <th className="px-6 py-3 text-xs font-medium text-gray-500 uppercase">
-                            Total vendido
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {productosData.map((p, i) => (
-                          <tr key={i} className="hover:bg-gray-50">
-                            <td className="col-centro px-6 py-3 text-sm text-gray-500">
-                              {i + 1}
-                            </td>
-                            <td className="px-6 py-3 text-sm font-medium text-gray-800">
-                              {p.nombre}
-                            </td>
-                            <td className="col-num px-6 py-3 text-sm text-gray-600">
-                              {p.cantidad_total}
-                            </td>
-                            <td className="col-num px-6 py-3 text-sm font-semibold text-gray-800">
-                              {formatCurrency(p.total_vendido)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
+          {tab === "productos" && <ReporteProductos datos={productosData} />}
 
           {/* TAB REPARACIONES */}
           {tab === "reparaciones" && reparacionesData && (

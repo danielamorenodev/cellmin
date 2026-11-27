@@ -6,7 +6,7 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
 from app.utils.logger import registrar_auditoria
-from app.utils.stock import completar, stock_en, minimo_en, validar_sucursal, aplicar_delta, descontar_stock, bajo_minimo, SUCURSALES
+from app.utils.stock import completar, stock_en, minimo_en, validar_sucursal, aplicar_delta, descontar_stock, bajo_minimo, SUCURSALES, marcar_modificado
 
 router = APIRouter()
 
@@ -113,6 +113,7 @@ async def create_movement(movement: StockMovement, current_user: dict = Depends(
             )
     else:
         await aplicar_delta(db, movement.producto_id, movement.variante_nombre, movement.sucursal, delta)
+    await marcar_modificado(db, [movement.producto_id])
 
     # 5. Recién ahora registrar el movimiento en el historial
     await db.stock_movimientos.insert_one({

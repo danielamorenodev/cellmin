@@ -283,24 +283,92 @@ async def get_ventas_report(
         "por_sucursal": [{"sucursal": k, "total": v} for k, v in por_sucursal.items()],
     }
 
+def _rango(periodo: str, desde: str | None, hasta: str | None):
+    """Desde/hasta del período elegido arriba en Reportes (mismo criterio que rentabilidad)."""
+    hoy = datetime.utcnow()
+    if desde and hasta:
+        return (datetime.strptime(desde, "%Y-%m-%d"),
+                datetime.strptime(hasta, "%Y-%m-%d").replace(hour=23, minute=59, second=59))
+    if periodo == "dia":
+        return inicio_dia_local(), hoy
+    if periodo == "semana":
+        return hoy - timedelta(days=7), hoy
+    if periodo == "año":
+        return hoy.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0), hoy
+    return hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0), hoy
+
+
 @router.get("/productos-vendidos")
-async def get_top_products(current_user: dict = Depends(get_current_user)):
+async def get_productos_vendidos(
+    periodo: str = "mes",
+    desde: str = None,
+    hasta: str = None,
+    current_user: dict = Depends(get_current_user),
+):
+    """Todos los productos con lo que se vendió de cada uno en el período
+    (también los que no se vendieron, con 0). Solo ventas completadas."""
     check_permission(current_user["role"], "*")
     db = get_db()
+    fecha_desde, fecha_hasta = _rango(periodo, desde, hasta)
     pipeline = [
-        {"$match": {"estado": "completada"}},
+        {"$match": {"estado": "completada", "fecha": {"$gte": fecha_desde, "$lte": fecha_hasta}}},
         {"$unwind": "$items"},
         {"$group": {
-            "_id": "$items.producto_id",
+            "_id": {"producto": "$items.producto_id", "variante": "$items.variante_nombre"},
             "nombre": {"$first": "$items.nombre_producto"},
-            "cantidad_total": {"$sum": "$items.cantidad"},
-            "total_vendido": {"$sum": "$items.subtotal"}
+            "cantidad": {"$sum": "$items.cantidad"},
+            "total": {"$sum": "$items.subtotal"},
+            "ventas": {"$addToSet": "$_id"},
         }},
-        {"$sort": {"cantidad_total": -1}},
-        {"$limit": 10}
     ]
-    result = await db.ventas.aggregate(pipeline).to_list(10)
-    return result
+    vendidos = {}
+    async for g in db.ventas.aggregate(pipeline):
+        pid = g["_id"]["producto"]
+        fila = vendidos.setdefault(pid, {"nombre": g["nombre"], "cantidad": 0, "total": 0.0, "ventas": set(), "variantes": []})
+        fila["cantidad"] += g["cantidad"]
+        fila["total"] += g["total"] or 0
+        fila["ventas"].update(str(v) for v in g["ventas"])
+        if g["_id"].get("variante"):
+            fila["variantes"].append({"nombre": g["_id"]["variante"], "cantidad": g["cantidad"]})
+
+    categorias = {str(c["_id"]): c["nombre"] async for c in db.categorias.find({}, {"nombre": 1})}
+    resultado = []
+    vistos = set()
+    async for p in db.productos.find({}, {"nombre": 1, "categoria_id": 1, "activo": 1, "stock_actual": 1, "variantes": 1, "tiene_variantes": 1}):
+        pid = str(p["_id"])
+        v = vendidos.get(pid)
+        # Los inactivos aparecen solo si se vendieron en el período
+        if not v and not p.get("activo", True):
+            continue
+        vistos.add(pid)
+        stock_total = (sum(x.get("stock_actual", 0) for x in p.get("variantes") or [])
+                       if p.get("tiene_variantes") else p.get("stock_actual", 0))
+        resultado.append({
+            "id": pid,
+            "nombre": p["nombre"],
+            "categoria": categorias.get(p.get("categoria_id") or "", ""),
+            "activo": p.get("activo", True),
+            "stock": stock_total,
+            "cantidad_total": v["cantidad"] if v else 0,
+            "total_vendido": round(v["total"], 2) if v else 0,
+            "cantidad_ventas": len(v["ventas"]) if v else 0,
+            "variantes": sorted(v["variantes"], key=lambda x: -x["cantidad"]) if v else [],
+        })
+    # Vendidos que ya no existen (producto borrado): igual cuentan
+    for pid, v in vendidos.items():
+        if pid not in vistos:
+            resultado.append({
+                "id": pid, "nombre": v["nombre"], "categoria": "", "activo": False, "stock": None,
+                "cantidad_total": v["cantidad"], "total_vendido": round(v["total"], 2),
+                "cantidad_ventas": len(v["ventas"]),
+                "variantes": sorted(v["variantes"], key=lambda x: -x["cantidad"]),
+            })
+    resultado.sort(key=lambda r: (-r["cantidad_total"], r["nombre"].lower()))
+    return {
+        "desde": fecha_desde.isoformat(),
+        "hasta": fecha_hasta.isoformat(),
+        "productos": resultado,
+    }
 
 @router.get("/rentabilidad")
 async def get_rentabilidad(

@@ -6,7 +6,7 @@ from app.utils.logger import registrar_auditoria
 from bson import ObjectId
 from datetime import datetime
 from app.models.purchase import PurchaseCreate
-from app.utils.stock import validar_sucursal, stock_en, aplicar_delta, descontar_varios
+from app.utils.stock import validar_sucursal, stock_en, aplicar_delta, descontar_varios, marcar_modificado
 from app.utils.cuenta_proveedor import registrar_movimiento, anular_movimiento, redondear
 
 
@@ -96,6 +96,7 @@ async def create_purchase(purchase: PurchaseCreate, current_user: dict = Depends
             "fecha": datetime.utcnow()
         })
         await aplicar_delta(db, item.producto_id, item.variante_nombre, purchase.sucursal, item.cantidad)
+    await marcar_modificado(db, [item.producto_id for item in purchase.items])
     return {"message": "Compra registrada", "numero_compra": numero, "id": str(result.inserted_id),
             "total": datos["total"], "monto_adeudado": adeudado}
 
@@ -146,6 +147,7 @@ async def cancel_purchase(purchase_id: str, current_user: dict = Depends(get_cur
             status_code=409,
             detail="El stock cambió mientras se cancelaba la compra y ya no alcanza para revertirla. Revisá el stock actual.",
         )
+    await marcar_modificado(db, [i["producto_id"] for i in compra.get("items", [])])
     for item in compra.get("items", []):
         await db.stock_movimientos.insert_one({
             "producto_id": item["producto_id"],

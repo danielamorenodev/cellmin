@@ -51,7 +51,9 @@ def format_product(p):
         "stock_sucursal": p["stock_sucursal"],
         "stock_minimo_sucursal": p["stock_minimo_sucursal"],
         "activo": p.get("activo", True),
-        "fecha_creacion": p.get("fecha_creacion")
+        "fecha_creacion": p.get("fecha_creacion"),
+        # Los productos de antes de esta fecha toman la de creación
+        "fecha_modificacion": p.get("fecha_modificacion") or p.get("fecha_creacion"),
     }
 
 @router.get("/")
@@ -90,9 +92,11 @@ async def create_product(product: ProductCreate, current_user: dict = Depends(ge
         datos["stock_minimo_sucursal"] = mapa()
     datos = completar(datos)
     datos["variantes"] = [completar(v) for v in datos["variantes"]]
+    ahora = datetime.utcnow()
     new_product = {
         **datos,
-        "fecha_creacion": datetime.utcnow()
+        "fecha_creacion": ahora,
+        "fecha_modificacion": ahora,
     }
     result = await db.productos.insert_one(new_product)
     new_product["_id"] = result.inserted_id
@@ -138,6 +142,7 @@ async def update_product(product_id: str, product: ProductUpdate, current_user: 
                 v["stock_actual"] = previa["stock_actual"]
             nuevas.append(completar(v))
         update_data["variantes"] = nuevas
+    update_data["fecha_modificacion"] = datetime.utcnow()
     await db.productos.update_one({"_id": ObjectId(product_id)}, {"$set": update_data})
     updated = await db.productos.find_one({"_id": ObjectId(product_id)})
     await _registrar_cambios_de_precio(actual, updated, current_user)
@@ -176,5 +181,5 @@ async def delete_product(product_id: str, current_user: dict = Depends(get_curre
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     nuevo_estado = not producto.get("activo", True)
-    await db.productos.update_one({"_id": ObjectId(product_id)}, {"$set": {"activo": nuevo_estado}})
+    await db.productos.update_one({"_id": ObjectId(product_id)}, {"$set": {"activo": nuevo_estado, "fecha_modificacion": datetime.utcnow()}})
     return {"message": f"Producto {'activado' if nuevo_estado else 'desactivado'} correctamente"}

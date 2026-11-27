@@ -1072,6 +1072,17 @@ function FilaProducto({ producto, categorias, onEdit, onDelete, puedeEditar }) {
         <td className="col-centro px-6 py-4">
           <EstadoStock producto={producto} />
         </td>
+        <td className="col-centro px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
+          {formatDate(producto.fecha_modificacion || producto.fecha_creacion)}
+          {(producto.fecha_modificacion || producto.fecha_creacion) && (
+            <span className="block text-xs text-gray-400">
+              {new Date(producto.fecha_modificacion || producto.fecha_creacion).toLocaleTimeString("es-AR", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+          )}
+        </td>
         <td className="col-acc px-6 py-4 ">
           <div className="flex items-center justify-center gap-1">
             <button
@@ -1099,7 +1110,7 @@ function FilaProducto({ producto, categorias, onEdit, onDelete, puedeEditar }) {
       {/* Fila expandida */}
       {expandido && (
         <tr>
-          <td colSpan={6} className="px-6 pb-4 bg-gray-50">
+          <td colSpan={7} className="px-6 pb-4 bg-gray-50">
             <div className="rounded-xl border border-gray-200 overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-gray-100">
@@ -1625,14 +1636,17 @@ export default function Productos() {
 
   const nombreCategoria = (id) =>
     categorias.find((c) => c.id === id)?.nombre || "";
-  const fechaCreacion = (p) =>
-    p.fecha_creacion ? new Date(p.fecha_creacion).getTime() : null;
+  // Al entrar, primero lo último que se modificó (edición, ingreso, ajuste o remito)
+  const fechaModificacion = (p) => {
+    const f = p.fecha_modificacion || p.fecha_creacion;
+    return f ? new Date(f).getTime() : null;
+  };
 
   const tabla = useTabla(filtered, {
     porPagina: 20,
-    ordenInicial: { campo: "fecha_creacion", dir: "desc" },
+    ordenInicial: { campo: "fecha_modificacion", dir: "desc" },
     accessors: {
-      fecha_creacion: fechaCreacion,
+      fecha_modificacion: fechaModificacion,
       categoria: (p) => nombreCategoria(p.categoria_id),
       precio: getPrecioVenta,
       stock_total: stockTotalProducto,
@@ -1848,6 +1862,7 @@ export default function Productos() {
                       <ThOrdenable campo="precio" tabla={tabla} align="center" className="px-6 py-3">Precio Venta</ThOrdenable>
                       <ThOrdenable campo="stock_total" tabla={tabla} align="center" className="px-6 py-3">Stock total</ThOrdenable>
                       <ThOrdenable campo="estado_stock" tabla={tabla} align="center" className="px-6 py-3">Estado</ThOrdenable>
+                      <ThOrdenable campo="fecha_modificacion" tabla={tabla} align="center" className="px-6 py-3">Modificado</ThOrdenable>
                       <th className="text-center px-6 py-3 text-xs font-medium text-gray-500 uppercase">
                         Acciones
                       </th>
@@ -1896,9 +1911,9 @@ export default function Productos() {
                               (c) => c.id === producto.categoria_id,
                             )?.nombre || "-"}
                           </p>
-                          {producto.fecha_creacion && (
+                          {(producto.fecha_modificacion || producto.fecha_creacion) && (
                             <p className="text-xs text-gray-500">
-                              Creado: {formatDate(producto.fecha_creacion)}
+                              Modificado: {formatDate(producto.fecha_modificacion || producto.fecha_creacion)}
                             </p>
                           )}
                         </div>

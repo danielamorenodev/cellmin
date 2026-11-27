@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models.remito import RemitoCreate
 from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
-from app.utils.stock import validar_sucursal, descontar_varios, aplicar_delta, NOMBRES
+from app.utils.stock import validar_sucursal, descontar_varios, aplicar_delta, NOMBRES, marcar_modificado
 from app.utils.idempotencia import reclamar_clave, guardar_resultado, liberar_clave
 from app.utils.logger import registrar_auditoria
 
@@ -89,6 +89,7 @@ async def crear(datos: RemitoCreate, current_user: dict = Depends(get_current_us
             )
         for i in items:
             await aplicar_delta(db, i["producto_id"], i["variante_nombre"], datos.destino, i["cantidad"])
+        await marcar_modificado(db, [i["producto_id"] for i in items])
 
         contador = await db.contadores.find_one_and_update(
             {"_id": "remitos"}, {"$inc": {"seq": 1}}, upsert=True, return_document=True
