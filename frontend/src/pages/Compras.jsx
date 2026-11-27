@@ -1165,7 +1165,7 @@ function GestionProveedores() {
             ))}
           </div>
 
-          <Paginacion
+          <Paginacion nombre={["proveedor", "proveedores"]}
             total={tabla.total}
             porPagina={tabla.porPagina}
             paginaActual={tabla.pagina}
@@ -1370,7 +1370,7 @@ export default function Compras() {
                 })}
               </div>
 
-          <Paginacion
+          <Paginacion nombre={["ingreso", "ingresos"]}
             total={tabla.total}
             porPagina={tabla.porPagina}
             paginaActual={tabla.pagina}

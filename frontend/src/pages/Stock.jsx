@@ -635,7 +635,7 @@ export default function Stock() {
             )}
           </div>
 
-          <Paginacion
+          <Paginacion nombre={["movimiento", "movimientos"]}
             total={tablaMov.total}
             porPagina={tablaMov.porPagina}
             paginaActual={tablaMov.pagina}

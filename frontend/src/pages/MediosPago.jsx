@@ -303,7 +303,7 @@ export default function MediosPago() {
           )}
         </div>
       )}
-      <Paginacion
+      <Paginacion nombre={["tarjeta", "tarjetas"]}
         total={tabla.total}
         porPagina={tabla.porPagina}
         paginaActual={tabla.pagina}

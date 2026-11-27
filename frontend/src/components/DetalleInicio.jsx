@@ -24,6 +24,12 @@ const DESTINO = { reparaciones: "/reparaciones", ventas: "/ventas", stock: "/pro
 // Lo que hay detrás de cada número del Inicio: se abre debajo de las
 // tarjetas, ya con los datos cargados (así aparece de una sola vez).
 // tipo: reparaciones | ventas | stock; filtro: listas | mias | atrasadas
+const NOMBRES = {
+  reparaciones: ["orden", "órdenes"],
+  ventas: ["venta", "ventas"],
+  stock: ["producto", "productos"],
+};
+
 export default function DetalleInicio({ tipo, filtro, filas: todas, onClose }) {
   const navigate = useNavigate();
   const tabla = useTabla(todas, { porPagina: 10 });
@@ -159,7 +165,7 @@ export default function DetalleInicio({ tipo, filtro, filas: todas, onClose }) {
       )}
       {todas.length > 0 && (
         <div className="px-3">
-          <Paginacion total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
+          <Paginacion nombre={NOMBRES[tipo] || ["registro", "registros"]} total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
         </div>
       )}
     </section>

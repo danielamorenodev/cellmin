@@ -410,7 +410,7 @@ export default function MarcasModelos() {
             ))}
           </div>
 
-          <Paginacion
+          <Paginacion nombre={["marca", "marcas"]}
             total={tabla.total}
             porPagina={tabla.porPagina}
             paginaActual={tabla.pagina}

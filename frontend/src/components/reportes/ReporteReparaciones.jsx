@@ -72,7 +72,7 @@ function Tarjeta({ titulo, valor, detalle, icono: Icono, color }) {
   );
 }
 
-function TablaGrupo({ titulo, filas, onElegir, elegido }) {
+function TablaGrupo({ titulo, filas, onElegir, elegido, nombre }) {
   const tabla = useTabla(filas, { porPagina: 10 });
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-x-auto">
@@ -115,7 +115,7 @@ function TablaGrupo({ titulo, filas, onElegir, elegido }) {
         </tbody>
       </table>
       <div className="px-3">
-        <Paginacion total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
+        <Paginacion nombre={nombre} total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
       </div>
     </div>
   );
@@ -195,14 +195,16 @@ export default function ReporteReparaciones({ periodo, desde: desdeP, hasta: has
 
       <TablaGrupo
         titulo="Por técnico (tocá una fila para ver su historial)"
+        nombre={["técnico", "técnicos"]}
         filas={porTecnico}
         elegido={filtro.tecnico}
         onElegir={(k) => setFiltro({ ...filtro, tecnico: filtro.tecnico === k ? "" : k })}
       />
       <div className="grid gap-4 lg:grid-cols-2">
-        <TablaGrupo titulo="Por sucursal de ingreso" filas={porSucursal} />
+        <TablaGrupo titulo="Por sucursal de ingreso" filas={porSucursal} nombre={["sucursal", "sucursales"]} />
         <TablaGrupo
           titulo="Por quién atendió"
+          nombre={["persona", "personas"]}
           filas={porVendedor}
           elegido={filtro.vendedor}
           onElegir={(k) => setFiltro({ ...filtro, vendedor: filtro.vendedor === k ? "" : k })}
@@ -314,7 +316,7 @@ export default function ReporteReparaciones({ periodo, desde: desdeP, hasta: has
           </table>
         </div>
         <div className="px-3">
-          <Paginacion
+          <Paginacion nombre={["orden", "órdenes"]}
             total={tablaHistorial.total}
             porPagina={tablaHistorial.porPagina}
             paginaActual={tablaHistorial.pagina}

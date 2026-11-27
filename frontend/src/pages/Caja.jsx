@@ -1125,7 +1125,7 @@ function ListadoCajas({ abiertas, esAdmin, miCajaAbierta, onAbrir, onVer }) {
           </div>
         ))}
       </div>
-      <Paginacion
+      <Paginacion nombre={["caja abierta", "cajas abiertas"]}
         total={tabla.total}
         porPagina={tabla.porPagina}
         paginaActual={tabla.pagina}
@@ -1516,7 +1516,7 @@ export default function Caja() {
                       ))}
                     </div>
 
-                    <Paginacion
+                    <Paginacion nombre={["movimiento", "movimientos"]}
                       total={tablaMov.total}
                       porPagina={tablaMov.porPagina}
                       paginaActual={tablaMov.pagina}
@@ -1779,7 +1779,7 @@ export default function Caja() {
               );
             })
           )}
-          <Paginacion
+          <Paginacion nombre={["caja", "cajas"]}
             total={tablaHist.total}
             porPagina={tablaHist.porPagina}
             paginaActual={tablaHist.pagina}

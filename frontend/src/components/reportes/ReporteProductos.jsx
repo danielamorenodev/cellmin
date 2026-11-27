@@ -142,7 +142,7 @@ export default function ReporteProductos({ datos }) {
           </div>
         )}
       </div>
-      <Paginacion total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
+      <Paginacion nombre={["producto", "productos"]} total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
     </div>
   );
 }

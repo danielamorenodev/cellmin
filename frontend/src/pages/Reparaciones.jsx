@@ -392,7 +392,7 @@ function SelectorTipos({ tiposDisponibles, tiposSeleccionados, onToggle, onCrear
           })
         )}
       </div>
-      <Paginacion
+      <Paginacion nombre={["tipo", "tipos"]}
         total={tiposFiltrados.length}
         porPagina={POR_PAGINA}
         paginaActual={pagina}
@@ -2610,7 +2610,7 @@ function GestionTiposReparacion() {
             ))}
           </div>
 
-          <Paginacion
+          <Paginacion nombre={["tipo de reparación", "tipos de reparación"]}
             total={tabla.total}
             porPagina={tabla.porPagina}
             paginaActual={tabla.pagina}
@@ -3060,7 +3060,7 @@ export default function Reparaciones() {
                 ))}
               </div>
 
-              <Paginacion
+              <Paginacion nombre={["orden", "órdenes"]}
                 total={tabla.total}
                 porPagina={tabla.porPagina}
                 paginaActual={tabla.pagina}

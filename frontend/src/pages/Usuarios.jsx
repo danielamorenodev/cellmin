@@ -520,7 +520,7 @@ export default function Usuarios() {
             })}
           </div>
 
-          <Paginacion
+          <Paginacion nombre={["usuario", "usuarios"]}
             total={tabla.total}
             porPagina={tabla.porPagina}
             paginaActual={tabla.pagina}

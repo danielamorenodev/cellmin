@@ -198,7 +198,7 @@ export default function RegistroActividad() {
               </tbody>
             </table>
           </div>
-          <Paginacion total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
+          <Paginacion nombre={["registro", "registros"]} total={tabla.total} porPagina={tabla.porPagina} paginaActual={tabla.pagina} onChange={tabla.setPagina} />
         </>
       )}
     </div>

@@ -391,7 +391,7 @@ export default function Remitos() {
               </tbody>
             </table>
           </div>
-          <Paginacion
+          <Paginacion nombre={["remito", "remitos"]}
             total={tabla.total}
             porPagina={tabla.porPagina}
             paginaActual={tabla.pagina}

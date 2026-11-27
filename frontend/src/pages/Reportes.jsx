@@ -425,7 +425,7 @@ export default function Reportes() {
                   </tbody>
                 </table>
                 <div className="px-4">
-                  <Paginacion
+                  <Paginacion nombre={["vendedor", "vendedores"]}
                     total={tablaVendedores.total}
                     porPagina={tablaVendedores.porPagina}
                     paginaActual={tablaVendedores.pagina}
@@ -665,7 +665,7 @@ export default function Reportes() {
                     </tbody>
                   </table>
                   <div className="px-4">
-                    <Paginacion
+                    <Paginacion nombre={["producto", "productos"]}
                       total={tablaStockBajo.total}
                       porPagina={tablaStockBajo.porPagina}
                       paginaActual={tablaStockBajo.pagina}

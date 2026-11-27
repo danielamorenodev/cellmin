@@ -1471,7 +1471,7 @@ function GestionCategorias({ onCambio }) {
             ))}
           </div>
 
-          <Paginacion
+          <Paginacion nombre={["categoría", "categorías"]}
             total={tabla.total}
             porPagina={tabla.porPagina}
             paginaActual={tabla.pagina}
@@ -1956,7 +1956,7 @@ export default function Productos() {
                 ))}
               </div>
 
-              <Paginacion
+              <Paginacion nombre={["producto", "productos"]}
                 total={tabla.total}
                 porPagina={tabla.porPagina}
                 paginaActual={tabla.pagina}

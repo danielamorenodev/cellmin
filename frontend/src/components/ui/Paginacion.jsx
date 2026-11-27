@@ -5,9 +5,13 @@ export default function Paginacion({
   paginaActual,
   onChange,
   compacto = false,
+  // Qué se cuenta: ["venta", "ventas"] → "Mostrando 1–20 de 200 ventas"
+  nombre = ["registro", "registros"],
 }) {
   const totalPaginas = Math.ceil(total / porPagina);
-  if (totalPaginas <= 1) return null;
+  // El contador se ve siempre que haya algo; los botones, solo con más de una página
+  if (!total) return null;
+  const [singular, plural] = nombre;
 
   const paginas = [];
   const rango = 2;
@@ -39,9 +43,11 @@ export default function Paginacion({
       }`}
     >
       <p className="text-sm text-gray-500">
-        Mostrando {Math.min((paginaActual - 1) * porPagina + 1, total)} —{" "}
-        {Math.min(paginaActual * porPagina, total)} de {total}
+        Mostrando {Math.min((paginaActual - 1) * porPagina + 1, total)}–{Math.min(paginaActual * porPagina, total)} de{" "}
+        <span className="font-medium text-gray-700">{total.toLocaleString("es-AR")}</span>{" "}
+        {total === 1 ? singular : plural}
       </p>
+      {totalPaginas > 1 && (
       <div className="flex items-center gap-1">
         <button
           onClick={() => onChange(paginaActual - 1)}
@@ -77,6 +83,7 @@ export default function Paginacion({
           <ChevronRight size={16} />
         </button>
       </div>
+      )}
     </div>
   );
 }

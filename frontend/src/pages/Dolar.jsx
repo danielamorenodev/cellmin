@@ -333,7 +333,7 @@ export default function Dolar() {
           </table>
         )}
         <div className="px-4">
-          <Paginacion
+          <Paginacion nombre={["cambio del dólar", "cambios del dólar"]}
             total={tabla.total}
             porPagina={tabla.porPagina}
             paginaActual={tabla.pagina}

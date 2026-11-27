@@ -2225,7 +2225,7 @@ export default function Ventas() {
             ))}
           </div>
 
-          <Paginacion
+          <Paginacion nombre={["venta", "ventas"]}
             total={tabla.total}
             porPagina={tabla.porPagina}
             paginaActual={tabla.pagina}
