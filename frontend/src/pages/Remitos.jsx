@@ -12,6 +12,7 @@ import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import { useTabla } from "../hooks/useTabla";
+import { useSucursales } from "../hooks/useSucursales";
 import { SUCURSALES, formatDateTime, nombreSucursal, stockEn, mensajeError } from "../utils/helpers";
 
 const CAMPO =
@@ -22,7 +23,9 @@ const otraSucursal = (s) => SUCURSALES.find((o) => o.value !== s)?.value || "";
 
 function NuevoRemitoModal({ onClose, onSave }) {
   const [productos, setProductos] = useState([]);
-  const [origen, setOrigen] = useState(SUCURSALES[0].value);
+  // Envía: solo una sucursal asignada al usuario (el admin, cualquiera)
+  const { opciones: sucursalesPropias, porDefecto } = useSucursales();
+  const [origen, setOrigen] = useState(porDefecto);
   const [items, setItems] = useState([]);
   const [notas, setNotas] = useState("");
   const [loading, setLoading] = useState(false);
@@ -129,7 +132,7 @@ function NuevoRemitoModal({ onClose, onSave }) {
                   onChange={(e) => setOrigen(e.target.value)}
                   className={CAMPO}
                 >
-                  {SUCURSALES.map((s) => (
+                  {sucursalesPropias.map((s) => (
                     <option key={s.value} value={s.value}>
                       {s.label}
                     </option>

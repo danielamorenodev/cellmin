@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.remito import RemitoCreate
 from app.utils.auth import get_current_user
 from app.utils.permissions import check_permission
+from app.utils.cajas import puede_sucursal
 from app.utils.stock import validar_sucursal, descontar_varios, aplicar_delta, NOMBRES, marcar_modificado
 from app.utils.idempotencia import reclamar_clave, guardar_resultado, liberar_clave
 from app.utils.logger import registrar_auditoria
@@ -44,6 +45,8 @@ async def crear(datos: RemitoCreate, current_user: dict = Depends(get_current_us
     db = get_db()
     validar_sucursal(datos.origen)
     validar_sucursal(datos.destino)
+    if not puede_sucursal(current_user, datos.origen):
+        raise HTTPException(status_code=403, detail="Solo podés enviar mercadería desde tus sucursales asignadas")
     if datos.origen == datos.destino:
         raise HTTPException(status_code=400, detail="La sucursal de origen y la de destino tienen que ser distintas")
     if not datos.items:

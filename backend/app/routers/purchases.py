@@ -6,6 +6,7 @@ from app.utils.logger import registrar_auditoria
 from bson import ObjectId
 from datetime import datetime
 from app.models.purchase import PurchaseCreate
+from app.utils.cajas import puede_sucursal
 from app.utils.stock import validar_sucursal, stock_en, aplicar_delta, descontar_varios, marcar_modificado
 from app.utils.cuenta_proveedor import registrar_movimiento, anular_movimiento, redondear
 
@@ -44,6 +45,8 @@ async def create_purchase(purchase: PurchaseCreate, current_user: dict = Depends
     check_permission(current_user["role"], "compras:create")
     db = get_db()
     validar_sucursal(purchase.sucursal)
+    if not puede_sucursal(current_user, purchase.sucursal):
+        raise HTTPException(status_code=403, detail="Solo podés cargar mercadería en tus sucursales asignadas")
     # Validar todo ANTES de registrar: proveedor, productos y cantidades
     if not ObjectId.is_valid(purchase.proveedor_id) or not await db.proveedores.find_one({"_id": ObjectId(purchase.proveedor_id)}):
         raise HTTPException(status_code=400, detail="Elegí un proveedor válido")
@@ -115,6 +118,8 @@ async def cancel_purchase(purchase_id: str, current_user: dict = Depends(get_cur
         raise HTTPException(status_code=400, detail="La compra ya está cancelada")
 
     sucursal = compra.get("sucursal", "sucursal_1")
+    if not puede_sucursal(current_user, sucursal):
+        raise HTTPException(status_code=403, detail="Solo podés anular ingresos de tus sucursales asignadas")
 
     # Primero verificamos que haya stock suficiente para revertir todos los ítems
     for item in compra.get("items", []):
