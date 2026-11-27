@@ -238,7 +238,7 @@ export const GUIAS = [
     "bloques": [
       {
         "pasos": [
-          "Entrá a **Ventas** y presioná **Nueva venta** (o usá el acceso **Nueva venta** de Inicio). Si la caja está cerrada, aparece el aviso **Abrí la caja para vender** con el botón **Abrir caja**: al abrirla, el sistema vuelve solo a Ventas con la venta lista para cargar.",
+          "Entrá a **Ventas** y presioná **Nueva venta** (o usá el acceso **Nueva venta** de Inicio). El administrador que no abrió una caja vende en la caja abierta de la sucursal que elija arriba (si hay una sola abierta, ya queda elegida): el dinero entra en la caja de esa sucursal y la venta queda a su nombre. Si la caja está cerrada, aparece el aviso **Abrí la caja para vender** con el botón **Abrir caja**: al abrirla, el sistema vuelve solo a Ventas con la venta lista para cargar.",
           "Escaneá el producto con el lector o buscalo por nombre: ves el stock de tu sucursal. Repetí para cada producto.",
           "Si vendés un celular, debajo aparece el campo **IMEI**: escanealo de la caja o del equipo, o escribí los 15 números (en el celular se ve marcando *#06#). Si llevás dos unidades, aparece un campo por cada una. El campo se pone verde cuando el IMEI es válido; sin todos los IMEI no se puede confirmar la venta.",
           "En **Vendió**, dejá tu nombre o elegí el vendedor que atendió al cliente.",

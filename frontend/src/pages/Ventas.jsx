@@ -44,7 +44,7 @@ import {
   parsearMetodoPago,
   stockEn,
   recargoTarjeta,
-  MEDIOS_UNICOS, mensajeError, fechaLocal } from "../utils/helpers";
+  MEDIOS_UNICOS, mensajeError, fechaLocal, SUCURSALES } from "../utils/helpers";
 import CamposTarjeta from "../components/ui/CamposTarjeta";
 import { useTarjetas } from "../hooks/useTarjetas";
 import { usePersonal } from "../hooks/usePersonal";
@@ -1286,7 +1286,7 @@ function FilaVenta({
             : "Consumidor final"}
         </td>
         <td className="hidden xl:table-cell px-6 py-4 text-sm  text-gray-600">
-          {venta.sucursal === "sucursal_1" ? "Sucursal 1" : "Sucursal 2"}
+          {nombreSucursal(venta.sucursal)}
           {venta.vendedor_nombre && (
             <span className="block text-xs text-gray-500">Vendió: {venta.vendedor_nombre}</span>
           )}
@@ -1453,7 +1453,7 @@ function CardVentaMobile({
           <div className="flex items-center gap-2 flex-wrap">
             <BadgePago metodoPago={venta.metodo_pago} />
             <span className="text-xs text-gray-500">
-              {venta.sucursal === "sucursal_1" ? "Sucursal 1" : "Sucursal 2"}
+              {nombreSucursal(venta.sucursal)}
               {venta.vendedor_nombre && ` · ${venta.vendedor_nombre}`}
             </span>
           </div>
@@ -1655,6 +1655,11 @@ export default function Ventas() {
   const { opciones: sucursalesOpc } = useSucursales();
   // El vendedor vende en la caja abierta de su sucursal (el cajero, en la suya)
   const esVendedor = user?.rol === "vendedor";
+  // El admin vende en su caja; si no abrió ninguna, en la caja abierta de la
+  // sucursal que elija (como un vendedor de las dos sucursales)
+  const esAdmin = user?.rol === "administrador";
+  const [adminSinCaja, setAdminSinCaja] = useState(false);
+  const eligeSucursal = (esVendedor && user?.sucursales?.length > 1) || (esAdmin && adminSinCaja);
   const [sucursalVendedor, setSucursalVendedor] = useState(
     user?.sucursales?.length === 1 ? user.sucursales[0] : "",
   );
@@ -1701,11 +1706,21 @@ export default function Ventas() {
   // Caja en la que se va a registrar la venta
   const cargarCaja = async (sucursal = sucursalVendedor) => {
     try {
-      const caja = esVendedor
-        ? sucursal || user?.sucursales?.length === 1
-          ? await cajaService.getParaVender(sucursal || undefined)
-          : { estado: "cerrada", motivo: "Elegí la sucursal en la que vas a vender." }
-        : await cajaService.getActual();
+      let caja;
+      if (esVendedor) {
+        caja =
+          sucursal || user?.sucursales?.length === 1
+            ? await cajaService.getParaVender(sucursal || undefined)
+            : { estado: "cerrada", motivo: "Elegí la sucursal en la que vas a vender." };
+      } else {
+        caja = await cajaService.getActual();
+        if (esAdmin) {
+          setAdminSinCaja(caja?.estado !== "abierta");
+          if (caja?.estado !== "abierta") caja = await cajaService.getParaVender(sucursal || undefined);
+          // Con una sola caja abierta se usa esa: se muestra elegida
+          if (caja?.estado === "abierta" && !sucursal) setSucursalVendedor(caja.sucursal);
+        }
+      }
       setCajaAbierta(caja?.estado === "abierta");
       setCajaActual(caja);
       setMotivoCaja(caja?.motivo || "");
@@ -1868,7 +1883,7 @@ export default function Ventas() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-        {esVendedor && user?.sucursales?.length > 1 && (
+        {eligeSucursal && (
           <select
             value={sucursalVendedor}
             onChange={(e) => {
@@ -2098,8 +2113,11 @@ export default function Ventas() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Todas</option>
-                <option value="sucursal_1">Sucursal 1</option>
-                <option value="sucursal_2">Sucursal 2</option>
+                {SUCURSALES.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div>

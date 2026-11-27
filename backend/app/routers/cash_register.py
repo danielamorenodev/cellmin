@@ -414,4 +414,13 @@ async def get_cash_history(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "caja:read")
     db = get_db()
     cajas = await db.cajas.find().sort("fecha_apertura", -1).to_list(1000)
-    return [{**c, "_id": str(c["_id"])} for c in cajas]
+    # Quién la abrió y quién la cerró, con nombre
+    ids = {c.get(k) for c in cajas for k in ("usuario_apertura_id", "usuario_cierre_id")}
+    oids = [ObjectId(i) for i in ids if i and ObjectId.is_valid(i)]
+    nombres = {str(u["_id"]): u["nombre"] async for u in db.usuarios.find({"_id": {"$in": oids}}, {"nombre": 1})}
+    return [{
+        **c,
+        "_id": str(c["_id"]),
+        "usuario_apertura_nombre": nombres.get(c.get("usuario_apertura_id")),
+        "usuario_cierre_nombre": nombres.get(c.get("usuario_cierre_id")),
+    } for c in cajas]

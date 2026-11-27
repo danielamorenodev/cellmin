@@ -1234,8 +1234,13 @@ export default function Caja() {
     .filter((c) => c.estado === "cerrada")
     .filter((c) => {
       if (!busquedaHistorial) return true;
-      const fecha = c.fecha_apertura ? formatDateTime(c.fecha_apertura) : "";
-      return fecha.toLowerCase().includes(busquedaHistorial.toLowerCase());
+      const texto = [
+        c.fecha_apertura ? formatDateTime(c.fecha_apertura) : "",
+        nombreSucursal(c.sucursal || "sucursal_1"),
+        c.usuario_apertura_nombre,
+        c.usuario_cierre_nombre,
+      ].join(" ");
+      return texto.toLowerCase().includes(busquedaHistorial.toLowerCase());
     });
 
   const tablaMov = useTabla(caja?.movimientos_completos || [], {
@@ -1539,7 +1544,7 @@ export default function Caja() {
             />
             <input
               type="text"
-              placeholder="Buscar por fecha..."
+              placeholder="Buscar por fecha, sucursal o persona..."
               value={busquedaHistorial}
               onChange={(e) => setBusquedaHistorial(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1569,8 +1574,11 @@ export default function Caja() {
                           : "-"}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Cerrada:{" "}
-                        {c.fecha_cierre ? formatDateTime(c.fecha_cierre) : "-"}
+                        {nombreSucursal(c.sucursal || "sucursal_1")} · Abrió: {c.usuario_apertura_nombre || "—"}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Cerrada: {c.fecha_cierre ? formatDateTime(c.fecha_cierre) : "-"}
+                        {c.usuario_cierre_nombre ? ` por ${c.usuario_cierre_nombre}` : ""}
                       </p>
                     </div>
                   </div>

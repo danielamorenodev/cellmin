@@ -91,10 +91,31 @@ async def exigir_caja_propia(db, user, para="registrar esta operación"):
 async def caja_para_vender(db, user, sucursal=None):
     """Caja en la que este usuario registra una venta.
 
-    - Cajero (o administrador): solo en la caja que abrió él.
+    - Cajero: solo en la caja que abrió él.
     - Vendedor: en la caja abierta de la sucursal a la que pertenece. Si
       pertenece a las dos, tiene que indicar cuál.
+    - Administrador: en la caja que abrió él; si no abrió ninguna, como un
+      vendedor de las dos sucursales (en la caja abierta de la que elija; si
+      hay una sola abierta, en esa).
     """
+    if es_admin(user):
+        propia = await caja_propia(db, user)
+        if propia:
+            return propia
+        if sucursal is None:
+            abiertas = await db.cajas.find({"estado": "abierta"}).to_list(None)
+            if len(abiertas) == 1:
+                return abiertas[0]
+            if not abiertas:
+                raise HTTPException(status_code=400, detail="No hay ninguna caja abierta. Abrí una caja para vender.")
+            raise HTTPException(status_code=400, detail="Hay cajas abiertas en las dos sucursales: elegí en cuál vas a vender.")
+        from app.utils.stock import validar_sucursal
+        validar_sucursal(sucursal)
+        caja = await db.cajas.find_one({"estado": "abierta", "sucursal": sucursal})
+        if not caja:
+            raise HTTPException(status_code=400, detail=f"No hay una caja abierta en {nombre_sucursal(sucursal)}.")
+        return caja
+
     if user.get("role") != "vendedor":
         return await exigir_caja_propia(db, user, "registrar ventas")
 
