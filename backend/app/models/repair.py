@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -27,7 +27,7 @@ class Sena(BaseModel):
 class TipoReparacionItem(BaseModel):
     tipo_id: str
     nombre: str
-    precio: float
+    precio: float = Field(ge=0)
 
 class Pago(BaseModel):
     monto: float
@@ -45,7 +45,7 @@ class RepairCreate(BaseModel):
     tipos_reparacion: List[TipoReparacionItem] = []
     sucursal: str = "sucursal_1"
     notas_internas: Optional[str] = None
-    garantia_dias: int = 90
+    garantia_dias: int = Field(default=90, ge=0, le=3650)
     estado: str = "en_diagnostico"
     sena: Optional[Sena] = None
     # Enviar la orden por email al crearla (al email escrito o al del cliente)
@@ -61,7 +61,7 @@ class RepairUpdate(BaseModel):
     tipos_reparacion: Optional[List[TipoReparacionItem]] = None
     notas_internas: Optional[str] = None
     tecnico_id: Optional[str] = None
-    garantia_dias: Optional[int] = None
+    garantia_dias: Optional[int] = Field(default=None, ge=0, le=3650)
     fecha_estimada_entrega: Optional[str] = None  # "AAAA-MM-DD"
 
 class RepairResponse(BaseModel):

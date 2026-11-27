@@ -6,22 +6,35 @@ from app.utils.permissions import check_permission
 from bson import ObjectId
 from datetime import datetime
 from app.utils.logger import registrar_auditoria
+from app.utils.cajas import rango_periodo
 from app.utils.stock import completar, stock_en, minimo_en, validar_sucursal, aplicar_delta, descontar_stock, bajo_minimo, SUCURSALES, marcar_modificado
 
 router = APIRouter()
 
 @router.get("/")
-async def get_stock(current_user: dict = Depends(get_current_user)):
+async def get_stock(
+    desde: str = None,
+    hasta: str = None,
+    limite: int = 2000,
+    current_user: dict = Depends(get_current_user),
+):
+    """Movimientos de stock, de los más nuevos. Con fechas (AAAA-MM-DD) busca
+    en todo el historial; sin fechas trae los últimos `limite`."""
     check_permission(current_user["role"], "stock:read")
     db = get_db()
-    movements = await db.stock_movimientos.find().sort("fecha", -1).to_list(500)
+    filtro = {}
+    if desde or hasta:
+        inicio, fin = rango_periodo(None, desde, hasta)
+        filtro["fecha"] = {"$gte": inicio, "$lte": fin}
+    limite = max(1, min(limite, 20000))
+    movements = await db.stock_movimientos.find(filtro).sort("fecha", -1).limit(limite).to_list(None)
     return [{**m, "_id": str(m["_id"])} for m in movements]
 
 @router.get("/productos")
 async def get_stock_productos(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "stock:read")
     db = get_db()
-    products = await db.productos.find({"activo": True}).to_list(1000)
+    products = await db.productos.find({"activo": True}).to_list(None)
     result = []
     for p in products:
         p = completar(dict(p))

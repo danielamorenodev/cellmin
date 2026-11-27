@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { mensajeError } from "../utils/helpers";
 import { Eye, EyeOff, KeyRound } from "lucide-react";
 import toast from "react-hot-toast";
 import { authService } from "../services/auth.service";
@@ -58,7 +59,7 @@ export default function CambiarClaveModal({ usuario = null, onClose }) {
       }
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "No se pudo cambiar la contraseña");
+      toast.error(mensajeError(err, "No se pudo cambiar la contraseña"));
     } finally {
       setGuardando(false);
     }

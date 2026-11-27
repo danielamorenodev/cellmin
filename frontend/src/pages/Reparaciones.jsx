@@ -510,7 +510,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
       toast.success(`Marca «${m.nombre}» creada`);
       return m.nombre;
     } catch (error) {
-      toast.error(error.response?.data?.detail || "No se pudo crear la marca");
+      toast.error(mensajeError(error, "No se pudo crear la marca"));
       return null;
     }
   };
@@ -522,7 +522,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
       toast.success(`Modelo «${nombre}» agregado a ${m.nombre}`);
       return nombre;
     } catch (error) {
-      toast.error(error.response?.data?.detail || "No se pudo crear el modelo");
+      toast.error(mensajeError(error, "No se pudo crear el modelo"));
       return null;
     }
   };
@@ -659,7 +659,7 @@ function NuevaReparacionModal({ onClose, onSave, cajaAbierta, userRol }) {
         );
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al crear la orden");
+      toast.error(mensajeError(error, "Error al crear la orden"));
     } finally {
       setLoading(false);
     }
@@ -1453,7 +1453,7 @@ function PagoModal({ reparacion, onClose, onSave }) {
       );
       onSave();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al registrar pago");
+      toast.error(mensajeError(error, "Error al registrar pago"));
     } finally {
       setLoading(false);
     }
@@ -2745,7 +2745,7 @@ export default function Reparaciones() {
         if (avisar) abrirWhatsApp({ ...r, estado: "lista" }, "listo");
       }
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al actualizar");
+      toast.error(mensajeError(error, "Error al actualizar"));
     }
   };
 
@@ -2827,7 +2827,7 @@ export default function Reparaciones() {
       );
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al cancelar");
+      toast.error(mensajeError(error, "Error al cancelar"));
     }
   };
 

@@ -29,15 +29,17 @@ def format_client(c):
 
 @router.get("/")
 async def get_clients(current_user: dict = Depends(get_current_user)):
+    check_permission(current_user["role"], "clientes:read")
     db = get_db()
     if current_user["role"] == "administrador":
-        clients = await db.clientes.find().to_list(500)
+        clients = await db.clientes.find().to_list(None)
     else:
-        clients = await db.clientes.find({"activo": True}).to_list(500)
+        clients = await db.clientes.find({"activo": True}).to_list(None)
     return [format_client(c) for c in clients]
 
 @router.get("/{client_id}")
 async def get_client(client_id: str, current_user: dict = Depends(get_current_user)):
+    check_permission(current_user["role"], "clientes:read")
     db = get_db()
     client = await db.clientes.find_one({"_id": _oid(client_id)})
     if not client:

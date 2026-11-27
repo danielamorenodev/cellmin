@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { cotizacionService } from "../services/cotizacion.service";
 import { useCotizacion, refrescarCotizacion } from "../hooks/useCotizacion";
 import InputNumero from "../components/ui/InputNumero";
-import { formatCurrency, formatDateTime } from "../utils/helpers";
+import { formatCurrency, formatDateTime, mensajeError } from "../utils/helpers";
 import { useTabla } from "../hooks/useTabla";
 import Paginacion from "../components/ui/Paginacion";
 
@@ -39,7 +39,7 @@ export default function Dolar() {
     try {
       setExterna(await cotizacionService.consultarInfodolar());
     } catch (error) {
-      setExterna({ error: error.response?.data?.detail || "No se pudo consultar InfoDolar" });
+      setExterna({ error: mensajeError(error, "No se pudo consultar InfoDolar") });
     } finally {
       setConsultando(false);
     }
@@ -56,7 +56,7 @@ export default function Dolar() {
           : `Dólar actualizado con el blue de Córdoba (${cual}): ${formatCurrency(r.venta)}`,
       );
     } catch (error) {
-      toast.error(error.response?.data?.detail || "No se pudo usar el valor de InfoDolar");
+      toast.error(mensajeError(error, "No se pudo usar el valor de InfoDolar"));
     }
   };
 
@@ -69,7 +69,7 @@ export default function Dolar() {
           : "Actualización automática desactivada: el valor se carga a mano",
       );
     } catch (error) {
-      toast.error(error.response?.data?.detail || "No se pudo cambiar la configuración");
+      toast.error(mensajeError(error, "No se pudo cambiar la configuración"));
     }
   };
 
@@ -102,7 +102,7 @@ export default function Dolar() {
       setValor("");
       toast.success("Dólar actualizado. Los precios en USD ya se recalcularon.");
     } catch (error) {
-      toast.error(error.response?.data?.detail || "No se pudo guardar el valor");
+      toast.error(mensajeError(error, "No se pudo guardar el valor"));
     } finally {
       setGuardando(false);
     }

@@ -56,13 +56,18 @@ def format_product(p):
         "fecha_modificacion": p.get("fecha_modificacion") or p.get("fecha_creacion"),
     }
 
+async def _validar_categoria(db, categoria_id):
+    if not categoria_id or not ObjectId.is_valid(categoria_id) or not await db.categorias.find_one({"_id": ObjectId(categoria_id)}):
+        raise HTTPException(status_code=400, detail="Elegí una categoría válida")
+
+
 @router.get("/")
 async def get_products(current_user: dict = Depends(get_current_user)):
     db = get_db()
     if current_user["role"] in ["administrador", "deposito"]:
-        products = await db.productos.find().to_list(1000)
+        products = await db.productos.find().to_list(None)
     else:
-        products = await db.productos.find({"activo": True}).to_list(1000)
+        products = await db.productos.find({"activo": True}).to_list(None)
     return [format_product(p) for p in products]
 
 @router.get("/{product_id}")
@@ -90,6 +95,7 @@ async def create_product(product: ProductCreate, current_user: dict = Depends(ge
     if datos["tiene_variantes"]:
         datos["stock_sucursal"] = mapa()
         datos["stock_minimo_sucursal"] = mapa()
+    await _validar_categoria(db, datos.get("categoria_id"))
     datos = completar(datos)
     datos["variantes"] = [completar(v) for v in datos["variantes"]]
     ahora = datetime.utcnow()
@@ -116,6 +122,8 @@ async def update_product(product_id: str, product: ProductUpdate, current_user: 
         if existing:
             raise HTTPException(status_code=400, detail=f"Ya existe un producto con el nombre '{product.nombre}'")
     update_data = {k: v for k, v in product.model_dump().items() if v is not None}
+    if "categoria_id" in update_data:
+        await _validar_categoria(db, update_data["categoria_id"])
     actual = await db.productos.find_one({"_id": ObjectId(product_id)})
     if not actual:
         raise HTTPException(status_code=404, detail="Producto no encontrado")

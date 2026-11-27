@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -6,16 +6,25 @@ class Variante(BaseModel):
     nombre: str
     sku: Optional[str] = None
     codigo_barras: Optional[str] = None
-    precio_costo: float
-    precio_venta: float
+    precio_costo: float = Field(ge=0)
+    precio_venta: float = Field(ge=0)
     # Si el producto tiene el precio en dólares: los valores en US$
-    precio_costo_usd: Optional[float] = None
-    precio_venta_usd: Optional[float] = None
+    precio_costo_usd: Optional[float] = Field(default=None, ge=0)
+    precio_venta_usd: Optional[float] = Field(default=None, ge=0)
     stock_actual: int = 0
     stock_minimo: int = 0
     # Stock y mínimo de cada sucursal: {"sucursal_1": 5, "sucursal_2": 0}
     stock_sucursal: Optional[Dict[str, int]] = None
     stock_minimo_sucursal: Optional[Dict[str, int]] = None
+
+    @field_validator("nombre")
+    @classmethod
+    def nombre_completo(cls, v):
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Escribí el nombre")
+        return v.strip()
 
 class ProductCreate(BaseModel):
     nombre: str
@@ -25,19 +34,28 @@ class ProductCreate(BaseModel):
     unidad_medida: str
     tiene_variantes: bool = False
     variantes: List[Variante] = []
-    precio_costo: Optional[float] = None
-    precio_venta: Optional[float] = None
+    precio_costo: Optional[float] = Field(default=None, ge=0)
+    precio_venta: Optional[float] = Field(default=None, ge=0)
     # Precio en dólares: el precio en pesos se recalcula cada vez que cambia
     # el dólar. En pesos (False) queda fijo, por ejemplo en fundas.
     precio_en_usd: bool = False
-    precio_costo_usd: Optional[float] = None
-    precio_venta_usd: Optional[float] = None
+    precio_costo_usd: Optional[float] = Field(default=None, ge=0)
+    precio_venta_usd: Optional[float] = Field(default=None, ge=0)
     stock_actual: Optional[int] = 0
     stock_minimo: Optional[int] = 0
     stock_sucursal: Optional[Dict[str, int]] = None
     stock_minimo_sucursal: Optional[Dict[str, int]] = None
     pide_imei: bool = False  # celulares: al venderlo hay que cargar el IMEI de cada unidad
     activo: bool = True
+
+    @field_validator("nombre")
+    @classmethod
+    def nombre_completo(cls, v):
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Escribí el nombre")
+        return v.strip()
 
 class ProductUpdate(BaseModel):
     nombre: Optional[str] = None
@@ -48,14 +66,23 @@ class ProductUpdate(BaseModel):
     tiene_variantes: Optional[bool] = None
     pide_imei: Optional[bool] = None
     variantes: Optional[List[Variante]] = None
-    precio_costo: Optional[float] = None
-    precio_venta: Optional[float] = None
+    precio_costo: Optional[float] = Field(default=None, ge=0)
+    precio_venta: Optional[float] = Field(default=None, ge=0)
     precio_en_usd: Optional[bool] = None
-    precio_costo_usd: Optional[float] = None
-    precio_venta_usd: Optional[float] = None
+    precio_costo_usd: Optional[float] = Field(default=None, ge=0)
+    precio_venta_usd: Optional[float] = Field(default=None, ge=0)
     stock_minimo: Optional[int] = None
     stock_minimo_sucursal: Optional[Dict[str, int]] = None
     activo: Optional[bool] = None
+
+    @field_validator("nombre")
+    @classmethod
+    def nombre_completo(cls, v):
+        if v is None:
+            return v
+        if not v.strip():
+            raise ValueError("Escribí el nombre")
+        return v.strip()
 
 class ProductResponse(BaseModel):
     id: str

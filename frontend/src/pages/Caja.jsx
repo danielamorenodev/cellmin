@@ -31,8 +31,7 @@ import {
   formatDateTime,
   formatUSD,
   nombreSucursal,
-  parsearMoneda,
-} from "../utils/helpers";
+  parsearMoneda, mensajeError } from "../utils/helpers";
 
 // Separa los movimientos de la caja por origen, para no mezclar las
 // cancelaciones de ventas con los movimientos hechos a mano
@@ -145,7 +144,7 @@ function AbrirCajaModal({ onClose, onSave }) {
       toast.success("Caja abierta correctamente");
       onSave();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al abrir la caja");
+      toast.error(mensajeError(error, "Error al abrir la caja"));
     } finally {
       setLoading(false);
     }
@@ -398,7 +397,7 @@ function CerrarCajaModal({ caja, onClose, onSave }) {
       toast.success("Caja cerrada correctamente");
       onSave(result);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al cerrar la caja");
+      toast.error(mensajeError(error, "Error al cerrar la caja"));
     } finally {
       setLoading(false);
     }
@@ -694,7 +693,7 @@ function MovimientoModal({ onClose, onSave }) {
       onSave();
     } catch (error) {
       toast.error(
-        error.response?.data?.detail || "Error al registrar movimiento",
+        mensajeError(error, "Error al registrar movimiento"),
       );
     } finally {
       setLoading(false);
@@ -1206,7 +1205,7 @@ export default function Caja() {
       if (accion === "cerrar") setShowCerrarModal(true);
       if (accion === "movimiento") setShowMovimientoModal(true);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "No se pudo abrir la caja");
+      toast.error(mensajeError(error, "No se pudo abrir la caja"));
       fetchData(null);
     }
   };

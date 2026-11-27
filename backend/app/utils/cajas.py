@@ -35,6 +35,36 @@ def inicio_dia_local(momento=None):
     return local.astimezone(timezone.utc).replace(tzinfo=None)
 
 
+def a_utc(local: datetime) -> datetime:
+    """Hora argentina (sin zona) -> UTC sin zona, como se guardan las fechas."""
+    return local.replace(tzinfo=ZONA_AR).astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def rango_periodo(periodo: str = "mes", desde: str | None = None, hasta: str | None = None):
+    """Desde/hasta (UTC sin zona) de un período de los reportes, contado en
+    horario argentino: "mes" arranca el día 1 a las 00:00 de acá, y un rango
+    AAAA-MM-DD incluye el día "hasta" completo (hasta las 23:59 de acá)."""
+    ahora = datetime.utcnow()
+    if desde or hasta:
+        try:
+            inicio = a_utc(datetime.strptime(desde, "%Y-%m-%d")) if desde else datetime(2000, 1, 1)
+            fin = (a_utc(datetime.strptime(hasta, "%Y-%m-%d") + timedelta(days=1)) - timedelta(microseconds=1)
+                   if hasta else ahora)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Fecha inválida: usá el formato AAAA-MM-DD")
+        if fin < inicio:
+            raise HTTPException(status_code=400, detail="La fecha «hasta» es anterior a la fecha «desde»")
+        return inicio, fin
+    hoy_local = datetime.now(ZONA_AR).replace(tzinfo=None, hour=0, minute=0, second=0, microsecond=0)
+    if periodo == "dia":
+        return a_utc(hoy_local), ahora
+    if periodo == "semana":
+        return ahora - timedelta(days=7), ahora
+    if periodo == "año":
+        return a_utc(hoy_local.replace(month=1, day=1)), ahora
+    return a_utc(hoy_local.replace(day=1)), ahora
+
+
 def es_admin(user):
     return user.get("role") == "administrador"
 

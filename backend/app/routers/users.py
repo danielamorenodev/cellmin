@@ -49,7 +49,7 @@ async def personal(current_user: dict = Depends(get_current_user)):
 async def get_users(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
-    users = await db.usuarios.find().to_list(100)
+    users = await db.usuarios.find().to_list(None)
     return [format_user(u) for u in users]
 
 @router.post("/")

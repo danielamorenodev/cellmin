@@ -12,7 +12,7 @@ import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import { useTabla } from "../hooks/useTabla";
-import { SUCURSALES, formatDateTime, nombreSucursal, stockEn } from "../utils/helpers";
+import { SUCURSALES, formatDateTime, nombreSucursal, stockEn, mensajeError } from "../utils/helpers";
 
 const CAMPO =
   "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -103,7 +103,7 @@ function NuevoRemitoModal({ onClose, onSave }) {
       );
       onSave();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al registrar el remito");
+      toast.error(mensajeError(error, "Error al registrar el remito"));
     } finally {
       setLoading(false);
     }

@@ -42,8 +42,7 @@ import {
   minimoEn,
   bajoMinimo,
   esCategoriaCelulares,
-  idsFiltro,
-} from "../utils/helpers";
+  idsFiltro, mensajeError } from "../utils/helpers";
 import FiltroCategorias from "../components/ui/FiltroCategorias";
 import { exportarListaPrecios } from "../utils/exportExcel";
 import Paginacion from "../components/ui/Paginacion";
@@ -658,10 +657,7 @@ export function ProductoModal({ producto, categorias, onClose, onSave, sinStockI
       }
       onSave();
     } catch (error) {
-      const detalle = error.response?.data?.detail;
-      toast.error(
-        typeof detalle === "string" ? detalle : "Error al guardar el producto",
-      );
+      toast.error(mensajeError(error, "Error al guardar el producto"));
     } finally {
       setLoading(false);
     }
@@ -1202,7 +1198,7 @@ function CategoriaModal({ categoria, onClose, onSave }) {
       }
       onSave();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al guardar la categoría");
+      toast.error(mensajeError(error, "Error al guardar la categoría"));
     } finally {
       setLoading(false);
     }

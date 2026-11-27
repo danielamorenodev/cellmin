@@ -25,7 +25,7 @@ async def get_next_number(db, collection: str, prefix: str) -> str:
 async def get_purchases(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "compras:read")
     db = get_db()
-    purchases = await db.compras.find().sort("fecha", -1).to_list(500)
+    purchases = await db.compras.find().sort("fecha", -1).to_list(None)
     return [{**p, "_id": str(p["_id"])} for p in purchases]
 
 @router.get("/{purchase_id}")

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { mensajeError } from "../utils/helpers";
 import { Plus, Edit, Trash2, ToggleLeft, CreditCard, PlusCircle, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { confirmar } from "../utils/confirmar";
@@ -57,7 +58,7 @@ function TarjetaModal({ tarjeta, onClose, onSave }) {
       }
       onSave();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al guardar la tarjeta");
+      toast.error(mensajeError(error, "Error al guardar la tarjeta"));
     } finally {
       setLoading(false);
     }
@@ -227,7 +228,7 @@ export default function MediosPago() {
       toast.success(`Tarjeta ${t.nombre} ${t.activo ? "desactivada" : "activada"}`);
       cargar();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al actualizar la tarjeta");
+      toast.error(mensajeError(error, "Error al actualizar la tarjeta"));
     }
   };
 

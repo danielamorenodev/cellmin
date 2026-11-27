@@ -264,7 +264,29 @@ const CAMPOS_ERROR = {
   sucursales: "Las sucursales",
   precio: "El precio",
   telefono: "El teléfono",
+  precio_venta: "El precio de venta",
+  precio_costo: "El costo",
+  precio_venta_usd: "El precio de venta en US$",
+  precio_costo_usd: "El costo en US$",
+  monto: "El monto",
+  monto_inicial: "El monto inicial",
+  dejar_en_caja: "Lo que queda en caja",
+  garantia_dias: "La garantía",
+  motivo: "El motivo",
+  cantidad: "La cantidad",
+  dni: "El DNI",
+  cuit: "El CUIT",
+  imei: "El IMEI",
 };
+
+// Mensajes de validación del servidor (vienen en inglés) en castellano
+const traducirValidacion = (msg) =>
+  msg
+    .replace(/^Input should be greater than or equal to (\S+)$/, "tiene que ser $1 o más")
+    .replace(/^Input should be greater than (\S+)$/, "tiene que ser mayor a $1")
+    .replace(/^Input should be less than or equal to (\S+)$/, "tiene que ser $1 o menos")
+    .replace(/^Field required$/, "es obligatorio")
+    .replace(/^Input should be a valid (number|integer).*$/, "tiene que ser un número");
 
 // Texto claro para mostrar el error de una llamada a la API. El servidor
 // manda "detail" como texto, o como lista cuando un dato no es válido (422).
@@ -275,7 +297,7 @@ export const mensajeError = (error, porDefecto = "Ocurrió un error") => {
     const d = detail[0];
     const campo = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : "";
     if (campo === "email") return "El email no es válido";
-    const msg = String(d.msg || "").replace(/^Value error, /, "");
+    const msg = traducirValidacion(String(d.msg || "").replace(/^Value error, /, ""));
     return CAMPOS_ERROR[campo] ? `${CAMPOS_ERROR[campo]}: ${msg}` : msg || porDefecto;
   }
   if (!error?.response) return "No hay conexión con el servidor";
@@ -287,4 +309,11 @@ export const textoSaldo = (saldo) => {
   if (saldo > 0.009) return { texto: `Se le debe ${formatCurrency(saldo)}`, color: "text-red-700" };
   if (saldo < -0.009) return { texto: `A favor ${formatCurrency(-saldo)}`, color: "text-green-700" };
   return { texto: "Al día", color: "text-gray-500" };
+};
+
+// "AAAA-MM-DD" de un filtro de fechas como fecha LOCAL (new Date("AAAA-MM-DD")
+// la toma en UTC: en Argentina queda en el día anterior a las 21 h)
+export const fechaLocal = (texto, finDelDia = false) => {
+  const [a, m, d] = String(texto).split("-").map(Number);
+  return finDelDia ? new Date(a, m - 1, d, 23, 59, 59, 999) : new Date(a, m - 1, d);
 };

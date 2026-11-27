@@ -23,7 +23,7 @@ def _formato(r: dict) -> dict:
 async def listar(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "stock:read")
     db = get_db()
-    return [_formato(r) for r in await db.remitos.find().sort("fecha", -1).to_list(500)]
+    return [_formato(r) for r in await db.remitos.find().sort("fecha", -1).to_list(None)]
 
 
 @router.get("/{remito_id}")

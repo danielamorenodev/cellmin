@@ -10,7 +10,8 @@ from datetime import datetime
 from app.utils.logger import registrar_auditoria
 from app.utils import imei as imei_util
 from app.utils.stock import stock_en, aplicar_delta, descontar_varios
-from app.utils.cajas import caja_para_vender, exigir_dueno_o_admin
+import re
+from app.utils.cajas import caja_para_vender, exigir_dueno_o_admin, rango_periodo
 from app.utils.idempotencia import resultado_previo, reclamar_clave, guardar_resultado, liberar_clave
 from app.utils.tarjetas import datos_tarjeta, texto_tarjeta
 from app.utils.personal import persona, ROLES_VENDEDOR
@@ -35,11 +36,35 @@ async def get_next_number(db, collection: str, prefix: str) -> str:
     )
     return f"{prefix}{str(counter['seq']).zfill(4)}"
 
+LIMITE_LISTADO = 1000
+
+
 @router.get("/")
-async def get_sales(current_user: dict = Depends(get_current_user)):
+async def get_sales(
+    desde: str = None,
+    hasta: str = None,
+    q: str = None,
+    limite: int = LIMITE_LISTADO,
+    current_user: dict = Depends(get_current_user),
+):
+    """Ventas, de la más nueva a la más vieja. Sin filtros trae las últimas
+    LIMITE_LISTADO; con fechas (AAAA-MM-DD, horario de acá) o con un número de
+    venta / IMEI en q, busca en todas."""
     check_permission(current_user["role"], "ventas:read")
     db = get_db()
-    sales = await db.ventas.find().sort("fecha", -1).to_list(500)
+    filtro = {}
+    if desde or hasta:
+        inicio, fin = rango_periodo(None, desde, hasta)
+        filtro["fecha"] = {"$gte": inicio, "$lte": fin}
+    texto = (q or "").strip()
+    if texto:
+        opciones = [{"numero_venta": {"$regex": re.escape(texto), "$options": "i"}}]
+        digitos = imei_util.normalizar(texto)
+        if len(digitos) >= 4:
+            opciones.append({"items.imeis": {"$regex": re.escape(digitos)}})
+        filtro["$or"] = opciones
+    limite = max(1, min(limite, 10000))
+    sales = await db.ventas.find(filtro).sort("fecha", -1).limit(limite).to_list(None)
     return [{**s, "_id": str(s["_id"])} for s in sales]
 
 @router.get("/{sale_id}")
@@ -122,10 +147,12 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
             if not variante:
                 raise HTTPException(status_code=404, detail=f"Variante '{item.variante_nombre}' no encontrada")
             precio = variante.get("precio_venta", 0)
+            costo = variante.get("precio_costo")
             stock = stock_en(variante, sucursal)
             nombre = f"{producto['nombre']} — {item.variante_nombre}"
         else:
             precio = producto.get("precio_venta", 0) or 0
+            costo = producto.get("precio_costo")
             stock = stock_en(producto, sucursal)
             nombre = producto["nombre"]
 
@@ -141,6 +168,8 @@ async def create_sale(sale: SaleCreate, current_user: dict = Depends(get_current
             "cantidad": item.cantidad,
             "precio_unitario": precio,
             "subtotal": redondear(precio * item.cantidad),
+            # Costo al momento de la venta: la rentabilidad no cambia si después sube el costo
+            "precio_costo": costo,
         }
 
         # Celulares: un IMEI válido y distinto por cada unidad vendida

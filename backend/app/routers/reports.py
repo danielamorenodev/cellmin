@@ -6,7 +6,7 @@ from app.utils.permissions import check_permission
 from datetime import datetime, timedelta, timezone
 from bson import ObjectId
 from fastapi import HTTPException
-from app.utils.cajas import inicio_dia_local, dia_local
+from app.utils.cajas import inicio_dia_local, dia_local, rango_periodo
 
 
 router = APIRouter()
@@ -30,7 +30,7 @@ def dias_atraso(r) -> int:
 
 async def _nombres_clientes(db, ids):
     validos = [ObjectId(i) for i in set(ids) if i and ObjectId.is_valid(i)]
-    docs = await db.clientes.find({"_id": {"$in": validos}}, {"nombre": 1, "apellido": 1, "telefono": 1}).to_list(5000)
+    docs = await db.clientes.find({"_id": {"$in": validos}}, {"nombre": 1, "apellido": 1, "telefono": 1}).to_list(None)
     return {str(c["_id"]): (f"{c.get('nombre', '')} {c.get('apellido') or ''}".strip(), c.get("telefono")) for c in docs}
 
 
@@ -74,7 +74,7 @@ async def detalle_dashboard(tipo: str, filtro: str = None, current_user: dict = 
     check_permission(current_user["role"], "dashboard:read")
     db = get_db()
     if tipo == "reparaciones":
-        reps = await db.reparaciones.find({"estado": {"$in": ESTADOS_ACTIVOS}}).to_list(2000)
+        reps = await db.reparaciones.find({"estado": {"$in": ESTADOS_ACTIVOS}}).to_list(None)
         clientes = await _nombres_clientes(db, [r.get("cliente_id") for r in reps])
         filas = [fila_reparacion(r, clientes) for r in reps]
         # Recortes de la misma lista: listas para entregar, atrasadas o las del técnico conectado
@@ -88,14 +88,14 @@ async def detalle_dashboard(tipo: str, filtro: str = None, current_user: dict = 
         return sorted(filas, key=lambda f: (-f["dias_atraso"], -(f["dias_en_taller"] or 0)))
     if tipo == "ventas":
         check_permission(current_user["role"], "ventas:read")
-        ventas = await db.ventas.find({"estado": "completada", "fecha": {"$gte": inicio_dia_local()}}).sort("fecha", -1).to_list(1000)
+        ventas = await db.ventas.find({"estado": "completada", "fecha": {"$gte": inicio_dia_local()}}).sort("fecha", -1).to_list(None)
         return [{"id": str(v["_id"]), "numero_venta": v.get("numero_venta"), "fecha": v["fecha"],
                  "sucursal": v.get("sucursal"), "vendedor": v.get("vendedor_nombre"),
                  "metodo_pago": v.get("metodo_pago"), "total": v.get("total", 0),
                  "articulos": sum(i.get("cantidad", 0) for i in v.get("items", []))} for v in ventas]
     if tipo == "stock":
         check_permission(current_user["role"], "stock:read")
-        productos = await db.productos.find({"activo": True}).to_list(2000)
+        productos = await db.productos.find({"activo": True}).to_list(None)
         return _faltantes(productos)
     raise HTTPException(status_code=404, detail="Detalle no disponible")
 
@@ -114,7 +114,7 @@ async def reparaciones_detalle(desde: str = None, hasta: str = None, current_use
             filtro["fecha_ingreso"]["$gte"] = datetime.strptime(desde, "%Y-%m-%d") + timedelta(hours=3)
         if hasta:
             filtro["fecha_ingreso"]["$lt"] = datetime.strptime(hasta, "%Y-%m-%d") + timedelta(days=1, hours=3)
-    reps = await db.reparaciones.find(filtro).sort("fecha_ingreso", -1).to_list(5000)
+    reps = await db.reparaciones.find(filtro).sort("fecha_ingreso", -1).to_list(None)
     clientes = await _nombres_clientes(db, [r.get("cliente_id") for r in reps])
     return [fila_reparacion(r, clientes) for r in reps]
 
@@ -126,11 +126,11 @@ async def get_dashboard(current_user: dict = Depends(get_current_user)):
     ventas_hoy = await db.ventas.find({
         "estado": "completada",
         "fecha": {"$gte": hoy}
-    }).to_list(1000)
+    }).to_list(None)
     total_hoy = sum(v["total"] for v in ventas_hoy)
     activas = await db.reparaciones.find(
         {"estado": {"$in": ESTADOS_ACTIVOS}}, {"estado": 1, "fecha_estimada_entrega": 1, "tecnico_id": 1}
-    ).to_list(2000)
+    ).to_list(None)
     reparaciones_activas = len(activas)
     reparaciones_atrasadas = sum(1 for r in activas if dias_atraso(r) > 0)
     reparaciones_listas = sum(1 for r in activas if r.get("estado") == "lista")
@@ -138,7 +138,7 @@ async def get_dashboard(current_user: dict = Depends(get_current_user)):
     semana = datetime.utcnow() - timedelta(days=7)
     ingresos_semana = await db.compras.count_documents({"fecha": {"$gte": semana}, "estado": {"$ne": "cancelada"}})
     remitos_semana = await db.remitos.count_documents({"fecha": {"$gte": semana}})
-    productos_activos = await db.productos.find({"activo": True}).to_list(2000)
+    productos_activos = await db.productos.find({"activo": True}).to_list(None)
     stock_bajo = len(_faltantes(productos_activos))
     total_clientes = await db.clientes.count_documents({"activo": True})
     return {
@@ -163,27 +163,8 @@ async def get_ventas_report(
 ):
     check_permission(current_user["role"], "*")
     db = get_db()
-    hoy = datetime.utcnow()
-
-    if desde and hasta:
-        fecha_desde = datetime.strptime(desde, "%Y-%m-%d")
-        fecha_hasta = datetime.strptime(hasta, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-    else:
-        if periodo == "dia":
-            fecha_desde = inicio_dia_local()
-        elif periodo == "semana":
-            fecha_desde = hoy - timedelta(days=7)
-        elif periodo == "mes":
-            fecha_desde = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        elif periodo == "año":
-            fecha_desde = hoy.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:
-            fecha_desde = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        fecha_hasta = hoy
-
-    ventas = await db.ventas.find({
-    "fecha": {"$gte": fecha_desde, "$lte": fecha_hasta}
-    }).to_list(5000)
+    fecha_desde, fecha_hasta = rango_periodo(periodo, desde, hasta)
+    ventas = await db.ventas.find({"fecha": {"$gte": fecha_desde, "$lte": fecha_hasta}}).to_list(None)
 
     ventas_completadas = [v for v in ventas if v["estado"] == "completada"]
     ventas_canceladas = [v for v in ventas if v["estado"] == "cancelada"]
@@ -191,26 +172,19 @@ async def get_ventas_report(
     total = sum(v["total"] for v in ventas_completadas)
     total_descuentos = sum(v.get("descuento", 0) for v in ventas_completadas)
 
-    por_dia = {}
-    for v in ventas:
-        dia = v["fecha"].strftime("%Y-%m-%d") if hasattr(v["fecha"], "strftime") else str(v["fecha"])[:10]
+    # Los gráficos cuentan solo lo vendido (las canceladas no suman) y el día
+    # es el de acá: una venta de las 22 h no cae en el día siguiente
+    por_dia, por_metodo, por_sucursal, por_vendedor = {}, {}, {}, {}
+    for v in ventas_completadas:
+        dia = dia_local(v["fecha"])
         por_dia[dia] = por_dia.get(dia, 0) + v["total"]
-
-    por_metodo = {}
-    for v in ventas:
         metodo = v.get("metodo_pago", "efectivo")
         if "+" in metodo:
             metodo = "mixto"
         metodo = metodo.split(" (")[0]  # "credito (Visa 3 cuotas)" -> "credito"
         por_metodo[metodo] = por_metodo.get(metodo, 0) + v["total"]
-
-    por_sucursal = {}
-    for v in ventas:
         suc = v.get("sucursal", "sucursal_1")
         por_sucursal[suc] = por_sucursal.get(suc, 0) + v["total"]
-
-    por_vendedor = {}
-    for v in ventas_completadas:
         nombre = v.get("vendedor_nombre") or "Sin registrar"
         fila = por_vendedor.setdefault(nombre, {"vendedor": nombre, "cantidad": 0, "total": 0})
         fila["cantidad"] += 1
@@ -229,73 +203,6 @@ async def get_ventas_report(
         "por_metodo": [{"metodo": k, "total": v} for k, v in por_metodo.items()],
         "por_sucursal": [{"sucursal": k, "total": v} for k, v in por_sucursal.items()],
     }
-    check_permission(current_user["role"], "*")
-    db = get_db()
-    hoy = datetime.utcnow()
-    if periodo == "dia":
-        desde = inicio_dia_local()
-    elif periodo == "semana":
-        desde = hoy - timedelta(days=7)
-    elif periodo == "mes":
-        desde = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif periodo == "año":
-        desde = hoy.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        desde = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-    ventas = await db.ventas.find({
-        "estado": "completada",
-        "fecha": {"$gte": desde}
-    }).to_list(5000)
-
-    total = sum(v["total"] for v in ventas)
-    total_descuentos = sum(v.get("descuento", 0) for v in ventas)
-
-    # Agrupar por día
-    por_dia = {}
-    for v in ventas:
-        dia = v["fecha"].strftime("%Y-%m-%d") if hasattr(v["fecha"], "strftime") else str(v["fecha"])[:10]
-        por_dia[dia] = por_dia.get(dia, 0) + v["total"]
-
-    # Agrupar por método de pago
-    por_metodo = {}
-    for v in ventas:
-        metodo = v.get("metodo_pago", "efectivo")
-        if "+" in metodo:
-            metodo = "mixto"
-        metodo = metodo.split(" (")[0]  # "credito (Visa 3 cuotas)" -> "credito"
-        por_metodo[metodo] = por_metodo.get(metodo, 0) + v["total"]
-
-    # Agrupar por sucursal
-    por_sucursal = {}
-    for v in ventas:
-        suc = v.get("sucursal", "sucursal_1")
-        por_sucursal[suc] = por_sucursal.get(suc, 0) + v["total"]
-
-    return {
-        "periodo": periodo,
-        "desde": desde,
-        "cantidad_ventas": len(ventas),
-        "total": total,
-        "total_descuentos": total_descuentos,
-        "por_dia": [{"fecha": k, "total": v} for k, v in sorted(por_dia.items())],
-        "por_metodo": [{"metodo": k, "total": v} for k, v in por_metodo.items()],
-        "por_sucursal": [{"sucursal": k, "total": v} for k, v in por_sucursal.items()],
-    }
-
-def _rango(periodo: str, desde: str | None, hasta: str | None):
-    """Desde/hasta del período elegido arriba en Reportes (mismo criterio que rentabilidad)."""
-    hoy = datetime.utcnow()
-    if desde and hasta:
-        return (datetime.strptime(desde, "%Y-%m-%d"),
-                datetime.strptime(hasta, "%Y-%m-%d").replace(hour=23, minute=59, second=59))
-    if periodo == "dia":
-        return inicio_dia_local(), hoy
-    if periodo == "semana":
-        return hoy - timedelta(days=7), hoy
-    if periodo == "año":
-        return hoy.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0), hoy
-    return hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0), hoy
 
 
 @router.get("/productos-vendidos")
@@ -309,7 +216,7 @@ async def get_productos_vendidos(
     (también los que no se vendieron, con 0). Solo ventas completadas."""
     check_permission(current_user["role"], "*")
     db = get_db()
-    fecha_desde, fecha_hasta = _rango(periodo, desde, hasta)
+    fecha_desde, fecha_hasta = rango_periodo(periodo, desde, hasta)
     pipeline = [
         {"$match": {"estado": "completada", "fecha": {"$gte": fecha_desde, "$lte": fecha_hasta}}},
         {"$unwind": "$items"},
@@ -379,43 +286,35 @@ async def get_rentabilidad(
 ):
     check_permission(current_user["role"], "*")
     db = get_db()
-    hoy = datetime.utcnow()
-
-    if desde and hasta:
-        fecha_desde = datetime.strptime(desde, "%Y-%m-%d")
-        fecha_hasta = datetime.strptime(hasta, "%Y-%m-%d").replace(hour=23, minute=59, second=59)
-    else:
-        if periodo == "dia":
-            fecha_desde = inicio_dia_local()
-        elif periodo == "semana":
-            fecha_desde = hoy - timedelta(days=7)
-        elif periodo == "mes":
-            fecha_desde = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        elif periodo == "año":
-            fecha_desde = hoy.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-        else:
-            fecha_desde = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        fecha_hasta = hoy
-
+    fecha_desde, fecha_hasta = rango_periodo(periodo, desde, hasta)
     ventas = await db.ventas.find({
         "estado": "completada",
         "fecha": {"$gte": fecha_desde, "$lte": fecha_hasta}
-    }).to_list(5000)
+    }).to_list(None)
+
+    # Costo: el que tenía el producto al venderse (las ventas lo guardan desde
+    # nov. 2026); para las anteriores, el costo actual del producto
+    ids = {i["producto_id"] for v in ventas for i in v.get("items", []) if ObjectId.is_valid(i.get("producto_id", ""))}
+    productos = {str(p["_id"]): p async for p in db.productos.find(
+        {"_id": {"$in": [ObjectId(x) for x in ids]}}, {"precio_costo": 1, "variantes": 1})}
+
+    def costo_actual(item):
+        p = productos.get(item["producto_id"])
+        if not p:
+            return 0
+        if item.get("variante_nombre"):
+            var = next((x for x in p.get("variantes") or [] if x["nombre"] == item["variante_nombre"]), None)
+            return (var or {}).get("precio_costo") or 0
+        return p.get("precio_costo") or 0
 
     total_ingresos = sum(v["total"] for v in ventas)
     total_costo = 0
     for v in ventas:
         for item in v.get("items", []):
-            producto = await db.productos.find_one({"_id": __import__('bson').ObjectId(item["producto_id"])})
-            if producto:
-                if item.get("variante_nombre") and producto.get("variantes"):
-                    variante = next((var for var in producto["variantes"] if var["nombre"] == item["variante_nombre"]), None)
-                    if variante:
-                        total_costo += variante.get("precio_costo", 0) * item["cantidad"]
-                else:
-                    total_costo += producto.get("precio_costo", 0) * item["cantidad"]
-
-    ganancia = total_ingresos - total_costo
+            costo = item.get("precio_costo")
+            total_costo += (costo if costo is not None else costo_actual(item)) * item["cantidad"]
+    total_costo = round(total_costo, 2)
+    ganancia = round(total_ingresos - total_costo, 2)
     margen = (ganancia / total_ingresos * 100) if total_ingresos > 0 else 0
 
     return {
@@ -425,50 +324,7 @@ async def get_rentabilidad(
         "ganancia": ganancia,
         "margen_porcentual": round(margen, 2),
     }
-    check_permission(current_user["role"], "*")
-    db = get_db()
-    hoy = datetime.utcnow()
-    if periodo == "dia":
-        desde = inicio_dia_local()
-    elif periodo == "semana":
-        desde = hoy - timedelta(days=7)
-    elif periodo == "mes":
-        desde = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    elif periodo == "año":
-        desde = hoy.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-    else:
-        desde = hoy.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
-    ventas = await db.ventas.find({
-        "estado": "completada",
-        "fecha": {"$gte": desde}
-    }).to_list(5000)
-
-    total_ingresos = sum(v["total"] for v in ventas)
-
-    # Calcular costo de los productos vendidos
-    total_costo = 0
-    for v in ventas:
-        for item in v.get("items", []):
-            producto = await db.productos.find_one({"_id": __import__('bson').ObjectId(item["producto_id"])})
-            if producto:
-                if item.get("variante_nombre") and producto.get("variantes"):
-                    variante = next((var for var in producto["variantes"] if var["nombre"] == item["variante_nombre"]), None)
-                    if variante:
-                        total_costo += variante.get("precio_costo", 0) * item["cantidad"]
-                else:
-                    total_costo += producto.get("precio_costo", 0) * item["cantidad"]
-
-    ganancia = total_ingresos - total_costo
-    margen = (ganancia / total_ingresos * 100) if total_ingresos > 0 else 0
-
-    return {
-        "periodo": periodo,
-        "total_ingresos": total_ingresos,
-        "total_costo": total_costo,
-        "ganancia": ganancia,
-        "margen_porcentual": round(margen, 2),
-    }
 
 @router.get("/reparaciones")
 async def get_reparaciones_report(current_user: dict = Depends(get_current_user)):
@@ -480,7 +336,7 @@ async def get_reparaciones_report(current_user: dict = Depends(get_current_user)
         count = await db.reparaciones.count_documents({"estado": estado})
         por_estado[estado] = count
 
-    reparaciones = await db.reparaciones.find({}).to_list(5000)
+    reparaciones = await db.reparaciones.find({}).to_list(None)
     total_facturado = sum(r.get("precio_total", 0) for r in reparaciones if r.get("estado") == "entregada")
     total_cobrado = sum(r.get("total_pagado", 0) for r in reparaciones)
     total_pendiente = sum(r.get("saldo_pendiente", 0) for r in reparaciones if r.get("estado") not in ["entregada", "cancelada"])
@@ -518,5 +374,5 @@ def _faltantes(productos):
 async def get_stock_bajo(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "*")
     db = get_db()
-    productos = await db.productos.find({"activo": True}).to_list(1000)
+    productos = await db.productos.find({"activo": True}).to_list(None)
     return _faltantes(productos)

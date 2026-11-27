@@ -44,8 +44,7 @@ import {
   parsearMetodoPago,
   stockEn,
   recargoTarjeta,
-  MEDIOS_UNICOS,
-} from "../utils/helpers";
+  MEDIOS_UNICOS, mensajeError, fechaLocal } from "../utils/helpers";
 import CamposTarjeta from "../components/ui/CamposTarjeta";
 import { useTarjetas } from "../hooks/useTarjetas";
 import { usePersonal } from "../hooks/usePersonal";
@@ -610,7 +609,7 @@ function NuevaVentaModal({ onClose, onSave, sucursal }) {
       onSave(result.id, clientes.find((c) => c.id === form.cliente_id), result.envio_email);
     } catch (error) {
       toast.error(
-        error.response?.data?.detail || "Error al registrar la venta",
+        mensajeError(error, "Error al registrar la venta"),
       );
     } finally {
       enviando.current = false;
@@ -1639,6 +1638,18 @@ function VentaRegistrada({ venta, envioEmail, emailConfigurado, onImprimir, onWh
   );
 }
 
+const LIMITE_VENTAS = 1000;
+// Qué se le pide al servidor según los filtros (lo demás se filtra en pantalla)
+const consultaVentas = (f) => {
+  const q = f.busqueda?.trim();
+  const invertido = f.fecha_desde && f.fecha_hasta && f.fecha_hasta < f.fecha_desde;
+  return {
+    desde: invertido ? "" : f.fecha_desde,
+    hasta: invertido ? "" : f.fecha_hasta,
+    q: q && q.length >= 3 ? q : "",
+  };
+};
+
 export default function Ventas() {
   const { user } = useAuth();
   const { opciones: sucursalesOpc } = useSucursales();
@@ -1714,7 +1725,7 @@ export default function Ventas() {
       // liviana y habilita el botón sin esperar el listado de ventas
       const caja = cargarCaja();
       const [vs, cs, ps] = await Promise.all([
-        ventasService.getAll(),
+        ventasService.getAll(consultaVentas(filtros)),
         clientesService.getAll(),
         productosService.getAll(),
       ]);
@@ -1733,8 +1744,23 @@ export default function Ventas() {
     fetchData();
   }, []);
 
+  // Las fechas y la búsqueda se consultan al servidor (así se encuentran
+  // también las ventas más viejas que las últimas 1000)
+  const claveConsulta = JSON.stringify(consultaVentas(filtros));
+  const primeraConsulta = useRef(true);
   useEffect(() => {
-  }, [filtros]);
+    if (primeraConsulta.current) {
+      primeraConsulta.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      ventasService
+        .getAll(JSON.parse(claveConsulta))
+        .then(setVentas)
+        .catch((e) => toast.error(mensajeError(e, "Error al buscar ventas")));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [claveConsulta]);
 
   const handleCancel = async (id, numero) => {
     if (
@@ -1751,7 +1777,7 @@ export default function Ventas() {
       toast.success("Venta cancelada: stock restaurado y dinero devuelto desde la caja");
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al cancelar la venta");
+      toast.error(mensajeError(error, "Error al cancelar la venta"));
     }
   };
 
@@ -1796,17 +1822,8 @@ export default function Ventas() {
     if (filtros.vendedor && venta.vendedor_nombre !== filtros.vendedor) return false;
     if (filtros.cliente_id && venta.cliente_id !== filtros.cliente_id)
       return false;
-    if (filtros.fecha_desde) {
-      const desde = new Date(filtros.fecha_desde);
-      const fechaVenta = new Date(venta.fecha);
-      if (fechaVenta < desde) return false;
-    }
-    if (filtros.fecha_hasta) {
-      const hasta = new Date(filtros.fecha_hasta);
-      hasta.setHours(23, 59, 59);
-      const fechaVenta = new Date(venta.fecha);
-      if (fechaVenta > hasta) return false;
-    }
+    if (filtros.fecha_desde && new Date(venta.fecha) < fechaLocal(filtros.fecha_desde)) return false;
+    if (filtros.fecha_hasta && new Date(venta.fecha) > fechaLocal(filtros.fecha_hasta, true)) return false;
     if (filtros.producto) {
       const tieneProducto = venta.items?.some((item) =>
         item.nombre_producto
@@ -2104,6 +2121,13 @@ export default function Ventas() {
           </div>
         )}
       </div>
+
+      {/* Sin filtros se traen las últimas 1000: se avisa cómo ver las anteriores */}
+      {!loading && ventas.length >= LIMITE_VENTAS && !Object.values(JSON.parse(claveConsulta)).some(Boolean) && (
+        <p className="text-sm text-gray-500">
+          Se muestran las últimas {LIMITE_VENTAS} ventas. Para ver anteriores, buscá por número o IMEI, o elegí fechas en los filtros.
+        </p>
+      )}
 
       {/* Resumen filtrado */}
       {filtrosActivos && (

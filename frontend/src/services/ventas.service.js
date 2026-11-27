@@ -1,8 +1,10 @@
 import api from "./api";
 
 export const ventasService = {
-  getAll: async () => {
-    const response = await api.get("/sales");
+  // Sin filtros: las últimas 1000. Con fechas o búsqueda (número o IMEI), en todas.
+  getAll: async (filtros = {}) => {
+    const params = Object.fromEntries(Object.entries(filtros).filter(([, v]) => v));
+    const response = await api.get("/sales", { params });
     return response.data;
   },
 

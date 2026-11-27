@@ -182,7 +182,12 @@ async def caja_abierta_del_usuario(db, current_user):
 async def get_repairs(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "reparaciones:read")
     db = get_db()
-    repairs = await db.reparaciones.find().sort("fecha_ingreso", -1).to_list(500)
+    # Todas las que siguen en curso (nunca se pierde una del listado) y las
+    # últimas 2000 terminadas (entregadas o canceladas)
+    activas = await db.reparaciones.find({"estado": {"$nin": ["entregada", "cancelada"]}}).to_list(None)
+    cerradas = await db.reparaciones.find({"estado": {"$in": ["entregada", "cancelada"]}}).sort(
+        "fecha_ingreso", -1).limit(2000).to_list(None)
+    repairs = sorted(activas + cerradas, key=lambda r: r.get("fecha_ingreso") or datetime.min, reverse=True)
     return [format_repair(r, current_user) for r in repairs]
 
 @router.get("/pendientes")
@@ -191,7 +196,7 @@ async def get_pending_repairs(current_user: dict = Depends(get_current_user)):
     db = get_db()
     repairs = await db.reparaciones.find({
         "estado": {"$in": ["en_diagnostico", "ingresada", "en_reparacion", "lista"]}
-    }).sort("fecha_ingreso", -1).to_list(500)
+    }).sort("fecha_ingreso", -1).to_list(None)
     return [format_repair(r, current_user) for r in repairs]
 
 @router.get("/{repair_id}")
@@ -240,6 +245,8 @@ async def create_repair(repair: RepairCreate, current_user: dict = Depends(get_c
         if not puede_sucursal(current_user, data["sucursal"]):
             raise HTTPException(status_code=403, detail="No tenés acceso a esa sucursal")
     precio_total = sum(t["precio"] for t in data["tipos_reparacion"])
+    # Una orden nueva arranca en diagnóstico o, con presupuesto, ingresada (nunca más adelante)
+    data["estado"] = "ingresada" if data["tipos_reparacion"] else "en_diagnostico"
 
     # Validar la seña ANTES de crear nada
     caja = None
@@ -429,6 +436,8 @@ async def add_payment(repair_id: str, pago: Pago, current_user: dict = Depends(g
     if pago.monto <= 0:
         raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0")
     saldo_actual = repair.get("precio_total", 0) - repair.get("total_pagado", 0)
+    if saldo_actual <= 0.01:
+        raise HTTPException(status_code=400, detail="La orden no tiene saldo pendiente")
     plan = await planear_cobro(db, pago.metodo, pago.monto, saldo_actual, pago.tarjeta_id, pago.cuotas)
 
     nuevo_pago = {
@@ -442,8 +451,10 @@ async def add_payment(repair_id: str, pago: Pago, current_user: dict = Depends(g
     total_pagado = repair.get("total_pagado", 0) + plan["monto"]
     saldo = repair.get("precio_total", 0) - total_pagado
 
-    await db.reparaciones.update_one(
-        {"_id": ObjectId(repair_id)},
+    # Solo si nadie cobró mientras tanto (dos cobros a la vez no pueden pasar el total)
+    actualizado = await db.reparaciones.update_one(
+        {"_id": ObjectId(repair_id), "total_pagado": repair.get("total_pagado", 0),
+         "estado": {"$ne": "cancelada"}},
         {
             "$push": {"pagos": nuevo_pago},
             "$set": {
@@ -452,6 +463,8 @@ async def add_payment(repair_id: str, pago: Pago, current_user: dict = Depends(g
             }
         }
     )
+    if actualizado.modified_count != 1:
+        raise HTTPException(status_code=409, detail="La orden cambió mientras se registraba el cobro. Actualizá y volvé a intentar.")
 
     # Registrar en caja (ingreso y, si hubo vuelto en pesos, su egreso)
     await db.cajas.update_one(
@@ -487,7 +500,7 @@ async def get_repairs_by_client(cliente_id: str, current_user: dict = Depends(ge
     db = get_db()
     repairs = await db.reparaciones.find(
         {"cliente_id": cliente_id}
-    ).sort("fecha_ingreso", -1).to_list(100)
+    ).sort("fecha_ingreso", -1).to_list(None)
     return [format_repair(r, current_user) for r in repairs]
 
 @router.put("/{repair_id}/cancelar")
@@ -507,6 +520,7 @@ async def cancel_repair(repair_id: str, current_user: dict = Depends(get_current
     # Si hay pagos cobrados se devuelven: egreso de caja por cada pago, con su mismo medio de pago
     pagos = repair.get("pagos", [])
     total_devuelto = 0
+    caja = None
     if pagos:
         caja = await caja_abierta_del_usuario(db, current_user)
         if not caja:
@@ -514,6 +528,14 @@ async def cancel_repair(repair_id: str, current_user: dict = Depends(get_current
                 status_code=400,
                 detail="Esta orden tiene pagos cobrados. Para cancelarla hace falta una caja abierta, donde se registra la devolución.",
             )
+    # Se marca cancelada solo si nadie la cambió mientras tanto: dos clics no devuelven dos veces
+    marcada = await db.reparaciones.update_one(
+        {"_id": ObjectId(repair_id), "estado": repair["estado"], "total_pagado": repair.get("total_pagado", 0)},
+        {"$set": {"estado": "cancelada", "saldo_pendiente": 0, "fecha_cancelacion": datetime.utcnow()}},
+    )
+    if marcada.modified_count != 1:
+        raise HTTPException(status_code=409, detail="La orden cambió mientras se cancelaba. Actualizá y revisá su estado.")
+    if pagos:
         egresos = []
         for p in pagos:
             # Se devuelve por el mismo medio con el que se cobró. Lo cobrado en
@@ -552,13 +574,10 @@ async def cancel_repair(repair_id: str, current_user: dict = Depends(get_current
             total_devuelto += p["monto"]
         await db.cajas.update_one({"_id": caja["_id"]}, {"$push": {"movimientos": {"$each": egresos}}})
 
-    await db.reparaciones.update_one(
-        {"_id": ObjectId(repair_id)},
-        {"$set": {
-            "estado": "cancelada",
-            "saldo_pendiente": 0,
-            "total_devuelto": total_devuelto,
-            "fecha_cancelacion": datetime.utcnow(),
-        }}
+    await db.reparaciones.update_one({"_id": ObjectId(repair_id)}, {"$set": {"total_devuelto": total_devuelto}})
+    await registrar_auditoria(
+        db=db, usuario_id=current_user["user_id"], usuario_nombre="", rol=current_user["role"],
+        accion="cancelar", modulo="reparaciones",
+        descripcion=f"Orden {repair.get('numero_orden', '')} cancelada. Devuelto: {total_devuelto}",
     )
     return {"message": "Reparación cancelada", "total_devuelto": total_devuelto}

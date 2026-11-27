@@ -6,8 +6,10 @@ export const stockService = {
     return response.data;
   },
 
-  getMovimientos: async () => {
-    const response = await api.get("/stock");
+  // Sin fechas: los últimos 2000. Con fechas, en todo el historial.
+  getMovimientos: async (filtros = {}) => {
+    const params = Object.fromEntries(Object.entries(filtros).filter(([, v]) => v));
+    const response = await api.get("/stock", { params });
     return response.data;
   },
 

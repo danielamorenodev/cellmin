@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import InputNumero from "../components/ui/InputNumero";
 import {
   ArrowDownCircle,
@@ -17,8 +17,7 @@ import {
   formatDateTime,
   nombreSucursal,
   MOTIVOS_STOCK,
-  stockEn,
-} from "../utils/helpers";
+  stockEn, mensajeError, fechaLocal } from "../utils/helpers";
 import { useSucursales } from "../hooks/useSucursales";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
@@ -94,7 +93,7 @@ function MovimientoModal({ onClose, onSave, productoInicial = null, sucursalInic
       onSave();
     } catch (error) {
       toast.error(
-        error.response?.data?.detail || "Error al registrar movimiento",
+        mensajeError(error, "Error al registrar movimiento"),
       );
     } finally {
       setLoading(false);
@@ -287,7 +286,11 @@ export default function Stock() {
     try {
       const [prods, movs] = await Promise.all([
         stockService.getProductos(),
-        stockService.getMovimientos(),
+        stockService.getMovimientos(
+          filtrosMovimientos.fecha_desde && filtrosMovimientos.fecha_hasta && filtrosMovimientos.fecha_hasta < filtrosMovimientos.fecha_desde
+            ? {}
+            : { desde: filtrosMovimientos.fecha_desde, hasta: filtrosMovimientos.fecha_hasta },
+        ),
       ]);
       setProductos(prods);
       setMovimientos(movs);
@@ -299,6 +302,25 @@ export default function Stock() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Con fechas se consulta al servidor: así aparecen también los movimientos
+  // más viejos que los últimos 2000
+  const { fecha_desde: movDesde, fecha_hasta: movHasta } = filtrosMovimientos;
+  const primeraConsulta = useRef(true);
+  useEffect(() => {
+    if (primeraConsulta.current) {
+      primeraConsulta.current = false;
+      return;
+    }
+    if (movDesde && movHasta && movHasta < movDesde) return;
+    const t = setTimeout(() => {
+      stockService
+        .getMovimientos({ desde: movDesde, hasta: movHasta })
+        .then(setMovimientos)
+        .catch((e) => toast.error(mensajeError(e, "Error al buscar movimientos")));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [movDesde, movHasta]);
 
   const movimientosFiltrados = movimientos.filter((m) => {
     const producto = productos.find((p) => p.id === m.producto_id);
@@ -322,12 +344,11 @@ export default function Stock() {
     if (filtrosMovimientos.motivo && m.motivo !== filtrosMovimientos.motivo)
       return false;
     if (filtrosMovimientos.fecha_desde) {
-      const desde = new Date(filtrosMovimientos.fecha_desde);
+      const desde = fechaLocal(filtrosMovimientos.fecha_desde);
       if (new Date(m.fecha) < desde) return false;
     }
     if (filtrosMovimientos.fecha_hasta) {
-      const hasta = new Date(filtrosMovimientos.fecha_hasta);
-      hasta.setHours(23, 59, 59);
+      const hasta = fechaLocal(filtrosMovimientos.fecha_hasta, true);
       if (new Date(m.fecha) > hasta) return false;
     }
     return true;

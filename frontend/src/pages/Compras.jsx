@@ -33,7 +33,7 @@ import { ALTO_FILA, agregarOtraVariante } from "../utils/variantes";
 import Paginacion from "../components/ui/Paginacion";
 import ThOrdenable from "../components/ui/ThOrdenable";
 import { useTabla } from "../hooks/useTabla";
-import { formatCurrency, formatDateTime, nombreSucursal, textoSaldo } from "../utils/helpers";
+import { formatCurrency, formatDateTime, nombreSucursal, textoSaldo, mensajeError } from "../utils/helpers";
 import MenuAcciones from "../components/ui/MenuAcciones";
 import { useSucursales } from "../hooks/useSucursales";
 import DetalleCompra from "../components/ui/DetalleCompra";
@@ -73,7 +73,7 @@ function ProveedorModal({ proveedor, onClose, onSave }) {
       }
       onSave();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al guardar el proveedor");
+      toast.error(mensajeError(error, "Error al guardar el proveedor"));
     } finally {
       setLoading(false);
     }
@@ -333,7 +333,7 @@ function NuevaCompraModal({ onClose, onSave }) {
       );
       onSave();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al registrar el ingreso");
+      toast.error(mensajeError(error, "Error al registrar el ingreso"));
     } finally {
       setLoading(false);
     }
@@ -1255,7 +1255,7 @@ export default function Compras() {
       toast.success("Ingreso anulado: se restó el stock que había sumado");
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Error al anular el ingreso");
+      toast.error(mensajeError(error, "Error al anular el ingreso"));
     }
   };
 

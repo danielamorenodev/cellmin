@@ -36,15 +36,17 @@ def format_supplier(s):
 
 @router.get("/")
 async def get_suppliers(current_user: dict = Depends(get_current_user)):
+    check_permission(current_user["role"], "proveedores:read")
     db = get_db()
     if current_user["role"] in ["administrador", "deposito"]:
-        suppliers = await db.proveedores.find().to_list(200)
+        suppliers = await db.proveedores.find().to_list(None)
     else:
-        suppliers = await db.proveedores.find({"activo": True}).to_list(200)
+        suppliers = await db.proveedores.find({"activo": True}).to_list(None)
     return [format_supplier(s) for s in suppliers]
 
 @router.get("/{supplier_id}")
 async def get_supplier(supplier_id: str, current_user: dict = Depends(get_current_user)):
+    check_permission(current_user["role"], "proveedores:read")
     db = get_db()
     supplier = await db.proveedores.find_one({"_id": _oid(supplier_id)})
     if not supplier:

@@ -22,9 +22,9 @@ def format_repair_type(r):
 async def get_repair_types(current_user: dict = Depends(get_current_user)):
     db = get_db()
     if current_user["role"] in ["administrador", "tecnico"]:
-        tipos = await db.tipos_reparacion.find().to_list(200)
+        tipos = await db.tipos_reparacion.find().to_list(None)
     else:
-        tipos = await db.tipos_reparacion.find({"activo": True}).to_list(200)
+        tipos = await db.tipos_reparacion.find({"activo": True}).to_list(None)
     return [format_repair_type(t) for t in tipos]
 
 @router.post("/")

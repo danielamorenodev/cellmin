@@ -37,7 +37,7 @@ async def _marca(db, marca_id):
 async def listar(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "reparaciones:read")
     db = get_db()
-    return [_formato(m) for m in await db.marcas.find().sort("nombre", 1).to_list(500)]
+    return [_formato(m) for m in await db.marcas.find().sort("nombre", 1).to_list(None)]
 
 
 @router.post("/")

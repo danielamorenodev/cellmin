@@ -62,7 +62,7 @@ async def detalle_caja(db, caja, usuario=None):
         "estado": {"$in": ["completada", "cancelada"]},
         "fecha": {"$gte": caja["fecha_apertura"]},
         "sucursal": sucursal
-    }).to_list(1000)
+    }).to_list(None)
     total_ventas_hoy = sum(v["total"] for v in ventas)
 
     # Armar listado completo de movimientos
@@ -312,7 +312,7 @@ async def close_cash(data: CashClose, current_user: dict = Depends(get_current_u
         "estado": {"$in": ["completada", "cancelada"]},
         "fecha": {"$gte": caja["fecha_apertura"]},
         "sucursal": sucursal
-    }).to_list(1000)
+    }).to_list(None)
 
     total_ventas = sum(v["total"] for v in ventas)
 
@@ -413,5 +413,5 @@ async def close_cash(data: CashClose, current_user: dict = Depends(get_current_u
 async def get_cash_history(current_user: dict = Depends(get_current_user)):
     check_permission(current_user["role"], "caja:read")
     db = get_db()
-    cajas = await db.cajas.find().sort("fecha_apertura", -1).to_list(100)
+    cajas = await db.cajas.find().sort("fecha_apertura", -1).to_list(1000)
     return [{**c, "_id": str(c["_id"])} for c in cajas]

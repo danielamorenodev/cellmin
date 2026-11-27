@@ -21,9 +21,9 @@ def format_cat(c):
 async def get_categories(current_user: dict = Depends(get_current_user)):
     db = get_db()
     if current_user["role"] in ["administrador", "deposito"]:
-        cats = await db.categorias.find().to_list(200)
+        cats = await db.categorias.find().to_list(None)
     else:
-        cats = await db.categorias.find({"activo": True}).to_list(200)
+        cats = await db.categorias.find({"activo": True}).to_list(None)
     return [format_cat(c) for c in cats]
 
 @router.post("/")
