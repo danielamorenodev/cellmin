@@ -38,15 +38,16 @@ export default function DevolucionModal({ venta, cliente, onClose, onHecha }) {
   const cambiar = (i, cambios) => setFilas((f) => f.map((x, j) => (j === i ? { ...x, ...cambios } : x)));
   const calculado =
     Math.round(filas.reduce((s, f, i) => s + precioPagado(venta, venta.items[i]) * f.cantidad, 0) * 100) / 100;
-  const maximo = Math.round((venta.total - (venta.total_devuelto || 0)) * 100) / 100;
-  const monto = montoManual ?? Math.min(calculado, maximo);
+  // Tope: lo que pagó por las unidades elegidas (nunca más de lo que queda de la venta)
+  const maximo = Math.round(Math.min(calculado, venta.total - (venta.total_devuelto || 0)) * 100) / 100;
+  const monto = montoManual != null ? Math.min(montoManual, maximo) : maximo;
   const elegidas = filas.reduce((s, f) => s + f.cantidad, 0);
 
   const registrar = async (e) => {
     e.preventDefault();
     if (!elegidas) return toast.error("Elegí qué productos se devuelven");
     if (!(monto >= 0) || monto > maximo + 0.01)
-      return toast.error(`El monto a devolver tiene que estar entre $0 y ${formatCurrency(maximo)}`);
+      return toast.error(`El monto a devolver tiene que estar entre $0 y ${formatCurrency(maximo)} (lo que pagó por esas unidades)`);
     const detalle = filas
       .map((f, i) =>
         f.cantidad
@@ -181,7 +182,7 @@ export default function DevolucionModal({ venta, cliente, onClose, onHecha }) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <span className="block text-xs text-gray-500 mt-1">
-                Lo que pagó por esas unidades: {formatCurrency(calculado)}. Máximo: {formatCurrency(maximo)}.
+                Lo que pagó por esas unidades: {formatCurrency(maximo)}. Se puede devolver menos, no más.
                 {montoManual != null && (
                   <button type="button" onClick={() => setMontoManual(null)} className="ml-1 text-blue-600 hover:underline">
                     Usar el calculado

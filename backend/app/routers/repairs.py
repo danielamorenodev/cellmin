@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from app.utils.logger import registrar_auditoria
 from app.utils.cajas import caja_propia, puede_sucursal, exigir_dueno_o_admin, nombre_sucursal
 from app.utils.stock import validar_sucursal
+from app.utils.efectivo import exigir_efectivo
 from app.utils.tarjetas import datos_tarjeta, texto_tarjeta
 from app.utils.personal import persona, ROLES_VENDEDOR, ROLES_TECNICO
 from app.utils.marcas import registrar_marca_modelo
@@ -533,6 +534,8 @@ async def cancel_repair(repair_id: str, current_user: dict = Depends(get_current
                        f"{nombre_sucursal(sucursal)}, donde se registra la devolución.",
             )
         exigir_dueno_o_admin(caja, current_user, "cancelar órdenes con pagos de")
+        efectivo = sum(p["monto"] + (p.get("recargo") or 0) for p in pagos if p["metodo"] == "efectivo")
+        await exigir_efectivo(db, caja, efectivo, "devolver el efectivo de esta orden")
     # Se marca cancelada solo si nadie la cambió mientras tanto: dos clics no devuelven dos veces
     marcada = await db.reparaciones.update_one(
         {"_id": ObjectId(repair_id), "estado": repair["estado"], "total_pagado": repair.get("total_pagado", 0)},

@@ -1315,17 +1315,17 @@ function FilaVenta({
             className={`px-2 py-1 rounded-lg text-xs font-medium ${
               venta.estado !== "completada"
                 ? "bg-red-100 text-red-700"
-                : venta.total_devuelto > 0
+                : venta.devoluciones?.length
                   ? "bg-orange-100 text-orange-700"
                   : "bg-green-100 text-green-700"
             }`}
           >
             {venta.estado !== "completada"
               ? "Cancelada"
-              : venta.total_devuelto > 0
-                ? venta.total_devuelto >= venta.total - 0.01
-                  ? "Devuelta"
-                  : "Con devolución"
+              : venta.devoluciones?.length
+                ? quedaParaDevolver(venta)
+                  ? "Con devolución"
+                  : "Devuelta"
                 : "Completada"}
           </span>
         </td>
@@ -1457,17 +1457,17 @@ function CardVentaMobile({
             className={`px-2 py-1 rounded-lg text-xs font-medium ${
               venta.estado !== "completada"
                 ? "bg-red-100 text-red-700"
-                : venta.total_devuelto > 0
+                : venta.devoluciones?.length
                   ? "bg-orange-100 text-orange-700"
                   : "bg-green-100 text-green-700"
             }`}
           >
             {venta.estado !== "completada"
               ? "Cancelada"
-              : venta.total_devuelto > 0
-                ? venta.total_devuelto >= venta.total - 0.01
-                  ? "Devuelta"
-                  : "Con devolución"
+              : venta.devoluciones?.length
+                ? quedaParaDevolver(venta)
+                  ? "Con devolución"
+                  : "Devuelta"
                 : "Completada"}
           </span>
         </div>

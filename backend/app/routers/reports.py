@@ -123,10 +123,11 @@ async def devoluciones_en(db, desde, hasta=None):
     Restan en el día en que se devolvió, no en el de la venta."""
     rango = {"$gte": desde, **({"$lte": hasta} if hasta else {})}
     resultado = []
-    async for v in db.ventas.find({"devoluciones.fecha": rango}, {"devoluciones": 1, "sucursal": 1, "items": 1}):
+    async for v in db.ventas.find({"devoluciones.fecha": rango}, {"devoluciones": 1, "sucursal": 1, "vendedor_nombre": 1}):
         for d in v.get("devoluciones", []):
             if d["fecha"] >= desde and (hasta is None or d["fecha"] <= hasta):
-                resultado.append({**d, "sucursal": d.get("sucursal") or v.get("sucursal", "sucursal_1")})
+                resultado.append({**d, "sucursal": d.get("sucursal") or v.get("sucursal", "sucursal_1"),
+                                  "vendedor_venta": v.get("vendedor_nombre") or "Sin registrar"})
     return resultado
 
 
@@ -209,6 +210,9 @@ async def get_ventas_report(
         por_dia[dia] = por_dia.get(dia, 0) - d["monto"]
         por_metodo[d["metodo"]] = por_metodo.get(d["metodo"], 0) - d["monto"]
         por_sucursal[d["sucursal"]] = por_sucursal.get(d["sucursal"], 0) - d["monto"]
+        # Al vendedor de la venta original: así la suma por vendedor da el total
+        fila = por_vendedor.setdefault(d["vendedor_venta"], {"vendedor": d["vendedor_venta"], "cantidad": 0, "total": 0})
+        fila["total"] -= d["monto"]
 
     return {
         "por_vendedor": sorted(por_vendedor.values(), key=lambda f: -f["total"]),

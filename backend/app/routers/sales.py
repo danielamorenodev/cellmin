@@ -12,6 +12,7 @@ from app.utils import imei as imei_util
 from app.utils.stock import stock_en, aplicar_delta, descontar_varios
 import re
 from app.utils.cajas import caja_para_vender, exigir_dueno_o_admin, rango_periodo
+from app.utils.efectivo import exigir_efectivo
 from app.utils.idempotencia import resultado_previo, reclamar_clave, guardar_resultado, liberar_clave
 from app.utils.tarjetas import datos_tarjeta, texto_tarjeta
 from app.utils.personal import persona, ROLES_VENDEDOR
@@ -494,6 +495,10 @@ async def cancel_sale(sale_id: str, current_user: dict = Depends(get_current_use
             detail="Esta venta corresponde a una caja anterior (ya cerrada), por eso no se puede cancelar.",
         )
 
+    # El efectivo cobrado se devuelve de la caja: tiene que estar
+    efectivo = sum(p["monto"] for p in pagos_de_venta(sale) if p["metodo"] == "efectivo") - (sale.get("vuelto", 0) or 0)
+    await exigir_efectivo(db, caja, efectivo, "devolver el efectivo de esta venta")
+
     # Marcar como cancelada solo si seguía completada (evita doble cancelación simultánea)
     resultado = await db.ventas.update_one(
         {"_id": oid, "estado": "completada"},
@@ -667,8 +672,10 @@ async def registrar_devolucion(sale_id: str, datos: DevolucionCreate, current_us
 
     monto_calculado = round(monto_calculado, 2)
     ya_devuelto = sale.get("total_devuelto", 0) or 0
-    maximo = round(sale.get("total", 0) - ya_devuelto, 2)
-    monto = monto_calculado if datos.monto is None else round(datos.monto, 2)
+    # Tope: lo que pagó el cliente por las unidades que devuelve (y nunca más
+    # de lo que queda de la venta). Se puede devolver menos, no más.
+    maximo = round(min(monto_calculado, sale.get("total", 0) - ya_devuelto), 2)
+    monto = maximo if datos.monto is None else round(datos.monto, 2)
     # Lo devuelto de cada producto (para los reportes por producto)
     for it in elegidos:
         original = items_venta[it["indice"]]
@@ -677,8 +684,10 @@ async def registrar_devolucion(sale_id: str, datos: DevolucionCreate, current_us
     if monto < 0 or monto > maximo + 0.01:
         raise HTTPException(
             status_code=400,
-            detail=f"El monto a devolver tiene que estar entre $0 y {maximo:,.2f} (lo que queda de la venta).".replace(",", "X").replace(".", ",").replace("X", "."),
+            detail=f"El monto a devolver tiene que estar entre $0 y {maximo:,.2f} (lo que pagó por esas unidades).".replace(",", "X").replace(".", ",").replace("X", "."),
         )
+    if datos.metodo == "efectivo":
+        await exigir_efectivo(db, caja, monto, "esta devolución")
 
     ahora = datetime.utcnow()
     numero = await get_next_number(db, "devoluciones", "D-")

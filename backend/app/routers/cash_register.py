@@ -8,6 +8,7 @@ from datetime import datetime
 from app.utils.logger import registrar_auditoria
 from app.utils.cajas import caja_propia, exigir_caja_propia, exigir_dueno_o_admin, es_admin, puede_sucursal, dia_local, nombre_sucursal, caja_para_vender
 from app.utils.stock import validar_sucursal
+from app.utils.efectivo import exigir_efectivo
 from app.utils.pagos import USD, cotizacion_para_cobro, pagos_de_venta, redondear
 
 router = APIRouter()
@@ -277,6 +278,8 @@ async def add_movement(data: CashMovement, current_user: dict = Depends(get_curr
     check_permission(current_user["role"], "caja:open")
     db = get_db()
     caja = await exigir_caja_propia(db, current_user, "registrar movimientos")
+    if data.tipo == "egreso" and data.metodo_pago == "efectivo":
+        await exigir_efectivo(db, caja, data.monto, "este egreso")
     movimiento = {
         "tipo": data.tipo,
         "monto": data.monto,

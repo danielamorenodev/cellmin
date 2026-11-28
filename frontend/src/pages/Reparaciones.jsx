@@ -23,6 +23,7 @@ import {
   Wrench,
   Mail,
   MessageCircle,
+  Undo2,
   BellRing,
   X,
   AlertTriangle,
@@ -1631,6 +1632,8 @@ function PagoModal({ reparacion, onClose, onSave }) {
   );
 }
 
+const ESTADO_ANTERIOR = { ingresada: "en_diagnostico", en_reparacion: "ingresada", lista: "en_reparacion" };
+
 function construirAcciones({
   reparacion,
   siguienteEstado,
@@ -1670,6 +1673,20 @@ function construirAcciones({
       label: `Pasar a ${ESTADOS_REP[siguienteEstado]?.label}`,
       icono: <ArrowRight size={15} />,
       onClick: () => onUpdate(reparacion.id, { estado: siguienteEstado }),
+    },
+    // Volver un paso atrás (por si se avanzó por error). Desde «Entregada» no.
+    ESTADO_ANTERIOR[reparacion.estado] && {
+      label: `Volver a ${ESTADOS_REP[ESTADO_ANTERIOR[reparacion.estado]]?.label}`,
+      icono: <Undo2 size={15} />,
+      onClick: () =>
+        onUpdate(reparacion.id, {
+          estado: ESTADO_ANTERIOR[reparacion.estado],
+          volver: true,
+          // Al volver a «En reparación» sigue el mismo técnico
+          ...(ESTADO_ANTERIOR[reparacion.estado] === "en_reparacion" && reparacion.tecnico_id
+            ? { tecnico_id: reparacion.tecnico_id }
+            : {}),
+        }),
     },
     {
       label: "Imprimir orden",
@@ -2708,10 +2725,20 @@ export default function Reparaciones() {
   }, []);
 
   // "Pasar a …" desde las acciones: se confirma antes de cambiar el estado
-  const cambiarEstado = async (id, data) => {
+  const cambiarEstado = async (id, { volver, ...data }) => {
     const r = reparaciones.find((x) => x.id === id);
     const nuevo = ESTADOS_REP[data.estado]?.label || data.estado;
     const entrega = data.estado === "entregada";
+    if (volver) {
+      const ok = await confirmar({
+        titulo: "Volver al estado anterior",
+        mensaje: `¿Estás seguro de que querés volver la orden ${r?.numero_orden} a «${nuevo}»?`,
+        detalle: `Ahora está en «${ESTADOS_REP[r?.estado]?.label || r?.estado}». El cambio queda en el registro de actividad.`,
+        textoConfirmar: `Sí, volver a «${nuevo}»`,
+      });
+      if (ok) handleUpdate(id, data);
+      return;
+    }
     const ok = await confirmar({
       titulo: entrega ? "Entregar equipo" : "Cambiar estado",
       mensaje: entrega

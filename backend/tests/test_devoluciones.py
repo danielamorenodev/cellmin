@@ -27,6 +27,9 @@ def _cerrar_y_reabrir(client, cajero, db):
     client.portal.call(db.cajas.update_many, {}, {"$set": {"fecha_apertura": datetime.utcnow() - timedelta(days=1), "dia": "2000-01-01"}})
     client.portal.call(db.ventas.update_many, {}, {"$set": {"fecha": datetime.utcnow() - timedelta(days=1)}})
     _abrir_caja(client, cajero)
+    # Efectivo en la caja nueva para poder devolver
+    client.post("/api/cash/movimiento", headers=cajero["headers"], json={
+        "tipo": "ingreso", "monto": 100000, "motivo": "Cambio", "metodo_pago": "efectivo"})
 
 
 def test_devolucion_de_venta_vieja(client, admin, cajero, db):
@@ -116,3 +119,45 @@ def test_reportes_restan_las_devoluciones_el_dia_que_se_hacen(client, admin, caj
     semana = client.get("/api/reports/ventas?periodo=semana", headers=h).json()
     assert semana["total"] == 10000   # vendió 2, devolvió 1
     assert client.get("/api/reports/dashboard", headers=h).json()["total_ventas_hoy"] == -10000
+
+
+def test_monto_no_supera_lo_pagado_por_las_unidades(client, admin, cajero):
+    p = _producto(client, admin, stock1=10, precio=10000)
+    _abrir_caja(client, cajero)
+    v = _vender(client, cajero, p, 2)
+    url = f"/api/sales/{v['id']}/devolucion"
+    # 1 de 2 unidades: como máximo 10.000 (no los 20.000 de toda la venta)
+    assert client.post(url, headers=cajero["headers"], json={"items": [{"indice": 0, "cantidad": 1}], "monto": 20000}).status_code == 400
+    r = client.post(url, headers=cajero["headers"], json={"items": [{"indice": 0, "cantidad": 1}], "monto": 10000})
+    assert r.status_code == 200
+
+
+def test_sin_efectivo_en_caja_no_se_devuelve_en_efectivo(client, admin, cajero):
+    p = _producto(client, admin, stock1=10, precio=10000)
+    _abrir_caja(client, cajero)   # $ 10.000 iniciales
+    v = _vender(client, cajero, p, 2)   # + $ 20.000 en efectivo
+    # Se retira casi todo el efectivo
+    assert client.post("/api/cash/movimiento", headers=cajero["headers"], json={
+        "tipo": "egreso", "monto": 25000, "motivo": "Retiro", "metodo_pago": "efectivo"}).status_code == 200
+    # Un egreso que dejaría la caja en negativo
+    r = client.post("/api/cash/movimiento", headers=cajero["headers"], json={
+        "tipo": "egreso", "monto": 6000, "motivo": "Otro retiro", "metodo_pago": "efectivo"})
+    assert r.status_code == 400 and "En la caja hay $ 5.000,00" in r.json()["detail"]
+    url = f"/api/sales/{v['id']}/devolucion"
+    r = client.post(url, headers=cajero["headers"], json={"items": [{"indice": 0, "cantidad": 1}], "metodo": "efectivo"})
+    assert r.status_code == 400 and "efectivo" in r.json()["detail"]
+    # Por transferencia sí
+    r = client.post(url, headers=cajero["headers"], json={"items": [{"indice": 0, "cantidad": 1}], "metodo": "transferencia"})
+    assert r.status_code == 200, r.text
+    # Cancelar tampoco: devolvería $ 20.000 en efectivo que no están
+    assert client.put(f"/api/sales/{v['id']}/cancel", headers=cajero["headers"]).status_code == 400
+
+
+def test_reporte_por_vendedor_resta_devoluciones(client, admin, cajero, db):
+    p = _producto(client, admin, stock1=10, precio=10000)
+    _abrir_caja(client, cajero)
+    v = _vender(client, cajero, p, 2)
+    client.post(f"/api/sales/{v['id']}/devolucion", headers=cajero["headers"], json={
+        "items": [{"indice": 0, "cantidad": 1}], "metodo": "transferencia"})
+    r = client.get("/api/reports/ventas?periodo=dia", headers=admin["headers"]).json()
+    assert sum(f["total"] for f in r["por_vendedor"]) == r["total"] == 10000
